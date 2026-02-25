@@ -1,0 +1,221 @@
+{
+  "pages": [
+      {
+        "path": "owner/pages/index/index",
+        "style": {
+          "navigationBarTitleText": "智慧社区"
+        }
+      },
+      {
+        "path": "owner/pages/parking/index",
+        "style": {
+          "navigationBarTitleText": "停车管理"
+        }
+      },
+      {
+        "path": "owner/pages/topic/index",
+        "style": {
+          "navigationBarTitleText": "社区话题"
+        }
+      },
+      {
+        "path": "owner/pages/mine/index",
+        "style": {
+          "navigationBarTitleText": "个人中心"
+        }
+      },
+      {
+        "path": "owner/pages/communityService/index",
+        "style": {
+          "navigationBarTitleText": "社区服务"
+        }
+      },
+      {
+        "path": "owner/pages/communityService/pay-fee",
+        "style": {
+          "navigationBarTitleText": "费用缴纳"
+        }
+      },
+      {
+        "path": "owner/pages/communityService/visitor-apply",
+        "style": {
+          "navigationBarTitleText": "访客登记"
+        }
+      },
+      {
+        "path": "owner/pages/communityService/complaint",
+        "style": {
+          "navigationBarTitleText": "投诉建议"
+        }
+      },
+      {
+        "path": "owner/pages/communityService/activity-list",
+        "style": {
+          "navigationBarTitleText": "社区活动"
+        }
+      },
+      {
+        "path": "owner/pages/mine/profile",
+        "style": {
+          "navigationBarTitleText": "个人信息"
+        }
+      },
+      {
+        "path": "owner/pages/login/login",
+        "style": {
+          "navigationBarTitleText": "登录"
+        }
+      },
+      {
+        "path": "owner/pages/repair/repair",
+        "style": {
+          "navigationBarTitleText": "提交报修"
+        }
+      },
+      {
+        "path": "admin/pages/admin/repair-manage",
+        "style": {
+          "navigationBarTitleText": "报修管理",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/user-manage",
+        "style": {
+          "navigationBarTitleText": "用户管理",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/notice-manage",
+        "style": {
+          "navigationBarTitleText": "公告管理",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/parking-manage",
+        "style": {
+          "navigationBarTitleText": "停车管理",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/community-manage",
+        "style": {
+          "navigationBarTitleText": "社区管理",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/notice-edit",
+        "style": {
+          "navigationBarTitleText": "编辑公告",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/fee-manage",
+        "style": {
+          "navigationBarTitleText": "费用管理",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/complaint-manage",
+        "style": {
+          "navigationBarTitleText": "投诉处理",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/visitor-manage",
+        "style": {
+          "navigationBarTitleText": "访客审核",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/activity-manage",
+        "style": {
+          "navigationBarTitleText": "社区活动",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/activity-edit",
+        "style": {
+          "navigationBarTitleText": "发布活动",
+          "navigationStyle": "default"
+        }
+      },
+      {
+        "path": "owner/pages/notice/list",
+        "style": {
+          "navigationBarTitleText": "公告列表"
+        }
+      },
+      {
+        "path": "owner/pages/notice/detail",
+        "style": {
+          "navigationBarTitleText": "公告详情"
+        }
+      },
+	  {
+	    "path": "owner/pages/topic/detail",
+	    "style": {
+	      "navigationBarTitleText": "话题详情"
+	    }
+	  },
+	  {
+	    "path": "owner/pages/topic/list",
+	    "style": {
+	      "navigationBarTitleText": "话题详情"
+	    }
+	  },
+	  {
+		"path":"owner/pages/parking/recharge",
+		"style":{
+			"navigationBarTitleText":"充值页面"
+		}
+	  },
+	  {
+	  	"path":"owner/pages/parking/space-detail",
+	  	"style":{
+	  			"navigationBarTitleText":"车位详细页面"
+	  		}
+	  }
+    ],
+  "tabBar": {
+    "color": "#7A7E83",
+    "selectedColor": "#2D81FF",
+    "borderStyle": "black",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "owner/pages/index/index",
+        "iconPath": "static/tab/home-active.png",
+        "selectedIconPath": "static/tab/home-active.png",
+        "text": "首页"
+      },
+      {
+        "pagePath": "owner/pages/parking/index",
+        "iconPath": "static/tab/service-active.png",
+        "selectedIconPath": "static/tab/service-active.png",
+        "text": "停车"
+      },
+      {
+        "pagePath": "owner/pages/topic/index",
+        "iconPath": "static/tab/neighbor-active.png",
+        "selectedIconPath": "static/tab/neighbor-active.png",
+        "text": "话题"
+      },
+      {
+        "pagePath": "owner/pages/mine/index",
+        "iconPath": "static/tab/mine.png",
+        "selectedIconPath": "static/tab/mine.png",
+        "text": "我的"
+      }
+    ]
+  }
+}

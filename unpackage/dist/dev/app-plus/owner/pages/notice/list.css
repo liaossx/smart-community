@@ -1,0 +1,67 @@
+
+.page[data-v-4f493c5b] {
+  min-height: 100vh;
+  padding: 1rem 0.875rem 3.75rem;
+  background: #f5f6fa;
+}
+
+/* 标题 */
+.section-header[data-v-4f493c5b] {
+  margin-bottom: 0.75rem;
+}
+.section-title[data-v-4f493c5b] {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2430;
+}
+
+/* 列表 */
+.notice-list[data-v-4f493c5b] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+/* 单条公告（卡片感） */
+.notice-item[data-v-4f493c5b] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.875rem;
+  background: #ffffff;
+  border-radius: 0.75rem;
+}
+
+/* 左侧内容 */
+.notice-main[data-v-4f493c5b] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+  flex: 1;
+  margin-right: 0.625rem;
+}
+.notice-title[data-v-4f493c5b] {
+  font-size: 0.875rem;
+  color: #1f2430;
+  line-height: 1.4;
+}
+
+/* 未读样式（不刺眼） */
+.notice-title.unread[data-v-4f493c5b] {
+  font-weight: 600;
+  color: #ff4d4f;
+}
+.notice-time[data-v-4f493c5b] {
+  font-size: 0.75rem;
+  color: #a0a4ac;
+}
+
+/* 标签 */
+.notice-tag[data-v-4f493c5b] {
+  font-size: 0.6875rem;
+  color: #2d81ff;
+  background: rgba(45, 129, 255, 0.12);
+  padding: 0.25rem 0.625rem;
+  border-radius: 31.21875rem;
+  white-space: nowrap;
+}

@@ -1,0 +1,53 @@
+
+.page { padding: 0.625rem; background-color: #f5f6fa; min-height: 100vh;
+}
+.title { font-size: 1.1875rem; font-weight: 700; color: #222; margin-bottom: 0.375rem;
+}
+.meta { font-size: 0.8125rem; color: #999; margin-bottom: 0.75rem;
+}
+.content { white-space: pre-wrap; line-height: 1.8; font-size: 0.9375rem; color: #333; padding: 0.625rem; background: #fff; border-radius: 0.5rem; box-shadow: 0 0.0625rem 0.1875rem rgba(0,0,0,0.05); margin-bottom: 0.9375rem;
+}
+.section-title { font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.5rem;
+}
+.comment-item { display: flex; margin-bottom: 0.625rem; background: #fff; border-radius: 0.5rem; padding: 0.5rem; box-shadow: 0 0.03125rem 0.125rem rgba(0,0,0,0.05);
+}
+.avatar { width: 1.875rem; height: 1.875rem; border-radius: 50%; margin-right: 0.5rem;
+}
+.comment-body { flex: 1;
+}
+.comment-header { display: flex; align-items: center; margin-bottom: 0.1875rem;
+}
+.comment-author { font-weight: 600; color: #007aff; margin-right: 0.25rem;
+}
+.comment-badge { font-size: 0.625rem; color: #fff; background: #ff7a45; padding: 0.0625rem 0.25rem; border-radius: 0.375rem;
+}
+.comment-content { font-size: 0.875rem; color: #333; line-height: 1.6; margin-bottom: 0.1875rem;
+}
+.comment-footer { display: flex; gap: 0.625rem; font-size: 0.75rem; color: #999;
+}
+.comment-footer uni-text { cursor: pointer;
+}
+.comment-like { color: #2d81ff;
+}
+.comment-reply { color: #409eff;
+}
+.reply-list { margin-left: 2.375rem; margin-top: 0.375rem;
+}
+.reply-item { background: #f0f4ff; padding: 0.3125rem 0.375rem; border-radius: 0.375rem; margin-bottom: 0.25rem;
+}
+.reply-author { font-weight: 600; color: #0051cc; margin-right: 0.125rem;
+}
+.reply-content { color: #333; font-size: 0.8125rem;
+}
+.reply-input { display: flex; gap: 0.3125rem; margin-top: 0.3125rem;
+}
+.reply-input uni-input { flex: 1; border: 0.03125rem solid #ccc; border-radius: 0.375rem; padding: 0.3125rem;
+}
+.reply-input uni-button { padding: 0.3125rem 0.625rem; background-color: #2d81ff; color: #fff; border-radius: 0.375rem;
+}
+.comment-input { flex-direction: row; display: flex; margin-top: 0.625rem; background: #fff; padding: 0.375rem; border-radius: 0.625rem; box-shadow: 0 0.03125rem 0.1875rem rgba(0,0,0,0.08); align-items: center;
+}
+.comment-input uni-input { flex: 1; border: none; padding: 0.3125rem 0.4375rem; border-radius: 0.5rem; background: #f0f2f5; font-size: 0.875rem; color: #333;
+}
+.comment-input uni-button { margin-left: 0.375rem; padding: 0.3125rem 0.75rem; background: linear-gradient(90deg, #2d81ff, #4facfe); color: #fff; font-size: 0.875rem; border-radius: 0.5rem; font-weight: 600; box-shadow: 0 0.0625rem 0.1875rem rgba(0,0,0,0.1);
+}

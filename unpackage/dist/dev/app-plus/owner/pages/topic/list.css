@@ -1,0 +1,17 @@
+
+.topic-content {
+  display: -webkit-box;
+  -webkit-line-clamp: 3; 
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.6;
+  color: #555;
+  margin: 0.375rem 0;
+}
+.post-textarea {
+  min-height: 9.375rem;
+  padding: 0.625rem;
+  line-height: 1.7;
+  font-size: 0.875rem;
+  box-sizing: border-box;
+}

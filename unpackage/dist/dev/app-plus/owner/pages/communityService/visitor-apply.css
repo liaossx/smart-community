@@ -1,0 +1,30 @@
+
+.container[data-v-c952a55e] {
+  padding: 0.9375rem;
+  background-color: #f5f7fa;
+  min-height: 100vh;
+}
+.form-item[data-v-c952a55e] {
+  margin-bottom: 0.9375rem;
+  background: white;
+  padding: 0.625rem;
+  border-radius: 0.3125rem;
+}
+.label[data-v-c952a55e] {
+  display: block;
+  font-size: 0.875rem;
+  color: #333;
+  margin-bottom: 0.46875rem;
+}
+.input[data-v-c952a55e], .picker[data-v-c952a55e] {
+  height: 2.5rem;
+  line-height: 2.5rem;
+  border-bottom: 0.03125rem solid #eee;
+  font-size: 0.9375rem;
+}
+.submit-btn[data-v-c952a55e] {
+  margin-top: 1.5625rem;
+  background: #2D81FF;
+  color: white;
+  border-radius: 1.25rem;
+}

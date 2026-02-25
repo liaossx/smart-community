@@ -1,0 +1,114 @@
+
+.page[data-v-d9f42c5e] {
+  min-height: 100vh;
+  background: #f5f6fa;
+  padding: 0.875rem;
+}
+.profile-card[data-v-d9f42c5e] {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(120deg, #f9d976, #f39f86);
+  border-radius: 0.875rem;
+  padding: 0.875rem;
+  color: #fff;
+  margin-bottom: 0.75rem;
+}
+.avatar[data-v-d9f42c5e] {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  margin-right: 0.75rem;
+}
+.info[data-v-d9f42c5e] {
+  flex: 1;
+}
+.name[data-v-d9f42c5e] {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+.meta[data-v-d9f42c5e] {
+  font-size: 0.8125rem;
+  opacity: 0.85;
+  margin-top: 0.1875rem;
+}
+.service-tag[data-v-d9f42c5e] {
+  padding: 0.375rem 0.75rem;
+  border-radius: 31.21875rem;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 0.75rem;
+}
+.section[data-v-d9f42c5e] {
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  margin-bottom: 0.625rem;
+}
+.section-header[data-v-d9f42c5e] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.375rem;
+}
+.section-title[data-v-d9f42c5e] {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.section-link[data-v-d9f42c5e] {
+  font-size: 0.8125rem;
+  color: #2d81ff;
+}
+.entry-card[data-v-d9f42c5e] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f6f8ff;
+  border-radius: 0.625rem;
+  padding: 0.625rem;
+  margin-top: 0.5rem;
+}
+.entry-title[data-v-d9f42c5e] {
+  font-size: 0.875rem;
+  color: #1f2430;
+}
+.entry-desc[data-v-d9f42c5e] {
+  font-size: 0.75rem;
+  color: #7a7e8a;
+}
+.entry-action[data-v-d9f42c5e] {
+  font-size: 0.75rem;
+  color: #2d81ff;
+}
+.bill-item[data-v-d9f42c5e] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid #f0f1f6;
+}
+.bill-item[data-v-d9f42c5e]:last-child {
+  border-bottom: none;
+}
+.bill-title[data-v-d9f42c5e] {
+  font-size: 0.875rem;
+  color: #1f2430;
+}
+.bill-desc[data-v-d9f42c5e] {
+  font-size: 0.75rem;
+  color: #7a7e8a;
+  margin-top: 0.1875rem;
+}
+.bill-amount[data-v-d9f42c5e] {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.bill-amount.done[data-v-d9f42c5e] {
+  color: #1f2430;
+}
+.bill-amount.pending[data-v-d9f42c5e] {
+  color: #ff7a45;
+}

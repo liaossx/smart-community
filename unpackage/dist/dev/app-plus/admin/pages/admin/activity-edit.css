@@ -1,0 +1,38 @@
+
+.edit-container[data-v-3b54f228] {
+  padding: 0.9375rem;
+}
+.form-item[data-v-3b54f228] {
+  margin-bottom: 0.9375rem;
+}
+.label[data-v-3b54f228] {
+  display: block;
+  font-size: 0.875rem;
+  color: #333;
+  margin-bottom: 0.46875rem;
+}
+.input[data-v-3b54f228], .picker[data-v-3b54f228] {
+  border: 0.03125rem solid #eee;
+  height: 2.5rem;
+  line-height: 2.5rem;
+  padding: 0 0.625rem;
+  border-radius: 0.3125rem;
+  font-size: 0.875rem;
+  background: #f9f9f9;
+}
+.textarea[data-v-3b54f228] {
+  border: 0.03125rem solid #eee;
+  width: 100%;
+  height: 6.25rem;
+  padding: 0.625rem;
+  border-radius: 0.3125rem;
+  font-size: 0.875rem;
+  background: #f9f9f9;
+  box-sizing: border-box;
+}
+.submit-btn[data-v-3b54f228] {
+  background: #2D81FF;
+  color: white;
+  border-radius: 1.25rem;
+  margin-top: 1.5625rem;
+}

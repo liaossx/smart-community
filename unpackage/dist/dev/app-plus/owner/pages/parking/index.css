@@ -1,0 +1,63 @@
+
+.page[data-v-b7a6754f] {
+  min-height: 100vh;
+  padding: 1rem 0.875rem 3.75rem;
+  background: #f5f6fa;
+}
+
+/* 顶部余额卡片 */
+.balance-card[data-v-b7a6754f] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #5ba8ff, #386bff);
+  color: #fff;
+  margin-bottom: 1rem;
+}
+.balance-title[data-v-b7a6754f] { font-size: 0.9375rem; font-weight: 600;
+}
+.balance-amount[data-v-b7a6754f] { font-size: 0.875rem; margin-top: 0.25rem;
+}
+.highlight[data-v-b7a6754f] { color: #ffbf00; font-weight: 600;
+}
+.btn.primary.small-btn[data-v-b7a6754f] {
+  background-color: #fff;
+  color: #386bff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* 我的车辆 */
+.section[data-v-b7a6754f] { background: #fff; border-radius: 0.75rem; padding: 0.875rem; margin-bottom: 0.75rem;
+}
+.section-header[data-v-b7a6754f] { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.625rem;
+}
+.section-title[data-v-b7a6754f] { font-size: 0.875rem; font-weight: 600; color: #1f2430;
+}
+.section-link[data-v-b7a6754f] { font-size: 0.8125rem; color: #2d81ff;
+}
+.car-card[data-v-b7a6754f] { background: #f6f8ff; border-radius: 0.625rem; padding: 0.75rem; margin-bottom: 0.625rem;
+}
+.car-card-header[data-v-b7a6754f] { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;
+}
+.plate[data-v-b7a6754f] { font-size: 0.875rem; font-weight: 600;
+}
+.car-status.status-on[data-v-b7a6754f] { color: #00c851; font-weight: 600;
+}
+.car-status.status-off[data-v-b7a6754f] { color: #ff4444; font-weight: 600;
+}
+.car-card-body .row[data-v-b7a6754f] { display: flex; justify-content: space-between; margin-bottom: 0.375rem;
+}
+.label[data-v-b7a6754f] { color: #7a7e8a; font-size: 0.75rem;
+}
+.value[data-v-b7a6754f] { font-size: 0.8125rem; color: #1f2430;
+}
+.car-card-footer[data-v-b7a6754f] { display: flex; gap: 0.75rem;
+}
+.btn.ghost[data-v-b7a6754f] { background: #fff; border: 0.03125rem solid #386bff; color: #386bff; border-radius: 0.5rem; padding: 0.375rem 1rem;
+}
+.btn.primary[data-v-b7a6754f] { background-color: #386bff; color: #fff; padding: 0.375rem 1rem; border-radius: 0.5rem;
+}

@@ -1,0 +1,104 @@
+
+.repair-container[data-v-62de0cb9] {
+  padding: 1.25rem;
+}
+.repair-title[data-v-62de0cb9] {
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 1.875rem;
+  color: #333;
+}
+.input-item[data-v-62de0cb9] {
+  display: flex;
+  align-items: center;
+  padding: 0.9375rem 0;
+  border-bottom: 0.03125rem solid #eee;
+}
+.input-textarea[data-v-62de0cb9] {
+  align-items: flex-start;
+}
+.input-icon[data-v-62de0cb9] {
+  color: #2D81FF;
+  margin-right: 0.625rem;
+  font-size: 1rem;
+  min-width: 1.25rem;
+}
+uni-input[data-v-62de0cb9], uni-textarea[data-v-62de0cb9] {
+  flex: 1;
+  font-size: 1rem;
+  color: #333;
+}
+.placeholder-style[data-v-62de0cb9] {
+  color: #999;
+}
+.upload-section[data-v-62de0cb9] {
+  flex: 1;
+}
+.upload-label[data-v-62de0cb9] {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 0.625rem;
+  display: block;
+}
+.image-preview[data-v-62de0cb9] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+.preview-item[data-v-62de0cb9] {
+  position: relative;
+  width: 3.75rem;
+  height: 3.75rem;
+}
+.preview-image[data-v-62de0cb9] {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.3125rem;
+}
+.delete-btn[data-v-62de0cb9] {
+  position: absolute;
+  top: -0.3125rem;
+  right: -0.3125rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: #ff4757;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+}
+.upload-btn[data-v-62de0cb9] {
+  width: 3.75rem;
+  height: 3.75rem;
+  border: 0.0625rem dashed #ccc;
+  border-radius: 0.3125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upload-icon[data-v-62de0cb9] {
+  font-size: 1.5rem;
+  color: #999;
+}
+.submit-btn[data-v-62de0cb9] {
+  background: #2D81FF;
+  color: white;
+  border-radius: 1.5625rem;
+  margin: 1.875rem 0 0.9375rem;
+  height: 2.8125rem;
+  line-height: 2.8125rem;
+}
+.submit-btn[data-v-62de0cb9]:disabled {
+  background: #ccc;
+}
+.back-btn[data-v-62de0cb9] {
+  border: 0.03125rem solid #2D81FF;
+  color: #2D81FF;
+  border-radius: 1.5625rem;
+  height: 2.5rem;
+  line-height: 2.5rem;
+  background: white;
+}

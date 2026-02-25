@@ -1,0 +1,56 @@
+
+.page {
+  padding: 0.625rem;
+}
+.balance-card {
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  border-radius: 0.625rem;
+  padding: 1.25rem;
+  color: #fff;
+  margin-bottom: 0.9375rem;
+}
+.balance-card .title {
+  font-size: 0.8125rem;
+  opacity: 0.9;
+}
+.balance-card .amount {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-top: 0.3125rem;
+}
+.section {
+  margin-bottom: 0.9375rem;
+}
+.section-title {
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.amount-list {
+  display: flex;
+  gap: 0.625rem;
+}
+.amount-item {
+  flex: 1;
+  text-align: center;
+  padding: 0.625rem 0;
+  border-radius: 0.375rem;
+  border: 1px solid #ddd;
+  font-size: 0.875rem;
+}
+.amount-item.active {
+  background-color: #4facfe;
+  color: #fff;
+  border-color: #4facfe;
+}
+.amount-input {
+  border: 1px solid #ddd;
+  border-radius: 0.375rem;
+  padding: 0.625rem;
+  font-size: 0.875rem;
+}
+.btn.primary {
+  background-color: #4facfe;
+  color: #fff;
+  margin-top: 1.25rem;
+}

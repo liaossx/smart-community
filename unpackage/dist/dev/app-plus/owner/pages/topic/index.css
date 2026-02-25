@@ -1,0 +1,142 @@
+
+.mask[data-v-8ddf5b97] {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.dialog[data-v-8ddf5b97] {
+  width: 90%;
+  max-height: 80vh;        /* 弹窗最大高度 */
+  background: #fff;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.dialog-title[data-v-8ddf5b97] {
+  padding: 16px;
+  font-size: 18px;
+  font-weight: bold;
+  border-bottom: 1px solid #eee;
+}
+.dialog-body[data-v-8ddf5b97] {
+  flex: 1;                 /* 占据中间空间 */
+  padding: 16px;
+  overflow: hidden;
+}
+.form-item[data-v-8ddf5b97] {
+  margin-bottom: 16px;
+}
+.label[data-v-8ddf5b97] {
+  display: block;
+  margin-bottom: 6px;
+  color: #555;
+}
+.content-textarea[data-v-8ddf5b97] {
+  width: 100%;
+  min-height: 120px;
+  max-height: 300px;       /* 🔴 限制 textarea 最大高度 */
+  box-sizing: border-box;
+}
+.dialog-actions[data-v-8ddf5b97] {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid #eee;
+}
+.topic-content[data-v-8ddf5b97] {
+	  line-height: 1.6;
+	  color: #555;
+	  margin: 8px 0;
+}
+.toggle-btn[data-v-8ddf5b97] {
+	  color: #409eff;
+	  font-size: 12px;
+	  margin-left: 5px;
+}
+.topic-card[data-v-8ddf5b97] {
+	  padding: 12px;
+	  border-bottom: 1px solid #eee;
+}
+.topic-actions[data-v-8ddf5b97] {
+	  display: flex;
+	  gap: 15px;
+	  margin-top: 6px;
+}
+.liked[data-v-8ddf5b97] {
+	  color: #409eff;
+}
+.page[data-v-8ddf5b97] {
+  padding: 0.625rem;
+  background: #f5f6fa;
+}
+.section-header[data-v-8ddf5b97] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.625rem;
+}
+.section-title[data-v-8ddf5b97] { font-size: 1rem; font-weight: bold;
+}
+.section-link[data-v-8ddf5b97] { color: #2d81ff; font-size: 0.875rem;
+}
+.topic-card[data-v-8ddf5b97] {
+  background: #fff;
+  padding: 0.625rem;
+  margin-bottom: 0.625rem;
+  border-radius: 0.625rem;
+  box-shadow: 0 0.0625rem 0.1875rem rgba(0,0,0,0.05);
+}
+.card-header[data-v-8ddf5b97] { display: flex; justify-content: space-between; align-items: center;
+}
+.topic-title[data-v-8ddf5b97] { font-size: 0.9375rem; font-weight: 600;
+}
+.topic-meta[data-v-8ddf5b97] { font-size: 0.75rem; color: #7a7e8a; margin-top: 0.1875rem;
+}
+.badge[data-v-8ddf5b97] { font-size: 0.75rem; color: #ff7a45; background: rgba(255,122,69,0.16); padding: 0.125rem 0.375rem; border-radius: 31.21875rem;
+}
+.topic-content[data-v-8ddf5b97] { margin-top: 0.5rem; font-size: 0.875rem; color: #44495a; line-height: 1.6;
+}
+.topic-actions[data-v-8ddf5b97] { margin-top: 0.5rem; display: flex; gap: 0.75rem; font-size: 0.8125rem; color: #7a7e8a;
+}
+.like-btn[data-v-8ddf5b97] { cursor: pointer; color: #2d81ff;
+}
+.liked[data-v-8ddf5b97] { cursor: default; color: #999;
+}
+.comment-box[data-v-8ddf5b97] { margin-top: 0.3125rem; display: flex; gap: 0.3125rem;
+}
+.comment-box uni-input[data-v-8ddf5b97] { flex: 1; padding: 0.1875rem; border: 0.03125rem solid #ccc; border-radius: 0.25rem;
+}
+.comment-box uni-button[data-v-8ddf5b97] { padding: 0.1875rem 0.375rem; background: #2d81ff; color: #fff; border-radius: 0.25rem;
+}
+.mask[data-v-8ddf5b97] {
+  position: fixed; top:0; left:0; width:100%; height:100%;
+  background: rgba(0,0,0,0.5); display: flex; justify-content:center; align-items:center;
+}
+.dialog[data-v-8ddf5b97] {
+  width: 90%; background: #fff; border-radius: 0.625rem; padding: 0.625rem;
+}
+.dialog-title[data-v-8ddf5b97] { font-size: 1rem; font-weight: 600; margin-bottom: 0.625rem;
+}
+.form-item[data-v-8ddf5b97] { margin-bottom: 0.5rem;
+}
+.label[data-v-8ddf5b97] { font-size: 0.8125rem; margin-bottom: 0.1875rem; display:block;
+}
+uni-input[data-v-8ddf5b97], uni-textarea[data-v-8ddf5b97] { width: 100%; padding: 0.3125rem; border: 0.03125rem solid #ccc; border-radius: 0.375rem;
+}
+uni-textarea[data-v-8ddf5b97] { min-height: 3.125rem;
+}
+.dialog-actions[data-v-8ddf5b97] { display: flex; justify-content: flex-end; gap: 0.375rem;
+}
+.btn[data-v-8ddf5b97] { padding: 0.3125rem 0.625rem; border-radius: 0.375rem; font-size: 0.875rem;
+}
+.btn.primary[data-v-8ddf5b97] { background: #2d81ff; color: #fff;
+}
+.btn.ghost[data-v-8ddf5b97] { background: #fff; color: #2d81ff; border: 0.03125rem solid #2d81ff;
+}
