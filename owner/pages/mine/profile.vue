@@ -65,7 +65,7 @@ export default {
     async loadData() {
       // 优先从接口获取最新信息
       try {
-        const res = await request('/api/user/info', 'GET')
+        const res = await request.get('/api/user/info')
         this.userInfo = {
           ...this.userInfo,
           ...res,

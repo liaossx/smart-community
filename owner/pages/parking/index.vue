@@ -97,6 +97,7 @@ export default {
     // 查询我的车位
     async loadCars() {
       try {
+        uni.showLoading({ title: '加载中...' })
         const list = await request.get('/api/parking/space/my')
 
         const format = (t) => {
@@ -130,6 +131,8 @@ export default {
       } catch (e) {
         console.error(e)
         uni.showToast({ title: '获取车位失败', icon: 'none' })
+      } finally {
+        uni.hideLoading()
       }
     },
 

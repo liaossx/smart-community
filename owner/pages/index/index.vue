@@ -135,25 +135,9 @@ export default {
     },
 
     gotoNoticeList() {
-      console.log("【DEBUG】点击查看全部触发了吗？") // 检查事件是否触发
-    
-      try {
-        const pages = getCurrentPages()
-        console.log("【DEBUG】当前页面栈 =", pages.map(p => p.route)) // 打印当前页面栈
-    
-        uni.navigateTo({ 
-          // 路径必须和 pages.json 一致，不要加开头的 '/'
-          url: "/owner/pages/notice/list",
-          success(res) {
-            console.log("【DEBUG】navigateTo 成功", res) // 跳转成功
-          },
-          fail(err) {
-            console.error("【DEBUG】navigateTo 失败", err) // 跳转失败
-          }
-        })
-      } catch (err) {
-        console.error("【DEBUG】gotoNoticeList 捕获异常", err) // 捕获异常
-      }
+      uni.navigateTo({ 
+        url: "/owner/pages/notice/list"
+      })
     },
     openNoticeDetail(item) {
       uni.navigateTo({
@@ -174,7 +158,6 @@ export default {
     /** 请求公告 */
    async loadNotices() {
      const user = uni.getStorageSync("userInfo")
-     console.log("【DEBUG】用户信息 =", user)
    
      if (!user?.id) return
    
@@ -199,8 +182,6 @@ export default {
          readFlag: n.readFlag,
          tag: this.getTag(n.targetType)
        }))
-   
-       console.log("【DEBUG】最终 notices =", this.notices)
    
      } catch (err) {
        console.error("公告加载失败", err)
@@ -249,6 +230,7 @@ export default {
         case "ALL": return "通知"
         case "COMMUNITY": return "小区"
         case "BUILDING": return "楼栋"
+        case "USER": return "提醒"
         default: return "公告"
       }
     },

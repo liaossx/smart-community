@@ -30,9 +30,23 @@
   background: #f9f9f9;
   box-sizing: border-box;
 }
+.btn-group[data-v-3b54f228] {
+  display: flex;
+  gap: 0.625rem;
+  margin-top: 1.5625rem;
+}
 .submit-btn[data-v-3b54f228] {
+  flex: 1;
+  border-radius: 1.25rem;
+  font-size: 0.9375rem;
+  height: 2.75rem;
+  line-height: 2.75rem;
+}
+.submit-btn.draft[data-v-3b54f228] {
+  background: #f0f2f5;
+  color: #666;
+}
+.submit-btn.publish[data-v-3b54f228] {
   background: #2D81FF;
   color: white;
-  border-radius: 1.25rem;
-  margin-top: 1.5625rem;
 }

@@ -5,11 +5,18 @@
         <image :src="item.cover" mode="aspectFill" class="cover-img"></image>
         <view class="content">
           <text class="title">{{ item.title }}</text>
-          <text class="time">{{ item.time }}</text>
-          <text class="location">{{ item.location }}</text>
-          <text class="status-tag" :class="item.status">{{ item.statusText }}</text>
+          <text class="time">时间：{{ formatTime(item.time) }}</text>
+          <text class="location">地点：{{ item.location }}</text>
+          <text class="signup-count">报名：{{ item.signupCount }}/{{ item.maxCount || '不限' }}</text>
+          <text class="status-tag" :class="getStatusClass(item.status)">{{ getStatusText(item.status) }}</text>
         </view>
-        <button class="join-btn" @click="handleJoin(item)">立即报名</button>
+        <button class="join-btn" @click="handleJoin(item)" :disabled="item.status !== 'ONLINE' && item.status !== 'PUBLISHED'">
+          {{ getBtnText(item.status) }}
+        </button>
+      </view>
+      
+      <view v-if="activities.length === 0" class="empty-state">
+        <text>暂无社区活动</text>
       </view>
     </view>
   </view>
@@ -24,44 +31,68 @@ export default {
       activities: []
     }
   },
-  onLoad() {
+  onShow() {
     this.loadData()
   },
   methods: {
     async loadData() {
       try {
-        const res = await request('/api/activity/list', 'GET')
-        const list = res || []
+        // 使用 POST + 查询参数获取列表 (与管理端保持一致或使用业主端专属接口)
+        // 假设业主端接口也复用 /api/activity/list 或者 /api/activity/my
+        // 这里尝试使用 /api/activity/list，并加上 status=PUBLISHED (只看已发布的)
+        // 如果后端接口是公开的，GET /api/activity/list 应该没问题
+        const res = await request('/api/activity/list', { status: 'PUBLISHED' }, 'GET')
+        const list = res.records || res || []
+        
         this.activities = list.map(item => ({
           id: item.id,
           title: item.title,
           time: item.startTime,
           location: item.location,
-          status: this.getStatus(item),
-          statusText: this.getStatusText(item),
+          status: item.status, // PUBLISHED/ONLINE/ENDED
+          signupCount: item.signupCount || 0,
+          maxCount: item.maxCount,
           cover: item.cover || '/static/default-cover.png'
         }))
       } catch (e) {
         console.error('获取活动列表失败', e)
+        uni.showToast({ title: '加载失败', icon: 'none' })
       }
     },
-    getStatus(item) {
-      const now = new Date()
-      const start = new Date(item.startTime)
-      if (now < start) return 'upcoming'
-      if (item.status === 'ended') return 'ended' // 假设后端有status字段
-      return 'active'
-    },
-    getStatusText(item) {
-      const status = this.getStatus(item)
+    
+    getStatusClass(status) {
       const map = {
-        'upcoming': '即将开始',
-        'active': '报名中',
-        'ended': '已结束'
+        'PUBLISHED': 'status-published',
+        'ONLINE': 'status-online',
+        'ENDED': 'status-ended'
       }
-      return map[status]
+      return map[status] || 'status-default'
     },
+    
+    getStatusText(status) {
+      const map = {
+        'PUBLISHED': '报名中',
+        'ONLINE': '进行中',
+        'ENDED': '已结束'
+      }
+      return map[status] || status
+    },
+    
+    getBtnText(status) {
+      if (status === 'ENDED') return '活动已结束'
+      if (status === 'ONLINE') return '立即报名'
+      if (status === 'PUBLISHED') return '立即报名'
+      return '查看详情'
+    },
+    
+    formatTime(time) {
+      if (!time) return ''
+      return time.replace('T', ' ')
+    },
+    
     handleJoin(item) {
+      if (item.status === 'ENDED') return
+      
       uni.showModal({
         title: '确认报名',
         content: `确认报名参加 ${item.title} 吗？`,
@@ -70,18 +101,25 @@ export default {
             try {
               uni.showLoading({ title: '报名中...' })
               const userInfo = uni.getStorageSync('userInfo')
+              console.log('当前用户信息:', userInfo)
+              console.log('准备报名活动:', item)
               
-              await request('/api/activity/join', {
-                userId: userInfo?.id || userInfo?.userId,
-                activityId: item.id
-              }, 'POST')
+              // 调用报名接口
+              // 后端要求：POST /join，参数必须拼接在URL上（Query Param）
+              // 例如：/api/activity/join?activityId=22&userId=5
+              // 注意：request工具的第二个参数如果是对象，默认会放入Body（对于POST），
+              // 所以我们需要手动拼接URL，或者让request工具支持Query Param
+              
+              const targetUrl = `/api/activity/join?activityId=${item.id}&userId=${userInfo.id || userInfo.userId}`;
+              
+              await request(targetUrl, {}, 'POST')
               
               uni.hideLoading()
               uni.showToast({ title: '报名成功', icon: 'success' })
-              this.loadData()
+              this.loadData() // 刷新列表
             } catch (e) {
               uni.hideLoading()
-              uni.showToast({ title: '报名失败', icon: 'none' })
+              uni.showToast({ title: e.message || '报名失败', icon: 'none' })
             }
           }
         }
@@ -120,7 +158,7 @@ export default {
   display: block;
   margin-bottom: 10rpx;
 }
-.time, .location {
+.time, .location, .signup-count {
   font-size: 26rpx;
   color: #666;
   display: block;
@@ -134,19 +172,24 @@ export default {
   padding: 4rpx 12rpx;
   border-radius: 6rpx;
 }
-.status-tag.active {
-  background: #e6f7ff;
-  color: #1890ff;
-}
-.status-tag.upcoming {
-  background: #f6ffed;
-  color: #52c41a;
-}
+.status-published { background: #e6f7ff; color: #1890ff; }
+.status-online { background: #f6ffed; color: #52c41a; }
+.status-ended { background: #f5f5f5; color: #999; }
+
 .join-btn {
   margin: 20rpx;
   background: #2D81FF;
   color: white;
   border-radius: 40rpx;
   font-size: 28rpx;
+}
+.join-btn[disabled] {
+  background: #ccc;
+  color: #fff;
+}
+.empty-state {
+  text-align: center;
+  padding: 100rpx 0;
+  color: #999;
 }
 </style>

@@ -93,7 +93,7 @@ export default {
     }
   },
   onLoad() {
-    this.loadTopics()
+    // onLoad中移除调用，避免与onShow重复
   },
   onShow() {
     this.userInfo = uni.getStorageSync('userInfo') || {}
@@ -101,7 +101,6 @@ export default {
       this.userInfo.id = this.userInfo.userId
     }
     this.loadTopics()
-    console.log('【DEBUG】话题页 userInfo:', this.userInfo)
   },
   methods: {
     async loadTopics() {
@@ -212,7 +211,7 @@ export default {
 
     goDetail(topicId) {
       uni.navigateTo({
-        url: `/pages/topic/detail?id=${topicId}`
+        url: `/owner/pages/topic/detail?id=${topicId}`
       })
     }
   }

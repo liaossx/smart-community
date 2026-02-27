@@ -44,22 +44,43 @@
         <view v-else-if="complaintList.length > 0" class="complaint-list">
           <view v-for="item in complaintList" :key="item.id" class="complaint-item">
             <view class="item-header">
-              <text class="item-title">{{ item.type }}</text>
+              <view class="title-row">
+                <text class="item-title">{{ item.type }}</text>
+                <text class="time-text">{{ formatTime(item.createTime) }}</text>
+              </view>
               <text class="status-tag" :class="getStatusClass(item.status)">
                 {{ getStatusText(item.status) }}
               </text>
             </view>
             <view class="item-content">
               <text class="content-text">{{ item.content }}</text>
+              <view v-if="item.images" class="image-preview">
+                 <!-- 假设 images 是逗号分隔的字符串 -->
+                 <image 
+                   v-for="(img, index) in item.images.split(',')" 
+                   :key="index" 
+                   :src="img" 
+                   mode="aspectFill" 
+                   class="complain-img"
+                   @click="previewImage(item.images, index)"
+                 ></image>
+              </view>
             </view>
             <view class="item-info">
-              <view class="info-row">
-                <text class="label">投诉人：</text>
-                <text class="value">{{ item.ownerName }} ({{ item.buildingNo }}{{ item.houseNo }})</text>
-              </view>
-              <view class="info-row">
-                <text class="label">时间：</text>
-                <text class="value">{{ formatTime(item.createTime) }}</text>
+                <view class="info-row">
+                  <text class="label">投诉人：</text>
+                  <!-- 优先使用 ownerName (业主实名)，如果没有则用 userName (用户名)，再没有则显示 '匿名' -->
+                  <text class="value">{{ item.ownerName || item.userName || '匿名' }} <text class="phone" v-if="item.phone" @click="makeCall(item.phone)">{{ item.phone }}</text></text>
+                </view>
+                <view class="info-row">
+                  <text class="label">房号：</text>
+                  <!-- 如果有楼栋号和房号则显示，否则显示 '未绑定房屋' -->
+                  <text class="value" v-if="item.buildingNo && item.houseNo">{{ item.buildingNo }}栋{{ item.houseNo }}室</text>
+                  <text class="value" v-else>未绑定房屋</text>
+                </view>
+              <view v-if="item.status === 'processed'" class="result-box">
+                <text class="label">处理结果：</text>
+                <text class="value">{{ item.result }}</text>
               </view>
             </view>
             
@@ -72,11 +93,11 @@
                 立即处理
               </button>
               <button 
-                v-else 
-                class="action-btn detail" 
-                @click="viewDetail(item)"
+                class="action-btn call" 
+                v-if="item.phone"
+                @click="makeCall(item.phone)"
               >
-                查看详情
+                联系业主
               </button>
             </view>
           </view>
@@ -157,7 +178,10 @@ export default {
           id: item.id,
           type: item.type,
           content: item.content,
-          ownerName: item.ownerName,
+          images: item.images, // 需要后端返回图片URL
+          ownerName: item.ownerName, // 业主实名 (可能为空)
+          userName: item.userName,   // 登录用户名 (通常不为空)
+          phone: item.phone, // 需要后端返回手机号
           buildingNo: item.buildingNo,
           houseNo: item.houseNo,
           createTime: item.createTime,
@@ -231,6 +255,20 @@ export default {
       }
     },
     
+    makeCall(phone) {
+      if (!phone) return
+      uni.makePhoneCall({ phoneNumber: phone })
+    },
+    
+    previewImage(images, index) {
+      if (!images) return
+      const urls = images.split(',')
+      uni.previewImage({
+        current: urls[index],
+        urls: urls
+      })
+    },
+
     getStatusClass(status) {
       return {
         'status-pending': status === 'pending',
@@ -321,20 +359,32 @@ export default {
 .item-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 20rpx;
+}
+
+.title-row {
+  display: flex;
+  flex-direction: column;
 }
 
 .item-title {
   font-size: 32rpx;
   font-weight: bold;
   color: #333;
+  margin-bottom: 6rpx;
+}
+
+.time-text {
+  font-size: 24rpx;
+  color: #999;
 }
 
 .status-tag {
   font-size: 24rpx;
   padding: 6rpx 16rpx;
   border-radius: 6rpx;
+  white-space: nowrap;
 }
 
 .status-tag.status-pending {
@@ -358,35 +408,77 @@ export default {
   font-size: 28rpx;
   color: #666;
   line-height: 1.5;
+  display: block;
+}
+
+.image-preview {
+  margin-top: 20rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15rpx;
+}
+
+.complain-img {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 8rpx;
+  background: #eee;
 }
 
 .item-info {
   margin-bottom: 20rpx;
+  border-top: 1rpx dashed #eee;
+  padding-top: 20rpx;
 }
 
 .info-row {
   display: flex;
   margin-bottom: 10rpx;
   font-size: 26rpx;
-  color: #999;
+  color: #666;
 }
 
 .info-row .label {
-  width: 120rpx;
+  width: 140rpx;
+  color: #999;
+}
+
+.info-row .phone {
+  color: #2D81FF;
+  margin-left: 10rpx;
+}
+
+.result-box {
+  margin-top: 15rpx;
+  background: #f0f9eb;
+  padding: 15rpx;
+  border-radius: 8rpx;
+  font-size: 26rpx;
+  color: #67c23a;
+  display: flex;
+}
+
+.result-box .label {
+  font-weight: bold;
+  margin-right: 10rpx;
 }
 
 .item-footer {
   border-top: 1rpx solid #f0f0f0;
   padding-top: 20rpx;
-  text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 20rpx;
 }
 
 .action-btn {
   display: inline-block;
   font-size: 26rpx;
-  padding: 10rpx 30rpx;
+  padding: 0 30rpx;
+  height: 60rpx;
+  line-height: 60rpx;
   border-radius: 30rpx;
-  margin-left: 20rpx;
+  margin: 0;
 }
 
 .action-btn.handle {
@@ -394,9 +486,10 @@ export default {
   color: white;
 }
 
-.action-btn.detail {
-  background: #f0f2f5;
-  color: #666;
+.action-btn.call {
+  background: #e6f7ff;
+  color: #1890ff;
+  border: 1rpx solid #91d5ff;
 }
 
 /* 弹窗 */

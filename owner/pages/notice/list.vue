@@ -113,6 +113,7 @@ export default {
         case "ALL": return "通知"
         case "COMMUNITY": return "小区"
         case "BUILDING": return "楼栋"
+        case "USER": return "提醒"
         default: return "公告"
       }
     }

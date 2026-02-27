@@ -145,8 +145,15 @@ export default {
 
     async loadCommunityInfo(id) {
       try {
-        const params = id ? { id } : {}
-        const data = await request('/api/community/info', params, 'GET')
+        // 如果是超级管理员，查看指定社区详情时，调用 /api/community/{id}
+        // 如果是普通管理员，调用 /api/community/info 获取当前登录管理员所属社区
+        
+        let url = '/api/community/info'
+        if (this.isSuperAdmin && id) {
+          url = `/api/community/${id}`
+        }
+        
+        const data = await request(url, {}, 'GET')
         if (data) {
           this.communityInfo = data
         } else if (this.isSuperAdmin && id) {

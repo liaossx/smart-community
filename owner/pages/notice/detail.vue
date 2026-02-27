@@ -11,7 +11,12 @@
       </view>
 
       <view class="content">
-        <text>{{ notice.content }}</text>
+        <text class="text">{{ notice.content }}</text>
+        
+        <!-- 缴费快捷入口 -->
+        <view class="action-area" v-if="isFeeNotice">
+          <button class="pay-btn" @tap="gotoPay">立即缴费</button>
+        </view>
       </view>
     </view>
   </view>
@@ -21,14 +26,36 @@
 export default {
   data() {
     return {
-      notice: null
+      notice: {}
+    }
+  },
+
+  computed: {
+    isFeeNotice() {
+      if (!this.notice) return false
+      const title = this.notice.title || ''
+      const content = this.notice.content || ''
+      // 判断逻辑：标题包含"缴费"或"催缴"，或者内容包含"物业费"
+      return title.includes('缴费') || title.includes('催缴') || content.includes('物业费')
     }
   },
 
   onLoad(options) {
     if (options.notice) {
-      this.notice = JSON.parse(decodeURIComponent(options.notice))
-      console.log("【DEBUG】公告详情 =", this.notice)
+      try {
+        this.notice = JSON.parse(decodeURIComponent(options.notice))
+        console.log("【DEBUG】公告详情 =", this.notice)
+      } catch (e) {
+        console.error("解析公告失败", e)
+      }
+    }
+  },
+
+  methods: {
+    gotoPay() {
+      uni.navigateTo({
+        url: '/owner/pages/communityService/pay-fee'
+      })
     }
   }
 }
@@ -50,13 +77,17 @@ export default {
 /* 标题区 */
 .header {
   margin-bottom: 28rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+  padding-bottom: 20rpx;
 }
 
 .title {
-  font-size: 34rpx;
+  font-size: 36rpx;
   font-weight: 600;
   color: #1f2430;
   line-height: 1.4;
+  display: block;
+  margin-bottom: 16rpx;
 }
 
 /* 时间 + 标签 */
@@ -64,7 +95,6 @@ export default {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  margin-top: 12rpx;
 }
 
 .time {
@@ -76,16 +106,37 @@ export default {
   font-size: 22rpx;
   color: #2d81ff;
   background: rgba(45, 129, 255, 0.12);
-  padding: 6rpx 18rpx;
-  border-radius: 999rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
 }
 
 /* 内容 */
 .content {
   margin-top: 24rpx;
-  font-size: 28rpx;
+}
+
+.text {
+  font-size: 30rpx;
   color: #333;
   line-height: 1.8;
-  white-space: pre-wrap; /* 关键：支持换行 */
+  white-space: pre-wrap;
+  display: block;
+}
+
+.action-area {
+  margin-top: 60rpx;
+  display: flex;
+  justify-content: center;
+}
+
+.pay-btn {
+  background: #2D81FF;
+  color: white;
+  font-size: 30rpx;
+  padding: 0 60rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  border-radius: 40rpx;
+  box-shadow: 0 8rpx 20rpx rgba(45, 129, 255, 0.3);
 }
 </style>

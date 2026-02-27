@@ -73,12 +73,22 @@ export default {
         uni.showLoading({ title: '提交中...' })
         const userInfo = uni.getStorageSync('userInfo')
         
+        // 构造 visitTime，确保包含秒，符合 LocalDateTime 格式 (yyyy-MM-dd HH:mm:ss)
+        let timeStr = this.form.visitTime || '00:00';
+        if (timeStr.length === 5) {
+          timeStr += ':00';
+        }
+        const visitTime = `${this.form.visitDate} ${timeStr}`;
+        
         await request('/api/visitor/apply', {
           userId: userInfo?.id || userInfo?.userId,
           visitorName: this.form.visitorName,
           visitorPhone: this.form.visitorPhone,
-          reason: this.form.reason,
-          visitTime: `${this.form.visitDate} ${this.form.visitTime || '00:00'}`,
+          reason: this.form.reason,// 格式化时间
+          // 后端报错：Text '2026-02-28 19:37:00' could not be parsed at index 10
+          // index 10 是 ' ' (空格)，这说明后端期望的格式可能是 ISO 标准的 'T' 分隔
+          // 即：yyyy-MM-ddTHH:mm:ss
+          visitTime: visitTime.replace(' ', 'T'), 
           carNo: this.form.carNo
         }, 'POST')
         

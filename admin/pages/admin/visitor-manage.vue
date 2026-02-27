@@ -44,33 +44,45 @@
         <view v-else-if="visitorList.length > 0" class="visitor-list">
           <view v-for="item in visitorList" :key="item.id" class="visitor-item">
             <view class="item-header">
-              <text class="item-title">{{ item.visitorName }} ({{ item.visitorPhone }})</text>
+              <view class="header-left">
+                <text class="item-title">{{ item.visitorName }}</text>
+                <text class="phone-text" @click="makeCall(item.visitorPhone)">{{ item.visitorPhone }}</text>
+              </view>
               <text class="status-tag" :class="getStatusClass(item.status)">
                 {{ getStatusText(item.status) }}
               </text>
             </view>
             <view class="item-body">
-              <view class="info-row">
-                <text class="label">访问对象：</text>
-                <text class="value">{{ item.ownerName }} ({{ item.buildingNo }}{{ item.houseNo }})</text>
-              </view>
-              <view class="info-row">
-                <text class="label">访问时间：</text>
-                <text class="value">{{ formatTime(item.visitTime) }}</text>
-              </view>
-              <view class="info-row">
-                <text class="label">访问事由：</text>
-                <text class="value">{{ item.reason }}</text>
-              </view>
-              <view class="info-row">
-                <text class="label">车牌号：</text>
-                <text class="value">{{ item.carNo || '无' }}</text>
+              <view class="info-grid">
+                <view class="info-item">
+                  <text class="label">访问对象</text>
+                  <text class="value">{{ item.ownerName }}</text>
+                </view>
+                <view class="info-item">
+                  <text class="label">房号</text>
+                  <text class="value">{{ item.buildingNo }}栋{{ item.houseNo }}室</text>
+                </view>
+                <view class="info-item full">
+                  <text class="label">访问时间</text>
+                  <text class="value highlight">{{ formatTime(item.visitTime) }}</text>
+                </view>
+                <view class="info-item">
+                  <text class="label">访问事由</text>
+                  <text class="value">{{ item.reason }}</text>
+                </view>
+                <view class="info-item">
+                  <text class="label">车牌号</text>
+                  <text class="value">{{ item.carNo || '无' }}</text>
+                </view>
               </view>
             </view>
             
-            <view class="item-footer" v-if="item.status === 'pending'">
-              <button class="action-btn reject" @click="handleReject(item)">拒绝</button>
-              <button class="action-btn approve" @click="handleApprove(item)">通过</button>
+            <view class="item-footer">
+               <button class="action-btn call" @click="makeCall(item.visitorPhone)">联系访客</button>
+               <view class="audit-btns" v-if="item.status === 'pending'">
+                  <button class="action-btn reject" @click="handleReject(item)">拒绝</button>
+                  <button class="action-btn approve" @click="handleApprove(item)">通过</button>
+               </view>
             </view>
           </view>
         </view>
@@ -115,10 +127,14 @@ export default {
       try {
         const params = {
           keyword: this.searchQuery || undefined,
-          status: this.statusFilter || undefined
+          status: this.statusFilter || undefined,
+          pageNum: 1,
+          pageSize: 10
         }
         
         // 调用后端接口
+        // 后端接口地址：/api/visitor/list (adminList方法)
+        // 注意：虽然方法名是adminList，但RequestMapping是/list，且在VisitorController下
         const data = await request('/api/visitor/list', { params }, 'GET')
         
         this.visitorList = (data.records || []).map(item => ({
@@ -157,6 +173,7 @@ export default {
         success: async (res) => {
           if (res.confirm) {
             try {
+              // 后端接口：PUT /api/visitor/audit
               await request('/api/visitor/audit', {
                 id: item.id,
                 status: 'approved'
@@ -178,6 +195,7 @@ export default {
         success: async (res) => {
           if (res.confirm) {
             try {
+              // 后端接口：PUT /api/visitor/audit
               await request('/api/visitor/audit', {
                 id: item.id,
                 status: 'rejected'
@@ -190,6 +208,11 @@ export default {
           }
         }
       })
+    },
+    
+    makeCall(phone) {
+      if (!phone) return
+      uni.makePhoneCall({ phoneNumber: phone })
     },
     
     getStatusClass(status) {
@@ -285,15 +308,26 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20rpx;
+  margin-bottom: 25rpx;
   padding-bottom: 20rpx;
   border-bottom: 1rpx solid #f0f0f0;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
 }
 
 .item-title {
   font-size: 32rpx;
   font-weight: bold;
   color: #333;
+  margin-bottom: 6rpx;
+}
+
+.phone-text {
+  font-size: 26rpx;
+  color: #666;
 }
 
 .status-tag {
@@ -321,35 +355,69 @@ export default {
   margin-bottom: 20rpx;
 }
 
-.info-row {
+.info-grid {
   display: flex;
-  margin-bottom: 15rpx;
-  font-size: 28rpx;
+  flex-wrap: wrap;
+  gap: 20rpx;
 }
 
-.info-row .label {
+.info-item {
+  width: 48%; /* 两列布局 */
+  background: #f9f9f9;
+  padding: 15rpx;
+  border-radius: 8rpx;
+  box-sizing: border-box;
+}
+
+.info-item.full {
+  width: 100%;
+  background: #e6f7ff;
+}
+
+.info-item .label {
+  font-size: 24rpx;
   color: #999;
-  width: 160rpx;
+  display: block;
+  margin-bottom: 6rpx;
 }
 
-.info-row .value {
+.info-item .value {
+  font-size: 28rpx;
   color: #333;
-  flex: 1;
+  font-weight: 500;
+  display: block;
+}
+
+.info-item .highlight {
+  color: #1890ff;
+  font-weight: bold;
 }
 
 .item-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between; /* 两端对齐 */
+  align-items: center;
+  padding-top: 10rpx;
+}
+
+.audit-btns {
+  display: flex;
   gap: 20rpx;
-  padding-top: 20rpx;
-  border-top: 1rpx solid #f0f0f0;
 }
 
 .action-btn {
   font-size: 26rpx;
-  padding: 10rpx 30rpx;
+  padding: 0 30rpx;
+  height: 60rpx;
+  line-height: 60rpx;
   border-radius: 30rpx;
   margin: 0;
+}
+
+.action-btn.call {
+  background: white;
+  color: #666;
+  border: 1rpx solid #ddd;
 }
 
 .action-btn.approve {

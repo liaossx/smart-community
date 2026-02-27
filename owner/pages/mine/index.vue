@@ -12,7 +12,8 @@
     <view class="section">
       <view class="section-header">
         <text class="section-title">房屋绑定</text>
-        <text class="section-link">去绑定</text>
+        <!-- 绑定跳转事件 -->
+        <text class="section-link" @tap="navTo('/owner/pages/mine/house-bind')">去绑定</text>
       </view>
       <view v-for="house in houses" :key="house.id" class="entry-card">
         <view class="entry-left">
@@ -26,7 +27,7 @@
     <view class="section">
       <view class="section-header">
         <text class="section-title">缴费记录</text>
-        <text class="section-link">查看全部</text>
+        <text class="section-link" @tap="navTo('/owner/pages/communityService/pay-fee')">查看全部</text>
       </view>
       <view v-for="bill in bills" :key="bill.id" class="bill-item">
         <view>
@@ -70,17 +71,16 @@ export default {
           method: 'GET'
           // 不需要传入userId，后端会从Authorization头中获取当前登录用户信息
         })
-        console.log('用户信息:', result)
         // request.js中已只返回data部分，直接使用result
         this.user = {
           name: result.username || result.name || '未知用户',
           community: result.community || '未绑定社区',
           room: result.room || '未绑定房屋',
-          userId: result.userId
+          userId: result.id || result.userId // 优先使用id
         }
       } catch (error) {
         console.error('获取用户信息失败:', error)
-        // 保持默认空数据，不影响页面展示
+        uni.showToast({ title: '获取用户信息失败', icon: 'none' })
       } finally {
         uni.hideLoading()
       }
@@ -93,7 +93,6 @@ export default {
           url: '/api/house/getHouseInfoByUserId',
           method: 'GET'
         })
-        console.log('房屋信息:', result)
         // request.js中已只返回data部分，直接使用result
         this.houses = Array.isArray(result) ? result.map(house => ({
           id: house.id, // 接口返回的是id，而非houseId
@@ -112,8 +111,14 @@ export default {
     async fetchBillData() {
       try {
         const userInfo = uni.getStorageSync('userInfo')
-        const userId = userInfo?.userId || this.user.userId
+        // 兼容 userId 和 id
+        const userId = userInfo?.id || userInfo?.userId || this.user.userId
         
+        if (!userId) {
+          console.warn('获取缴费记录失败: 未找到userId')
+          return
+        }
+
         const result = await request({
           url: '/api/fee/history',
           method: 'GET',
@@ -123,8 +128,6 @@ export default {
             endTime: new Date().toISOString().split('T')[0]
           }
         })
-    
-        console.log('缴费记录:', result)
     
         // 🔥 result.records 才是数组！！
         const list = result.records || []

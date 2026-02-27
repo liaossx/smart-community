@@ -5,117 +5,150 @@
     pageTitle="费用管理"
     currentPage="/admin/pages/admin/fee-manage"
   >
-    <view class="manage-container">
-      <!-- 统计卡片 -->
-      <view class="stats-card-container">
-        <view class="stats-card" @click="handleStatsClick('all')">
-          <text class="stats-number">{{ stats.total }}</text>
-          <text class="stats-label">总账单</text>
-        </view>
-        <view class="stats-card status-unpaid" @click="handleStatsClick('unpaid')">
-          <text class="stats-number">{{ stats.unpaid }}</text>
-          <text class="stats-label">待缴费</text>
-        </view>
-        <view class="stats-card status-paid" @click="handleStatsClick('paid')">
-          <text class="stats-number">{{ stats.paid }}</text>
-          <text class="stats-label">已缴费</text>
-        </view>
+  <view class="container">
+    <!-- 顶部搜索栏 -->
+    <view class="header">
+      <view class="search-box">
+        <input 
+          class="search-input" 
+          type="text" 
+          v-model="searchQuery" 
+          placeholder="搜索房号、业主姓名" 
+          confirm-type="search"
+          @confirm="onSearch"
+        />
+        <button class="search-btn" @click="onSearch">搜索</button>
       </view>
-      
-      <!-- 搜索和筛选栏 -->
-      <view class="search-filter-bar">
-        <view class="search-box">
-          <input 
-            type="text"
-            placeholder="搜索房屋编号、业主姓名"
-            v-model="searchQuery"
-            @confirm="handleSearch"
-            class="search-input"
-          />
-          <button class="search-btn" @click="handleSearch">搜索</button>
-        </view>
-        
-        <view class="filter-row">
-          <picker 
-            mode="selector"
-            :range="typeOptions"
-            :range-key="'label'"
-            :value="typeOptions.findIndex(opt => opt.value === typeFilter)"
-            @change="handleTypeChange"
-            class="filter-picker"
-          >
-            <view class="filter-picker-text">
-              {{ typeOptions.find(opt => opt.value === typeFilter)?.label || '全部费用' }}
-            </view>
-          </picker>
-        </view>
-      </view>
-      
-      <!-- 操作栏 -->
-      <view class="action-bar">
-        <button class="action-btn primary" @click="handleGenerateBill">生成账单</button>
-        <button class="action-btn secondary" @click="handleBatchRemind">批量催缴</button>
-      </view>
+    </view>
 
-      <!-- 账单列表 -->
-      <view class="list-container">
-        <view v-if="loading" class="loading-state">
-          <text class="loading-text">加载中...</text>
+    <!-- 筛选栏 -->
+    <view class="filter-bar">
+      <view class="filter-tabs">
+        <view 
+          v-for="tab in filterTabs" 
+          :key="tab.value"
+          class="filter-tab"
+          :class="{ active: typeFilter === tab.value }"
+          @click="switchTab(tab.value)"
+        >
+          {{ tab.label }}
         </view>
-        
-        <view v-else-if="feeList.length > 0" class="fee-list">
-          <view v-for="item in feeList" :key="item.id" class="fee-item">
-            <view class="fee-header">
-              <text class="fee-title">{{ item.feeName }}</text>
-              <text class="fee-amount">¥{{ item.amount }}</text>
+      </view>
+      <!-- 修改为打开弹窗 -->
+      <view class="action-buttons">
+        <button class="action-btn generate" @click="openGenerateModal">生成账单</button>
+        <button class="action-btn remind" @click="handleBatchRemind">一键催缴</button>
+      </view>
+    </view>
+
+    <!-- 账单列表 -->
+    <view class="list-container">
+      <view v-if="loading" class="loading-state">
+        <text class="loading-text">加载中...</text>
+      </view>
+      
+      <view v-else-if="feeList.length > 0" class="fee-list">
+        <view v-for="item in feeList" :key="item.id" class="fee-item">
+          <view class="item-header">
+            <text class="item-title">{{ item.feeName }}</text>
+            <text class="amount">¥{{ item.amount }}</text>
+          </view>
+          
+          <view class="item-info">
+            <view class="info-row">
+              <text class="label">业主：</text>
+              <text class="value">{{ item.ownerName }}</text>
             </view>
-            <view class="fee-body">
-              <view class="info-row">
-                <text class="label">房屋：</text>
-                <text class="value">{{ item.buildingNo }}{{ item.houseNo }}</text>
-              </view>
-              <view class="info-row">
-                <text class="label">业主：</text>
-                <text class="value">{{ item.ownerName }}</text>
-              </view>
-              <view class="info-row">
-                <text class="label">账单周期：</text>
-                <text class="value">{{ item.period }}</text>
-              </view>
-              <view class="info-row">
-                <text class="label">截止日期：</text>
-                <text class="value">{{ formatTime(item.deadline) }}</text>
-              </view>
+            <view class="info-row">
+              <text class="label">房号：</text>
+              <text class="value">{{ item.buildingNo }}栋{{ item.houseNo }}室</text>
             </view>
-            <view class="fee-footer">
-              <text class="status-tag" :class="getStatusClass(item.status)">
-                {{ getStatusText(item.status) }}
-              </text>
-              <view class="action-buttons">
-                <button 
-                  v-if="item.status === 'unpaid'" 
-                  class="mini-btn remind" 
-                  @click="handleRemind(item)"
-                >
-                  催缴
-                </button>
-                <button 
-                  v-if="item.status === 'paid'" 
-                  class="mini-btn check" 
-                  @click="handleCheck(item)"
-                >
-                  核对
-                </button>
-              </view>
+            <view class="info-row">
+              <text class="label">账单周期：</text>
+              <text class="value">{{ item.period }}</text>
+            </view>
+            <view class="info-row">
+              <text class="label">截止日期：</text>
+              <text class="value">{{ item.deadline }}</text>
+            </view>
+            <view class="info-row" v-if="item.status === 'unpaid'">
+              <text class="label">催缴次数：</text>
+              <text class="value" style="color: #ff9f43">{{ item.remindCount || 0 }}次</text>
             </view>
           </view>
+          
+          <view class="item-footer">
+            <text class="status-tag" :class="item.status">
+              {{ item.status === 'paid' ? '已缴费' : '待缴费' }}
+            </text>
+            <button 
+              v-if="item.status === 'unpaid'" 
+              class="remind-btn" 
+              @click="handleRemind(item)"
+            >
+              催缴
+            </button>
+          </view>
         </view>
-        
-        <view v-else class="empty-state">
-          <text>暂无账单记录</text>
+      </view>
+      
+      <view v-else class="empty-state">
+        <image src="/static/empty.png" mode="aspectFit" class="empty-img"></image>
+        <text class="empty-text">暂无账单记录</text>
+      </view>
+    </view>
+    
+    <!-- 底部统计 -->
+    <view class="stats-bar">
+      <view class="stat-item">
+        <text class="label">本月应收</text>
+        <text class="value">¥{{ stats.totalAmount }}</text>
+      </view>
+      <view class="stat-item">
+        <text class="label">已收金额</text>
+        <text class="value highlight">¥{{ stats.paidAmount }}</text>
+      </view>
+      <view class="stat-item">
+        <text class="label">缴费率</text>
+        <text class="value">{{ stats.rate }}%</text>
+      </view>
+    </view>
+
+    <!-- 生成账单弹窗 -->
+    <view class="modal-mask" v-if="showGenerateModal" @click="closeGenerateModal">
+      <view class="modal-content" @click.stop>
+        <view class="modal-header">
+          <text class="modal-title">生成本期账单</text>
+          <text class="close-icon" @click="closeGenerateModal">×</text>
+        </view>
+        <view class="modal-body">
+          <view class="form-item">
+            <text class="label">账单月份</text>
+            <picker mode="date" fields="month" :value="generateForm.month" @change="onMonthChange">
+              <view class="picker-value">{{ generateForm.month || '请选择月份' }}</view>
+            </picker>
+          </view>
+          <view class="form-item">
+            <text class="label">费用类型</text>
+            <picker :range="feeTypes" range-key="label" @change="onFeeTypeChange">
+              <view class="picker-value">{{ generateForm.feeTypeLabel || '请选择类型' }}</view>
+            </picker>
+          </view>
+          <view class="form-item">
+            <text class="label">截止日期</text>
+            <picker mode="date" :value="generateForm.deadline" @change="onDeadlineChange">
+              <view class="picker-value">{{ generateForm.deadline || '请选择日期' }}</view>
+            </picker>
+          </view>
+        </view>
+        <view class="modal-footer">
+          <button class="modal-btn cancel" @click="closeGenerateModal">取消</button>
+          <button class="modal-btn confirm" @click="submitGenerateBill">确认生成</button>
         </view>
       </view>
     </view>
+
+  </view>
   </admin-sidebar>
 </template>
 
@@ -131,115 +164,185 @@ export default {
     return {
       showSidebar: false,
       searchQuery: '',
-      typeFilter: '',
+      typeFilter: 'all', // all, unpaid, paid
       loading: false,
-      stats: {
-        total: 0,
-        unpaid: 0,
-        paid: 0
-      },
-      typeOptions: [
-        { value: '', label: '全部费用' },
-        { value: 'property', label: '物业费' },
-        { value: 'water', label: '水费' },
-        { value: 'electricity', label: '电费' },
-        { value: 'parking', label: '停车费' }
+      feeList: [],
+      filterTabs: [
+        { label: '全部', value: 'all' },
+        { label: '待缴费', value: 'unpaid' },
+        { label: '已缴费', value: 'paid' }
       ],
-      feeList: []
+      stats: {
+        totalAmount: 0,
+        paidAmount: 0,
+        rate: 0
+      },
+      
+      // 生成账单相关
+      showGenerateModal: false,
+      generateForm: {
+        month: '',
+        feeType: 'wuye',
+        feeTypeLabel: '物业费',
+        deadline: ''
+      },
+      feeTypes: [
+        { label: '物业费', value: 'wuye' },
+        { label: '停车费', value: 'parking' },
+        { label: '水费', value: 'water' },
+        { label: '电费', value: 'electric' }
+      ]
     }
   },
+  
   onLoad() {
+    // 初始化默认月份为当前月
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    this.generateForm.month = `${year}-${month}`;
+    
     this.loadData()
   },
+
   methods: {
+    onSearch() {
+      this.loadData()
+    },
+
+    switchTab(tabValue) {
+      this.typeFilter = tabValue
+      this.loadData()
+    },
+
     async loadData() {
       this.loading = true
       try {
+        const isStatusFilter = ['unpaid', 'paid'].includes(this.typeFilter)
         const params = {
           keyword: this.searchQuery || undefined,
-          status: this.typeFilter === 'unpaid' ? 'unpaid' : (this.typeFilter === 'paid' ? 'paid' : undefined)
+          status: isStatusFilter ? (this.typeFilter === 'unpaid' ? 'UNPAID' : 'PAID') : undefined,
+          pageNum: 1,
+          pageSize: 20
         }
         
-        // 调用后端接口
-        const data = await request('/api/fee/list', { params }, 'GET')
+        const data = await request('/api/fee/list', params, 'GET')
         
-        // 处理返回数据
-        this.feeList = (data.records || []).map(item => ({
-          id: item.id,
-          feeName: `${item.year}年${item.month}月物业费`, // 假设后端返回year/month
-          amount: item.amount,
-          buildingNo: item.buildingNo,
-          houseNo: item.houseNo,
-          ownerName: item.ownerName,
-          period: `${item.year}-${item.month}`,
-          deadline: item.deadline,
-          status: item.status === 1 ? 'paid' : 'unpaid' // 假设1为已缴
-        }))
+        this.feeList = (data.records || []).map(item => {
+          const feeCycle = item.feeCycle || '';
+          const [year, month] = feeCycle.split('-');
+          
+          return {
+            id: item.id,
+            feeName: item.feeName || (year && month ? `${year}年${month}月费用` : `${feeCycle} 费用`), 
+            amount: item.amount,
+            buildingNo: item.buildingNo,
+            houseNo: item.houseNo,
+            ownerName: item.ownerName,
+            period: feeCycle,
+            deadline: item.deadline || '月底',
+            remindCount: item.remindCount || 0, // 新增：催缴次数
+            status: (item.status === 'PAID' || item.status === 'paid' || item.status === 1) ? 'paid' : 'unpaid'
+          }
+        })
         
-        this.calculateStats()
+        // 简单统计逻辑 (仅当前页，实际应由后端返回)
+        const total = this.feeList.reduce((sum, item) => sum + Number(item.amount), 0);
+        const paid = this.feeList
+          .filter(item => item.status === 'paid')
+          .reduce((sum, item) => sum + Number(item.amount), 0);
+          
+        this.stats = {
+          totalAmount: total.toFixed(2),
+          paidAmount: paid.toFixed(2),
+          rate: total > 0 ? ((paid / total) * 100).toFixed(1) : 0
+        }
+        
       } catch (e) {
-        console.error('加载账单列表失败', e)
+        console.error(e)
         uni.showToast({ title: '加载失败', icon: 'none' })
       } finally {
         this.loading = false
       }
     },
-    
-    calculateStats() {
-      this.stats.total = this.feeList.length
-      this.stats.unpaid = this.feeList.filter(i => i.status === 'unpaid').length
-      this.stats.paid = this.feeList.filter(i => i.status === 'paid').length
-    },
 
-    handleSearch() {
-      this.loadData()
-    },
-
-    handleTypeChange(e) {
-      // 这里typeFilter实际上是用来筛选缴费状态的，因为options里value定义有点混用
-      // 假设我们只关心全部/待缴/已缴
-      const selected = this.typeOptions[e.detail.value]
-      this.typeFilter = selected.value
-      // 如果选的是具体的费用类型（如水费），后端接口需要支持type参数
-      // 这里简化为重新加载
-      this.loadData()
+    // 打开生成账单弹窗
+    openGenerateModal() {
+      this.showGenerateModal = true;
     },
     
-    handleStatsClick(type) {
-      if (type === 'all') this.typeFilter = ''
-      else this.typeFilter = type
-      this.loadData()
+    closeGenerateModal() {
+      this.showGenerateModal = false;
     },
-
-    async handleGenerateBill() {
+    
+    onMonthChange(e) {
+      this.generateForm.month = e.detail.value;
+    },
+    
+    onFeeTypeChange(e) {
+      const index = e.detail.value;
+      this.generateForm.feeType = this.feeTypes[index].value;
+      this.generateForm.feeTypeLabel = this.feeTypes[index].label;
+    },
+    
+    onDeadlineChange(e) {
+      this.generateForm.deadline = e.detail.value;
+    },
+    
+    // 提交生成账单
+    async submitGenerateBill() {
+      if (!this.generateForm.month) return uni.showToast({ title: '请选择月份', icon: 'none' });
+      if (!this.generateForm.deadline) return uni.showToast({ title: '请选择截止日期', icon: 'none' });
+      
       try {
         uni.showLoading({ title: '生成中...' })
-        await request('/api/fee/generate', {}, 'POST')
+        
+        // 获取当前管理员信息
+        const userInfo = uni.getStorageSync('userInfo') || {}
+        
+        // 构造符合 GenerateFeeDTO 的参数
+        // 接口：POST /api/fee/generate?adminId={adminId}
+        // Body: communityName, buildingNo, feeCycle, dueDate, unitPrice
+        const payload = {
+          communityName: '', // 默认全小区，或者从 userInfo.communityName 获取
+          buildingNo: '',    // 默认全楼栋
+          feeCycle: this.generateForm.month, // 对应 feeCycle (2026-02)
+          dueDate: this.generateForm.deadline, // 对应 dueDate
+          unitPrice: 2.5 // 暂时硬编码或从配置获取，或者在弹窗增加输入框
+        };
+        
+        // 注意：adminId 是 @RequestParam，必须拼在 URL 上
+        const adminId = userInfo.id || userInfo.userId || 1;
+        const url = `/api/fee/generate?adminId=${adminId}`;
+        
+        await request(url, payload, 'POST')
+        
         uni.hideLoading()
         uni.showToast({ title: '生成成功', icon: 'success' })
-        this.loadData()
+        this.closeGenerateModal()
+        this.loadData() // 刷新列表
       } catch (e) {
         uni.hideLoading()
-        uni.showToast({ title: '生成失败', icon: 'none' })
+        console.error('生成账单失败:', e)
+        uni.showToast({ title: '生成失败: ' + (e.message || '接口错误'), icon: 'none' })
       }
     },
 
     async handleBatchRemind() {
       try {
         uni.showLoading({ title: '发送中...' })
-        // 获取所有未缴费ID
         const unpaidIds = this.feeList.filter(i => i.status === 'unpaid').map(i => i.id)
         if (unpaidIds.length === 0) {
           uni.hideLoading()
           return uni.showToast({ title: '无待缴账单', icon: 'none' })
         }
         
-        await request('/api/fee/remind', { ids: unpaidIds }, 'POST')
+        await request('/api/fee/remind/batch', { ids: unpaidIds }, 'POST')
+        
         uni.hideLoading()
         uni.showToast({ title: '催缴发送成功', icon: 'success' })
       } catch (e) {
         uni.hideLoading()
-        uni.showToast({ title: '发送失败', icon: 'none' })
       }
     },
 
@@ -250,194 +353,168 @@ export default {
         success: async (res) => {
           if (res.confirm) {
             try {
-              await request('/api/fee/remind', { ids: [item.id] }, 'POST')
+              await request(`/api/fee/remind/${item.id}`, {}, 'POST')
               uni.showToast({ title: '发送成功', icon: 'success' })
             } catch (e) {
-              uni.showToast({ title: '发送失败', icon: 'none' })
+              // error handled
             }
           }
         }
       })
-    },
-
-    handleCheck(item) {
-      uni.showToast({ title: '核对成功', icon: 'success' })
-    },
-
-    getStatusClass(status) {
-      return {
-        'status-unpaid': status === 'unpaid',
-        'status-paid': status === 'paid'
-      }
-    },
-
-    getStatusText(status) {
-      const map = {
-        'unpaid': '待缴费',
-        'paid': '已缴费'
-      }
-      return map[status] || status
-    },
-
-    formatTime(dateStr) {
-      return dateStr
     }
   }
 }
 </script>
 
 <style scoped>
-.manage-container {
+/* 页面布局 */
+.container {
   padding: 30rpx;
   background-color: #f5f7fa;
   min-height: 100vh;
+  padding-bottom: 120rpx; /* 为底部统计栏留出空间 */
 }
 
-/* 统计卡片 */
-.stats-card-container {
-  display: flex;
-  gap: 20rpx;
+/* 顶部搜索 */
+.header {
   margin-bottom: 30rpx;
-}
-
-.stats-card {
-  flex: 1;
-  background: white;
-  padding: 30rpx;
-  border-radius: 15rpx;
-  text-align: center;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-}
-
-.stats-number {
-  font-size: 40rpx;
-  font-weight: bold;
-  display: block;
-  margin-bottom: 10rpx;
-}
-
-.stats-label {
-  font-size: 24rpx;
-  color: #999;
-}
-
-.status-unpaid .stats-number { color: #ff4757; }
-.status-paid .stats-number { color: #2ed573; }
-
-/* 搜索筛选 */
-.search-filter-bar {
-  background: white;
-  padding: 20rpx;
-  border-radius: 15rpx;
-  margin-bottom: 30rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
 }
 
 .search-box {
   display: flex;
   gap: 20rpx;
+  background: white;
+  padding: 20rpx;
+  border-radius: 15rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.03);
 }
 
 .search-input {
   flex: 1;
   background: #f5f7fa;
-  height: 70rpx;
-  border-radius: 35rpx;
+  height: 72rpx;
+  border-radius: 36rpx;
   padding: 0 30rpx;
   font-size: 28rpx;
 }
 
 .search-btn {
-  height: 70rpx;
-  line-height: 70rpx;
+  height: 72rpx;
+  line-height: 72rpx;
   background: #2D81FF;
   color: white;
   font-size: 28rpx;
-  border-radius: 35rpx;
+  border-radius: 36rpx;
   padding: 0 40rpx;
+  margin: 0;
 }
 
-.filter-picker {
-  background: #f5f7fa;
-  height: 70rpx;
-  border-radius: 35rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.filter-picker-text {
-  font-size: 28rpx;
-  color: #666;
-}
-
-/* 操作栏 */
-.action-bar {
-  display: flex;
-  gap: 20rpx;
-  margin-bottom: 30rpx;
-}
-
-.action-btn {
-  flex: 1;
-  font-size: 28rpx;
-  height: 80rpx;
-  line-height: 80rpx;
-  border-radius: 40rpx;
-}
-
-.action-btn.primary {
-  background: #2D81FF;
-  color: white;
-}
-
-.action-btn.secondary {
-  background: #fff;
-  color: #2D81FF;
-  border: 2rpx solid #2D81FF;
-}
-
-/* 列表 */
-.fee-item {
-  background: white;
-  border-radius: 15rpx;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-}
-
-.fee-header {
+/* 筛选与操作栏 */
+.filter-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20rpx;
-  padding-bottom: 20rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  margin-bottom: 30rpx;
+  flex-wrap: wrap; /* 小屏幕允许换行 */
+  gap: 20rpx;
 }
 
-.fee-title {
+.filter-tabs {
+  display: flex;
+  background: white;
+  padding: 8rpx;
+  border-radius: 12rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.03);
+}
+
+.filter-tab {
+  padding: 12rpx 30rpx;
+  font-size: 26rpx;
+  color: #666;
+  border-radius: 8rpx;
+  transition: all 0.3s;
+}
+
+.filter-tab.active {
+  background: #e6f7ff;
+  color: #2D81FF;
+  font-weight: bold;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 15rpx;
+}
+
+.action-btn {
+  font-size: 24rpx;
+  padding: 0 24rpx;
+  height: 60rpx;
+  line-height: 60rpx;
+  border-radius: 30rpx;
+  margin: 0;
+}
+
+.action-btn.generate {
+  background: white;
+  color: #2D81FF;
+  border: 1rpx solid #2D81FF;
+}
+
+.action-btn.remind {
+  background: #2D81FF;
+  color: white;
+}
+
+/* 列表样式 */
+.list-container {
+  min-height: 400rpx;
+}
+
+.fee-item {
+  background: white;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx dashed #f0f0f0;
+}
+
+.item-title {
   font-size: 32rpx;
   font-weight: bold;
   color: #333;
 }
 
-.fee-amount {
+.amount {
   font-size: 36rpx;
   font-weight: bold;
   color: #ff4757;
 }
 
+.item-info {
+  margin-bottom: 20rpx;
+}
+
 .info-row {
   display: flex;
-  margin-bottom: 15rpx;
-  font-size: 28rpx;
+  margin-bottom: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.5;
 }
 
 .info-row .label {
   color: #999;
-  width: 160rpx;
+  width: 140rpx;
+  flex-shrink: 0;
 }
 
 .info-row .value {
@@ -445,13 +522,11 @@ export default {
   flex: 1;
 }
 
-.fee-footer {
+.item-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 20rpx;
-  padding-top: 20rpx;
-  border-top: 1rpx solid #f0f0f0;
+  margin-top: 10rpx;
 }
 
 .status-tag {
@@ -460,32 +535,162 @@ export default {
   border-radius: 6rpx;
 }
 
-.status-tag.status-unpaid {
-  background: rgba(255, 71, 87, 0.1);
-  color: #ff4757;
-}
-
-.status-tag.status-paid {
+.status-tag.paid {
   background: rgba(46, 213, 115, 0.1);
   color: #2ed573;
 }
 
-.mini-btn {
-  font-size: 24rpx;
-  padding: 10rpx 30rpx;
-  margin-left: 20rpx;
-  border-radius: 30rpx;
-  display: inline-block;
-  line-height: 1.5;
+.status-tag.unpaid {
+  background: rgba(255, 71, 87, 0.1);
+  color: #ff4757;
 }
 
-.mini-btn.remind {
+.remind-btn {
+  font-size: 24rpx;
+  height: 52rpx;
+  line-height: 52rpx;
+  padding: 0 24rpx;
   background: #ff4757;
   color: white;
+  border-radius: 26rpx;
+  margin: 0;
 }
 
-.mini-btn.check {
-  background: #2D81FF;
-  color: white;
+/* 底部统计栏 */
+.stats-bar {
+  position: fixed;
+  bottom: 0;
+  left: 200rpx; /* admin-sidebar width */
+  right: 0;
+  height: 100rpx;
+  background: white;
+  box-shadow: 0 -2rpx 10rpx rgba(0,0,0,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-item .label {
+  font-size: 22rpx;
+  color: #999;
+  margin-bottom: 4rpx;
+}
+
+.stat-item .value {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.stat-item .value.highlight {
+  color: #2D81FF;
+}
+
+/* 适配小屏幕：侧边栏可能隐藏 */
+@media screen and (max-width: 768px) {
+  .stats-bar {
+    left: 0;
+  }
+}
+
+/* 弹窗样式 */
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-content {
+  width: 600rpx;
+  background: white;
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 30rpx;
+  text-align: center;
+  position: relative;
+  border-bottom: 1rpx solid #eee;
+}
+
+.modal-title {
+  font-size: 32rpx;
+  font-weight: bold;
+}
+
+.close-icon {
+  position: absolute;
+  right: 30rpx;
+  top: 30rpx;
+  font-size: 40rpx;
+  color: #999;
+  line-height: 1;
+}
+
+.modal-body {
+  padding: 40rpx 30rpx;
+}
+
+.form-item {
+  margin-bottom: 30rpx;
+}
+
+.form-item .label {
+  display: block;
+  font-size: 28rpx;
+  color: #666;
+  margin-bottom: 15rpx;
+}
+
+.picker-value {
+  height: 80rpx;
+  line-height: 80rpx;
+  background: #f5f7fa;
+  border-radius: 10rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.modal-footer {
+  display: flex;
+  border-top: 1rpx solid #eee;
+}
+
+.modal-btn {
+  flex: 1;
+  height: 100rpx;
+  line-height: 100rpx;
+  text-align: center;
+  font-size: 30rpx;
+  margin: 0;
+  border-radius: 0;
+  background: white;
+}
+
+.modal-btn.cancel {
+  color: #666;
+  border-right: 1rpx solid #eee;
+}
+
+.modal-btn.confirm {
+  color: #2D81FF;
+  font-weight: bold;
 }
 </style>

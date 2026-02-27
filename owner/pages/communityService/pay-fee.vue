@@ -59,7 +59,7 @@ export default {
     },
     async fetchUnpaidBills() {
       try {
-        const res = await request('/api/fee/unpaid', 'GET')
+        const res = await request.get('/api/fee/unpaid')
         this.unpaidBills = res || []
       } catch (e) {
         console.error('获取待缴账单失败', e)
@@ -67,7 +67,7 @@ export default {
     },
     async fetchHistoryBills() {
       try {
-        const res = await request('/api/fee/history', 'GET')
+        const res = await request.get('/api/fee/history')
         this.historyBills = res || []
       } catch (e) {
         console.error('获取历史账单失败', e)

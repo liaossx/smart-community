@@ -335,14 +335,23 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.625rem;
+  margin-bottom: 0.78125rem;
   padding-bottom: 0.625rem;
   border-bottom: 0.03125rem solid #f0f0f0;
+}
+.header-left[data-v-20feed08] {
+  display: flex;
+  flex-direction: column;
 }
 .item-title[data-v-20feed08] {
   font-size: 1rem;
   font-weight: bold;
   color: #333;
+  margin-bottom: 0.1875rem;
+}
+.phone-text[data-v-20feed08] {
+  font-size: 0.8125rem;
+  color: #666;
 }
 .status-tag[data-v-20feed08] {
   font-size: 0.75rem;
@@ -364,31 +373,60 @@
 .item-body[data-v-20feed08] {
   margin-bottom: 0.625rem;
 }
-.info-row[data-v-20feed08] {
+.info-grid[data-v-20feed08] {
   display: flex;
-  margin-bottom: 0.46875rem;
-  font-size: 0.875rem;
+  flex-wrap: wrap;
+  gap: 0.625rem;
 }
-.info-row .label[data-v-20feed08] {
+.info-item[data-v-20feed08] {
+  width: 48%; /* 两列布局 */
+  background: #f9f9f9;
+  padding: 0.46875rem;
+  border-radius: 0.25rem;
+  box-sizing: border-box;
+}
+.info-item.full[data-v-20feed08] {
+  width: 100%;
+  background: #e6f7ff;
+}
+.info-item .label[data-v-20feed08] {
+  font-size: 0.75rem;
   color: #999;
-  width: 5rem;
+  display: block;
+  margin-bottom: 0.1875rem;
 }
-.info-row .value[data-v-20feed08] {
+.info-item .value[data-v-20feed08] {
+  font-size: 0.875rem;
   color: #333;
-  flex: 1;
+  font-weight: 500;
+  display: block;
+}
+.info-item .highlight[data-v-20feed08] {
+  color: #1890ff;
+  font-weight: bold;
 }
 .item-footer[data-v-20feed08] {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between; /* 两端对齐 */
+  align-items: center;
+  padding-top: 0.3125rem;
+}
+.audit-btns[data-v-20feed08] {
+  display: flex;
   gap: 0.625rem;
-  padding-top: 0.625rem;
-  border-top: 0.03125rem solid #f0f0f0;
 }
 .action-btn[data-v-20feed08] {
   font-size: 0.8125rem;
-  padding: 0.3125rem 0.9375rem;
+  padding: 0 0.9375rem;
+  height: 1.875rem;
+  line-height: 1.875rem;
   border-radius: 0.9375rem;
   margin: 0;
+}
+.action-btn.call[data-v-20feed08] {
+  background: white;
+  color: #666;
+  border: 0.03125rem solid #ddd;
 }
 .action-btn.approve[data-v-20feed08] {
   background: #2D81FF;

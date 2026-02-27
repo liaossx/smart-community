@@ -64,7 +64,7 @@ export default {
       activityList: []
     }
   },
-  onLoad() {
+  onShow() {
     this.loadData()
   },
   methods: {
@@ -86,7 +86,7 @@ export default {
           location: item.location,
           signupCount: item.signupCount || 0,
           maxCount: item.maxCount,
-          status: this.getStatus(item),
+          status: item.status, // 直接使用后端返回的 status (PUBLISHED/DRAFT/ONLINE等)
           cover: item.cover || '/static/default-cover.png'
         }))
       } catch (e) {
@@ -97,14 +97,7 @@ export default {
       }
     },
     
-    getStatus(item) {
-      // 简单判断状态，实际应由后端返回
-      const now = new Date()
-      const start = new Date(item.startTime)
-      if (now < start) return 'upcoming'
-      if (item.status === 'ended') return 'ended'
-      return 'active'
-    },
+    // 移除 getStatus 方法，直接使用后端 status 字段映射样式和文本
     
     handleCreate() {
       uni.navigateTo({ url: '/admin/pages/admin/activity-edit' })
@@ -115,7 +108,7 @@ export default {
     },
     
     handleViewSignups(item) {
-      uni.showToast({ title: '报名管理功能开发中', icon: 'none' })
+      uni.navigateTo({ url: `/admin/pages/admin/activity-signups?id=${item.id}` })
     },
     
     handleDelete(item) {
@@ -137,18 +130,21 @@ export default {
     },
     
     getStatusClass(status) {
-      return {
-        'status-active': status === 'active',
-        'status-upcoming': status === 'upcoming',
-        'status-ended': status === 'ended'
+      const map = {
+        'PUBLISHED': 'status-published',
+        'DRAFT': 'status-draft',
+        'ONLINE': 'status-online',
+        'ENDED': 'status-ended'
       }
+      return map[status] || 'status-default'
     },
     
     getStatusText(status) {
       const map = {
-        'active': '进行中',
-        'upcoming': '报名中',
-        'ended': '已结束'
+        'PUBLISHED': '已发布',
+        'DRAFT': '草稿',
+        'ONLINE': '报名中', // 或进行中
+        'ENDED': '已结束'
       }
       return map[status] || status
     },
@@ -223,9 +219,11 @@ export default {
   white-space: nowrap;
 }
 
-.status-active { background: #e6f7ff; color: #1890ff; }
-.status-upcoming { background: #f6ffed; color: #52c41a; }
-.status-ended { background: #f5f5f5; color: #999; }
+.status-published { background: #e6f7ff; color: #1890ff; } /* 蓝色 */
+.status-online { background: #f6ffed; color: #52c41a; } /* 绿色 */
+.status-draft { background: #fff7e6; color: #fa8c16; } /* 橙色 */
+.status-ended { background: #f5f5f5; color: #999; } /* 灰色 */
+.status-default { background: #f0f0f0; color: #666; }
 
 .item-info {
   font-size: 24rpx;

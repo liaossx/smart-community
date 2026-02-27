@@ -334,18 +334,28 @@
 .item-header[data-v-f00c65e1] {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 0.625rem;
+}
+.title-row[data-v-f00c65e1] {
+  display: flex;
+  flex-direction: column;
 }
 .item-title[data-v-f00c65e1] {
   font-size: 1rem;
   font-weight: bold;
   color: #333;
+  margin-bottom: 0.1875rem;
+}
+.time-text[data-v-f00c65e1] {
+  font-size: 0.75rem;
+  color: #999;
 }
 .status-tag[data-v-f00c65e1] {
   font-size: 0.75rem;
   padding: 0.1875rem 0.5rem;
   border-radius: 0.1875rem;
+  white-space: nowrap;
 }
 .status-tag.status-pending[data-v-f00c65e1] {
   background: rgba(255, 71, 87, 0.1);
@@ -365,38 +375,76 @@
   font-size: 0.875rem;
   color: #666;
   line-height: 1.5;
+  display: block;
+}
+.image-preview[data-v-f00c65e1] {
+  margin-top: 0.625rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.46875rem;
+}
+.complain-img[data-v-f00c65e1] {
+  width: 4.6875rem;
+  height: 4.6875rem;
+  border-radius: 0.25rem;
+  background: #eee;
 }
 .item-info[data-v-f00c65e1] {
   margin-bottom: 0.625rem;
+  border-top: 0.03125rem dashed #eee;
+  padding-top: 0.625rem;
 }
 .info-row[data-v-f00c65e1] {
   display: flex;
   margin-bottom: 0.3125rem;
   font-size: 0.8125rem;
-  color: #999;
+  color: #666;
 }
 .info-row .label[data-v-f00c65e1] {
-  width: 3.75rem;
+  width: 4.375rem;
+  color: #999;
+}
+.info-row .phone[data-v-f00c65e1] {
+  color: #2D81FF;
+  margin-left: 0.3125rem;
+}
+.result-box[data-v-f00c65e1] {
+  margin-top: 0.46875rem;
+  background: #f0f9eb;
+  padding: 0.46875rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  color: #67c23a;
+  display: flex;
+}
+.result-box .label[data-v-f00c65e1] {
+  font-weight: bold;
+  margin-right: 0.3125rem;
 }
 .item-footer[data-v-f00c65e1] {
   border-top: 0.03125rem solid #f0f0f0;
   padding-top: 0.625rem;
-  text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.625rem;
 }
 .action-btn[data-v-f00c65e1] {
   display: inline-block;
   font-size: 0.8125rem;
-  padding: 0.3125rem 0.9375rem;
+  padding: 0 0.9375rem;
+  height: 1.875rem;
+  line-height: 1.875rem;
   border-radius: 0.9375rem;
-  margin-left: 0.625rem;
+  margin: 0;
 }
 .action-btn.handle[data-v-f00c65e1] {
   background: #2D81FF;
   color: white;
 }
-.action-btn.detail[data-v-f00c65e1] {
-  background: #f0f2f5;
-  color: #666;
+.action-btn.call[data-v-f00c65e1] {
+  background: #e6f7ff;
+  color: #1890ff;
+  border: 0.03125rem solid #91d5ff;
 }
 
 /* 弹窗 */
