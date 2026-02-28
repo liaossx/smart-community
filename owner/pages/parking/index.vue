@@ -19,6 +19,8 @@
     <view class="section">
       <view class="section-header">
         <text class="section-title">我的车位</text>
+        <!-- 车辆绑定入口 -->
+        <text class="section-link" @click="goBindCar">绑定车辆</text>
       </view>
 
       <view
@@ -140,29 +142,46 @@ export default {
     async loadBalance() {
       try {
         const balance = await request.get('/api/parking/account/balance')
-        this.summary.balance = balance
+        // 如果 balance 是对象，尝试取 data.data 或 data.balance
+        // 根据你之前的日志，balance 可能直接是数字或者 { code: 200, data: 0 }
+        if (typeof balance === 'number') {
+          this.summary.balance = balance
+        } else if (balance && typeof balance.data === 'number') {
+          this.summary.balance = balance.data
+        } else {
+          this.summary.balance = 0
+        }
       } catch (e) {
-        uni.showToast({ title: '获取余额失败', icon: 'none' })
+        console.error('获取余额失败', e)
+        // 余额获取失败不弹窗，显示 0 即可，避免打扰用户
+        this.summary.balance = 0 
       }
     },
 
     // 跳转充值页面
     goRecharge() {
       uni.navigateTo({
-        url: '/pages/parking/recharge'
+        url: `/owner/pages/parking/recharge?balance=${this.summary.balance || 0}`
+      })
+    },
+
+    // 跳转绑定车辆页面
+    goBindCar() {
+      uni.navigateTo({
+        url: '/owner/pages/parking/bind-car'
       })
     },
 
     // 跳转车位详情页
     goSpaceDetail(car) {
       uni.navigateTo({
-        url: '/pages/parking/space-detail',
-        success(res) {
+        url: '/owner/pages/parking/space-detail',
+        success: (res) => {
           // 🔴 关键：把 car 传给详情页
           res.eventChannel.emit('carDetail', car)
         }
       })
-    }
+    },
   }
 }
 </script>

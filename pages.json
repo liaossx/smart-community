@@ -157,7 +157,14 @@
         }
       },
       {
-        "path": "owner/pages/notice/list",
+    "path": "admin/pages/admin/car-audit",
+    "style": {
+      "navigationBarTitleText": "车辆审核",
+      "navigationStyle": "default"
+    }
+  },
+  {
+    "path": "owner/pages/notice/list",
         "style": {
           "navigationBarTitleText": "公告列表"
         }
@@ -191,6 +198,12 @@
   	"style":{
   			"navigationBarTitleText":"车位详细页面"
   		}
+  },
+  {
+    "path": "owner/pages/parking/bind-car",
+    "style": {
+      "navigationBarTitleText": "绑定车辆"
+    }
   },
   {
     "path": "owner/pages/mine/house-bind",

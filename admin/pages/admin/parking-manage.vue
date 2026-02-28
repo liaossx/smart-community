@@ -24,6 +24,13 @@
           <text>车位管理</text>
           <view class="tab-line" v-if="currentTab === 'space'"></view>
         </view>
+        <!-- 新增车辆审核入口 -->
+        <view 
+          class="tab-item" 
+          @click="goCarAudit"
+        >
+          <text>车辆审核</text>
+        </view>
       </view>
 
       <!-- 停车订单列表 -->
@@ -413,6 +420,13 @@ export default {
         this.spacePageNum = 1
         this.loadSpaceList()
       }
+    },
+
+    // 跳转车辆审核页面
+    goCarAudit() {
+      uni.navigateTo({
+        url: '/admin/pages/admin/car-audit'
+      })
     },
 
     handleSearch() {

@@ -1,0 +1,60 @@
+
+.container[data-v-3fdde2a0] {
+  padding: 0.9375rem;
+  background-color: #f5f7fa;
+  min-height: 100vh;
+}
+.form-card[data-v-3fdde2a0] {
+  background: white;
+  border-radius: 0.625rem;
+  padding: 1.25rem;
+  box-shadow: 0 0.125rem 0.625rem rgba(0,0,0,0.03);
+}
+.form-title[data-v-3fdde2a0] {
+  font-size: 1rem;
+  font-weight: bold;
+  margin-bottom: 1.25rem;
+  text-align: center;
+  color: #333;
+}
+.form-item[data-v-3fdde2a0] {
+  margin-bottom: 0.9375rem;
+  border-bottom: 0.03125rem solid #f0f0f0;
+  padding-bottom: 0.3125rem;
+}
+.label[data-v-3fdde2a0] {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.input[data-v-3fdde2a0], .picker-value[data-v-3fdde2a0] {
+  font-size: 0.9375rem;
+  color: #333;
+  height: 1.875rem;
+  line-height: 1.875rem;
+}
+.placeholder[data-v-3fdde2a0] {
+  color: #ccc;
+}
+.tips[data-v-3fdde2a0] {
+  margin-top: 1.25rem;
+  background: #f0f7ff;
+  padding: 0.625rem;
+  border-radius: 0.3125rem;
+}
+.tips uni-text[data-v-3fdde2a0] {
+  display: block;
+  font-size: 0.75rem;
+  color: #2d81ff;
+  line-height: 1.6;
+}
+.submit-btn[data-v-3fdde2a0] {
+  margin-top: 1.875rem;
+  background: #2D81FF;
+  color: white;
+  border-radius: 1.5625rem;
+  font-size: 1rem;
+  height: 2.75rem;
+  line-height: 2.75rem;
+}

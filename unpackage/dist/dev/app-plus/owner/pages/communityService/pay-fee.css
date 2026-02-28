@@ -58,10 +58,14 @@
   position: relative;
   opacity: 0.8;
 }
+.status-bar[data-v-e6979b53] {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.625rem;
+  padding-top: 0.625rem;
+  border-top: 0.03125rem dashed #f0f0f0;
+}
 .status-tag[data-v-e6979b53] {
-  position: absolute;
-  top: 0.9375rem;
-  right: 0.9375rem;
   color: #2ed573;
   font-size: 0.75rem;
   border: 0.03125rem solid #2ed573;

@@ -56,26 +56,37 @@ export default {
     }
   },
 
-  onLoad() {
+  onLoad(options) {
+    if (options.balance) {
+      this.balance = Number(options.balance)
+    }
     this.loadBalance()
   },
 
   methods: {
+    selectAmount(amount) {
+      this.selectedAmount = amount
+      this.customAmount = ''
+    },
+    
+    // 监听输入框
+    onInput(e) {
+      this.selectedAmount = null
+    },
 
     // 查询余额
     async loadBalance() {
       try {
         const res = await request.get('/api/parking/account/balance')
-        // request.js 已经返回 data，本身就是数字/BigDecimal
-        this.balance = Number(res || 0)
+        // 兼容处理：可能返回数字或对象
+        if (typeof res === 'number') {
+          this.balance = res
+        } else if (res && typeof res.data === 'number') {
+          this.balance = res.data
+        }
       } catch (e) {
-        uni.showToast({ title: '获取余额失败', icon: 'none' })
+        console.error('获取余额失败', e)
       }
-    },
-
-    selectAmount(amount) {
-      this.selectedAmount = amount
-      this.customAmount = ''
     },
 
     // 充值
@@ -91,9 +102,14 @@ export default {
       }
 
       try {
+        uni.showLoading({ title: '充值中...' })
         // 调用充值接口
-        await request.post('/api/parking/account/recharge', { amount })
+        await request('/api/parking/account/recharge', { 
+          amount,
+          userId: uni.getStorageSync('userInfo').id || uni.getStorageSync('userInfo').userId
+        }, 'POST')
 
+        uni.hideLoading()
         // 充值成功提示
         uni.showToast({ title: '充值成功', icon: 'success' })
 
@@ -105,8 +121,9 @@ export default {
         this.loadBalance()
 
       } catch (e) {
-        // request.js 已经处理了失败提示
-        console.error('充值失败:', e.message)
+        uni.hideLoading()
+        console.error('充值失败:', e)
+        uni.showToast({ title: '充值失败', icon: 'none' })
       }
     }
   }

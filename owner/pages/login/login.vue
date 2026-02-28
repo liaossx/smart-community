@@ -108,6 +108,7 @@ export default {
            username: result.username,
            role: role,  // 使用从 Token 中解析的真实角色
            fullRole: fullRole, // 保存完整角色名（如ROLE_ADMIN）
+           communityId: result.communityId, // ✅ 关键修复：从登录返回结果中保存 communityId
            token: result.token
          }
          uni.setStorageSync('userInfo', userInfo)

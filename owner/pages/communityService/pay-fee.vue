@@ -7,13 +7,16 @@
       <view class="bill-list">
         <view class="bill-item" v-for="item in unpaidBills" :key="item.id">
           <view class="bill-header">
-            <text class="bill-name">{{ item.feeName }}</text>
-            <text class="bill-amount">¥{{ item.amount }}</text>
+            <text class="bill-name">{{ item.feeType || item.feeName || item.fee_name || item.title || '物业费' }}</text>
+            <text class="bill-amount">¥{{ item.feeAmount || item.amount || item.payAmount || item.totalAmount || 0 }}</text>
           </view>
           <view class="bill-info">
-            <text>计费周期：{{ item.period }}</text>
-            <text>截止日期：{{ item.deadline }}</text>
+            <!-- 修复：不再重复显示费用名称，因为表头已经显示了 -->
+            <text>计费周期：{{ item.feeCycle || item.fee_cycle || item.period }}</text>
+            <text>截止日期：{{ item.dueDate || item.due_date || item.deadline }}</text>
           </view>
+          <!-- 调试信息：正式发布请删除 -->
+          <!-- <view style="font-size: 10px; color: #999;">ID: {{item.id}}</view> -->
           <button class="pay-btn" @click="handlePay(item)">立即缴费</button>
         </view>
       </view>
@@ -25,14 +28,18 @@
       <view class="bill-list">
         <view class="bill-item history-item" v-for="item in historyBills" :key="item.id">
           <view class="bill-header">
-            <text class="bill-name">{{ item.feeName }}</text>
-            <text class="bill-amount">¥{{ item.amount }}</text>
+            <text class="bill-name">{{ item.feeType || item.feeName || item.fee_name || item.title || '物业费' }}</text>
+            <text class="bill-amount">¥{{ item.payAmount || item.amount || item.pay_amount || 0 }}</text>
           </view>
           <view class="bill-info">
-            <text>缴费时间：{{ item.payTime }}</text>
-            <text>支付方式：{{ item.payMethod }}</text>
+          
+            <text>缴费时间：{{ item.payTime || item.pay_time }}</text>
+            <text>支付方式：{{ item.payType || item.pay_type || item.payMethod }}</text>
+            <text>计费周期：{{ item.feeCycle || item.fee_cycle || item.period }}</text>
           </view>
-          <text class="status-tag">已缴费</text>
+          <view class="status-bar">
+            <text class="status-tag">已缴费</text>
+          </view>
         </view>
       </view>
     </view>
@@ -59,7 +66,16 @@ export default {
     },
     async fetchUnpaidBills() {
       try {
-        const res = await request.get('/api/fee/unpaid')
+        const userInfo = uni.getStorageSync('userInfo')
+        const userId = userInfo?.id || userInfo?.userId
+        if (!userId) return
+
+        const res = await request({
+          url: '/api/fee/unpaid',
+          method: 'GET',
+          params: { userId }
+        })
+        console.log('【DEBUG】待缴账单数据:', JSON.stringify(res)) // 打印日志以便排查
         this.unpaidBills = res || []
       } catch (e) {
         console.error('获取待缴账单失败', e)
@@ -67,8 +83,18 @@ export default {
     },
     async fetchHistoryBills() {
       try {
-        const res = await request.get('/api/fee/history')
-        this.historyBills = res || []
+        const userInfo = uni.getStorageSync('userInfo')
+        const userId = userInfo?.id || userInfo?.userId
+        if (!userId) return
+
+        // 不传递 startTime 和 endTime，后端会查所有
+        const res = await request({
+          url: '/api/fee/history',
+          method: 'GET',
+          params: { userId }
+        })
+        // 兼容处理：后端可能返回分页对象或直接返回列表
+        this.historyBills = Array.isArray(res) ? res : (res.records || [])
       } catch (e) {
         console.error('获取历史账单失败', e)
       }
@@ -80,15 +106,26 @@ export default {
           const payMethod = res.tapIndex === 0 ? 'wechat' : 'alipay'
           try {
             uni.showLoading({ title: '支付中...' })
-            await request('/api/fee/pay', {
-              id: item.id,
-              payMethod: payMethod
-            }, 'POST')
+            const userInfo = uni.getStorageSync('userInfo')
+            const userId = userInfo?.id || userInfo?.userId
+            if (!userId) {
+              uni.hideLoading()
+              return uni.showToast({ title: '用户未登录', icon: 'none' })
+            }
+
+            // 手动拼接 userId 到 URL 上，确保后端能收到 @RequestParam 参数
+            await request(`/api/fee/pay?userId=${userId}`, {
+              feeId: item.feeId, // 【修复点1】后端返回的是 feeId，不是 id
+              payType: payMethod 
+            }, 'PUT')
             
             uni.hideLoading()
             uni.showToast({ title: '支付成功', icon: 'success' })
-            // 刷新数据
-            this.loadData()
+            // 刷新数据，重新获取待缴和历史账单
+            // 注意：因为后端可能存在主从延迟或事务提交延迟，稍微延迟一点再刷新
+            setTimeout(() => {
+              this.loadData()
+            }, 500)
           } catch (e) {
             uni.hideLoading()
             uni.showToast({ title: '支付失败', icon: 'none' })
@@ -160,10 +197,14 @@ export default {
   position: relative;
   opacity: 0.8;
 }
+.status-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx dashed #f0f0f0;
+}
 .status-tag {
-  position: absolute;
-  top: 30rpx;
-  right: 30rpx;
   color: #2ed573;
   font-size: 24rpx;
   border: 1rpx solid #2ed573;
