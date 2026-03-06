@@ -100,7 +100,8 @@ export default {
       const map = {
         'PENDING': '待审核',
         'APPROVED': '已通过',
-        'REJECTED': '已拒绝'
+        'REJECTED': '已拒绝',
+        'AWAITING_PAYMENT': '待缴费'
       }
       return map[status] || status
     },
@@ -118,7 +119,19 @@ export default {
           params: { status }
         })
         
-        this.list = Array.isArray(res) ? res : (res.records || [])
+        console.log('【DEBUG】车辆审核列表数据:', JSON.stringify(res))
+
+        let rawList = Array.isArray(res) ? res : (res.records || [])
+        
+        // 字段映射兼容处理
+        this.list = rawList.map(item => ({
+          ...item,
+          // 尝试兼容常见的字段名
+          ownerName: item.ownerName || item.userName || item.name || '未知用户',
+          phone: item.phone || item.mobile || item.phoneNumber || '-',
+          brand: item.brand || item.carBrand || '-',
+          color: item.color || item.carColor || '-'
+        }))
       } catch (e) {
         console.error('加载失败', e)
         // Mock 数据用于演示效果 (如果接口还没好)
@@ -163,10 +176,11 @@ export default {
     handleApprove(item) {
       uni.showModal({
         title: '确认通过',
-        content: `确认批准车辆 ${item.plateNo} 的绑定申请吗？`,
+        content: `确认通过车辆 ${item.plateNo} 的绑定申请吗？\n通过后业主将需要进行缴费。`,
         success: async (res) => {
           if (res.confirm) {
-            await this.submitAudit(item.id, 'APPROVED')
+            // 注意：这里将状态改为 AWAITING_PAYMENT (待缴费)
+            await this.submitAudit(item.id, 'AWAITING_PAYMENT')
           }
         }
       })

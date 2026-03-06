@@ -96,19 +96,20 @@ export default {
       }
 
       try {
-        const orderId = await request.post(
+        const orderId = await request(
           '/api/parking/lease/order/create',
           {
             userId: this.userInfo.id,
             spaceId: this.car.id,
             leaseType: this.car.leaseType
-          }
+          },
+          'POST'
         )
 
-        await request.post('/api/parking/lease/order/pay', {
+        await request('/api/parking/lease/order/pay', {
           orderId,
           payChannel: 'BALANCE'
-        })
+        }, 'POST')
 
         // 前端更新有效期
         this.car.expire = this.calcNewExpire(this.car)
@@ -136,9 +137,9 @@ export default {
       }
 
       try {
-        await request.post('/api/parking/gate/enter', {
+        await request('/api/parking/gate/enter', {
           plateNo: this.car.plateNo
-        })
+        }, 'POST')
         uni.showToast({ title: '开闸成功', icon: 'success' })
       } catch (e) {
         uni.showToast({ title: e.message || '开闸失败', icon: 'none' })
@@ -189,10 +190,10 @@ export default {
     
             console.log('绑定车牌号：', plateNo)
             try {
-              const result = await request.post('/api/parking/plate/bind', {
+              const result = await request('/api/parking/plate/bind', {
                 spaceId: this.car.id,
                 plateNo
-              })
+              }, 'POST')
               console.log('接口返回：', result)
               this.car.plateNo = plateNo
               uni.showToast({ title: '绑定成功', icon: 'success' })
@@ -214,11 +215,11 @@ export default {
       }
 
       try {
-        await request.post('/api/parking/plate/unbind', {
+        await request('/api/parking/plate/unbind', {
           userId: this.userInfo.id,
           spaceId: this.car.id,
           plateNo: this.car.plateNo
-        })
+        }, 'POST')
         this.car.plateNo = ''
         uni.showToast({ title: '解绑成功', icon: 'success' })
       } catch (e) {

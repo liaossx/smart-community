@@ -90,6 +90,31 @@
         <view v-else class="empty-state">
           <text>暂无访客申请记录</text>
         </view>
+
+        <!-- 分页组件 -->
+        <view v-if="total > 0" class="pagination">
+          <button 
+            class="page-btn" 
+            :disabled="currentPage === 1"
+            @click="handlePrevPage"
+          >
+            上一页
+          </button>
+          
+          <view class="page-info">
+            <text>{{ currentPage }}</text>
+            <text class="page-separator">/</text>
+            <text>{{ totalPages }}</text>
+          </view>
+          
+          <button 
+            class="page-btn" 
+            :disabled="currentPage === totalPages"
+            @click="handleNextPage"
+          >
+            下一页
+          </button>
+        </view>
       </view>
     </view>
   </admin-sidebar>
@@ -115,11 +140,29 @@ export default {
         { value: 'approved', label: '已通过' },
         { value: 'rejected', label: '已拒绝' }
       ],
-      visitorList: []
+      visitorList: [],
+      
+      // 分页相关
+      currentPage: 1,
+      pageSize: 10,
+      total: 0,
+      
+      // 统计数据
+      stats: {
+        total: 0,
+        pending: 0,
+        approved: 0
+      }
+    }
+  },
+  computed: {
+    totalPages() {
+      return Math.ceil(this.total / this.pageSize) || 1
     }
   },
   onLoad() {
     this.loadData()
+    this.loadStats()
   },
   methods: {
     async loadData() {
@@ -128,16 +171,16 @@ export default {
         const params = {
           keyword: this.searchQuery || undefined,
           status: this.statusFilter || undefined,
-          pageNum: 1,
-          pageSize: 10
+          pageNum: this.currentPage,
+          pageSize: this.pageSize
         }
         
-        // 调用后端接口
-        // 后端接口地址：/api/visitor/list (adminList方法)
-        // 注意：虽然方法名是adminList，但RequestMapping是/list，且在VisitorController下
         const data = await request('/api/visitor/list', { params }, 'GET')
         
-        this.visitorList = (data.records || []).map(item => ({
+        const records = data.records || data.data?.records || []
+        this.total = data.total || data.data?.total || 0
+        
+        this.visitorList = records.map(item => ({
           id: item.id,
           visitorName: item.visitorName,
           visitorPhone: item.visitorPhone,
@@ -152,18 +195,61 @@ export default {
       } catch (e) {
         console.error('加载访客列表失败', e)
         uni.showToast({ title: '加载失败', icon: 'none' })
+        this.visitorList = []
+        this.total = 0
       } finally {
         this.loading = false
       }
     },
     
+    // 加载统计数据
+    async loadStats() {
+      try {
+        const totalReq = request('/api/visitor/list', { params: { pageSize: 1 } }, 'GET')
+        const pendingReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'pending' } }, 'GET')
+        const approvedReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'approved' } }, 'GET')
+        
+        const [totalRes, pendingRes, approvedRes] = await Promise.all([totalReq, pendingReq, approvedReq])
+        
+        this.stats = {
+          total: totalRes.total || totalRes.data?.total || 0,
+          pending: pendingRes.total || pendingRes.data?.total || 0,
+          approved: approvedRes.total || approvedRes.data?.total || 0
+        }
+      } catch (e) {
+        console.error('加载统计数据失败', e)
+      }
+    },
+    
+    handleStatsClick(status) {
+      this.statusFilter = status
+      this.currentPage = 1
+      this.loadData()
+    },
+    
     handleSearch() {
+      this.currentPage = 1
       this.loadData()
     },
     
     handleStatusChange(e) {
       this.statusFilter = this.statusOptions[e.detail.value].value
+      this.currentPage = 1
       this.loadData()
+    },
+    
+    handlePrevPage() {
+      if (this.currentPage > 1) {
+        this.currentPage--
+        this.loadData()
+      }
+    },
+    
+    handleNextPage() {
+      if (this.currentPage < this.totalPages) {
+        this.currentPage++
+        this.loadData()
+      }
     },
     
     handleApprove(item) {
@@ -173,13 +259,13 @@ export default {
         success: async (res) => {
           if (res.confirm) {
             try {
-              // 后端接口：PUT /api/visitor/audit
               await request('/api/visitor/audit', {
                 id: item.id,
                 status: 'approved'
               }, 'PUT')
               item.status = 'approved'
               uni.showToast({ title: '审核通过', icon: 'success' })
+              this.loadStats() // 刷新统计
             } catch (e) {
               uni.showToast({ title: '操作失败', icon: 'none' })
             }
@@ -195,13 +281,13 @@ export default {
         success: async (res) => {
           if (res.confirm) {
             try {
-              // 后端接口：PUT /api/visitor/audit
               await request('/api/visitor/audit', {
                 id: item.id,
                 status: 'rejected'
               }, 'PUT')
               item.status = 'rejected'
               uni.showToast({ title: '已拒绝', icon: 'none' })
+              this.loadStats() // 刷新统计
             } catch (e) {
               uni.showToast({ title: '操作失败', icon: 'none' })
             }
@@ -244,6 +330,47 @@ export default {
   padding: 30rpx;
   background-color: #f5f7fa;
   min-height: 100vh;
+  padding-top: 100rpx;
+}
+
+/* 统计卡片样式 */
+.stats-card-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.stats-card {
+  background-color: #fff;
+  padding: 30rpx;
+  border-radius: 15rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+  text-align: center;
+  cursor: pointer;
+  border-left: 6rpx solid #2D81FF;
+}
+
+.stats-card.status-pending {
+  border-left-color: #ffa502;
+}
+
+.stats-card.status-approved {
+  border-left-color: #2ed573;
+}
+
+.stats-number {
+  display: block;
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+
+.stats-label {
+  display: block;
+  font-size: 24rpx;
+  color: #999;
 }
 
 /* 搜索栏 */
@@ -428,5 +555,45 @@ export default {
 .action-btn.reject {
   background: #f5f7fa;
   color: #666;
+}
+
+/* 分页组件样式 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20rpx;
+  margin-top: 40rpx;
+  padding: 20rpx 0;
+  background-color: #fff;
+  border-radius: 10rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+}
+
+.page-btn {
+  padding: 10rpx 20rpx;
+  background-color: #f5f7fa;
+  color: #333;
+  border: 1rpx solid #e4e7ed;
+  border-radius: 6rpx;
+  font-size: 28rpx;
+  min-width: 100rpx;
+}
+
+.page-btn[disabled] {
+  opacity: 0.5;
+  color: #909399;
+}
+
+.page-info {
+  display: flex;
+  align-items: center;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.page-separator {
+  margin: 0 10rpx;
+  color: #909399;
 }
 </style>

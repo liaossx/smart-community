@@ -47,6 +47,11 @@
     >
       登录
     </button>
+
+    <!-- 注册链接 -->
+    <view class="register-link" @click="goToRegister">
+      没有账号？去注册
+    </view>
   </view>
 </template>
 
@@ -64,6 +69,11 @@ export default {
     }
   },
   methods: {
+    goToRegister() {
+      uni.navigateTo({
+        url: '/owner/pages/register/register'
+      })
+    },
     async handleLogin() {
       try {
         // 表单验证
@@ -121,8 +131,8 @@ export default {
          setTimeout(() => {
            // 根据角色跳转到对应首页
           if (userInfo.role === 'admin' || userInfo.role === 'super_admin') {
-            // 管理员跳转到报修管理页面（管理员首页）
-            uni.redirectTo({ url: '/admin/pages/admin/repair-manage' })
+            // 管理员跳转到仪表盘页面（管理员首页）
+            uni.redirectTo({ url: '/admin/pages/admin/dashboard/index' })
           } else {
             // 业主跳转到用户首页
             uni.switchTab({ url: '/owner/pages/index/index' })
@@ -212,5 +222,12 @@ export default {
 .login-btn[disabled] {
   background-color: #89bfff;
   opacity: 0.8;
+}
+
+.register-link {
+  text-align: center;
+  margin-top: 30rpx;
+  color: #2D81FF;
+  font-size: 28rpx;
 }
 </style>

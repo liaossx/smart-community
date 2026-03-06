@@ -181,8 +181,8 @@
 
         <view class="parking-list">
           <view 
-            v-for="space in spaceList" 
-            :key="space.id" 
+            v-for="(space, index) in spaceList" 
+            :key="space.id ? `${space.id}-${index}` : index" 
             class="parking-item"
           >
             <view class="parking-info">
@@ -266,8 +266,17 @@
           />
         </view>
         <view class="dialog-row">
+          <text class="dialog-label">车牌号</text>
+          <input 
+            class="dialog-input" 
+            v-model="leaseForm.plateNo" 
+            placeholder="请输入车牌号 (必填)" 
+          />
+        </view>
+        <view class="dialog-row">
           <text class="dialog-label">卡类型</text>
           <picker 
+            class="dialog-picker"
             mode="selector" 
             :range="leaseTypeOptions" 
             range-key="label" 
@@ -275,6 +284,7 @@
           >
             <view class="dialog-picker-value">
               {{ getLeaseTypeLabel(leaseForm.leaseType) }}
+              <text class="iconfont">▼</text>
             </view>
           </picker>
         </view>
@@ -290,6 +300,7 @@
         <view class="dialog-row">
           <text class="dialog-label">支付方式</text>
           <picker 
+            class="dialog-picker"
             mode="selector" 
             :range="payChannelOptions" 
             range-key="label" 
@@ -297,6 +308,7 @@
           >
             <view class="dialog-picker-value">
               {{ getPayChannelLabel(leaseForm.payChannel) }}
+              <text class="iconfont">▼</text>
             </view>
           </picker>
         </view>
@@ -308,10 +320,10 @@
           v-model="leaseForm.remark" 
           placeholder="可填写办理说明"
         />
-      </view>
-      <view class="dialog-footer">
-        <button class="dialog-btn cancel" @click="closeLeaseDialog">取消</button>
-        <button class="dialog-btn confirm" @click="confirmLease">确认办理</button>
+        <view class="dialog-footer">
+          <button class="dialog-btn cancel" @click="closeLeaseDialog">取消</button>
+          <button class="dialog-btn confirm" @click="confirmLease">确认办理</button>
+        </view>
       </view>
     </view>
   </view>
@@ -371,6 +383,7 @@ export default {
       leaseDialogSpace: null,
       leaseForm: {
         userId: '',
+        plateNo: '',
         leaseType: 'MONTHLY',
         durationMonths: 1,
         payChannel: 'CASH',
@@ -692,19 +705,29 @@ export default {
           this.spacePageSize = backendPageSize
         }
 
+        const uniqueRecords = []
+        const spaceIds = new Set()
+        
+        filteredRecords.forEach(item => {
+          if (!spaceIds.has(item.id)) {
+            spaceIds.add(item.id)
+            uniqueRecords.push(item)
+          }
+        })
+
         const finalList = shouldSlice
-          ? filteredRecords.slice((effectivePageNum - 1) * effectivePageSize, effectivePageNum * effectivePageSize)
-          : filteredRecords
+          ? uniqueRecords.slice((effectivePageNum - 1) * effectivePageSize, effectivePageNum * effectivePageSize)
+          : uniqueRecords
         this.spaceList = finalList
 
         const stats = {
-          total: filteredRecords.length,
+          total: uniqueRecords.length,
           available: 0,
           occupied: 0,
           reserved: 0,
           disabled: 0
         }
-        filteredRecords.forEach(item => {
+        uniqueRecords.forEach(item => {
           const val = (item.status || '').toString().toUpperCase()
           if (val === 'AVAILABLE' || val === 'FREE') stats.available += 1
           else if (val === 'OCCUPIED') stats.occupied += 1
@@ -755,7 +778,10 @@ export default {
 
     handleOpenLease(space) {
       this.leaseDialogSpace = space
-      this.leaseForm.userId = ''
+      // 自动填充
+      this.leaseForm.userId = space.userId || space.ownerId || ''
+      this.leaseForm.plateNo = space.plateNo || ''
+      
       this.leaseForm.leaseType = 'MONTHLY'
       this.leaseForm.durationMonths = 1
       this.leaseForm.payChannel = 'CASH'
@@ -793,6 +819,12 @@ export default {
         uni.showToast({ title: '请输入用户ID', icon: 'none' })
         return
       }
+      const plateNo = (this.leaseForm.plateNo || '').toString().trim()
+      if (!plateNo) {
+        uni.showToast({ title: '请输入车牌号', icon: 'none' })
+        return
+      }
+
       let duration = Number(this.leaseForm.durationMonths)
       if (!duration || duration <= 0) {
         duration = 1
@@ -803,6 +835,7 @@ export default {
           data: {
             userId: userId,
             spaceId: this.leaseDialogSpace.id,
+            plateNo: plateNo, // 传递车牌号
             leaseType: this.leaseForm.leaseType,
             durationMonths: duration,
             remark: this.leaseForm.remark
@@ -1111,6 +1144,126 @@ export default {
   margin-bottom: 20rpx;
   filter: grayscale(1);
   opacity: 0.5;
+}
+
+/* 弹窗样式 */
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog-panel {
+  width: 600rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 40rpx;
+  animation: popIn 0.3s ease-out;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.dialog-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 40rpx;
+  color: #333;
+}
+
+.dialog-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.dialog-label {
+  width: 160rpx;
+  font-size: 28rpx;
+  color: #666;
+}
+
+.dialog-value {
+  font-size: 28rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.dialog-input {
+  flex: 1;
+  height: 80rpx;
+  background: #f5f7fa;
+  border-radius: 12rpx;
+  padding: 0 24rpx;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.dialog-picker-value {
+  flex: 1;
+  height: 80rpx;
+  line-height: 80rpx;
+  background: #f5f7fa;
+  border-radius: 12rpx;
+  padding: 0 24rpx;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.dialog-picker {
+  flex: 1;
+}
+
+.dialog-textarea {
+  width: 100%;
+  height: 160rpx;
+  background: #f5f7fa;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  font-size: 28rpx;
+  color: #333;
+  box-sizing: border-box;
+  margin-bottom: 40rpx;
+}
+
+.dialog-footer {
+  display: flex;
+  gap: 30rpx;
+}
+
+.dialog-btn {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  margin: 0;
+}
+
+.dialog-btn.cancel {
+  background: #f5f7fa;
+  color: #666;
+}
+
+.dialog-btn.confirm {
+  background: #2979ff;
+  color: #fff;
+  box-shadow: 0 8rpx 16rpx rgba(41, 121, 255, 0.2);
+}
+
+.dialog-btn:active {
+  transform: scale(0.98);
 }
 
 /* 分页 */

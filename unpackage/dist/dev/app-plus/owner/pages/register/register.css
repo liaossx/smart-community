@@ -1,5 +1,5 @@
 
-.login-container[data-v-cebd4568] {
+.register-container[data-v-e10ddd9f] {
   padding: 1.5625rem 0.9375rem;
   background-color: #f5f5f5;
   min-height: 100vh;
@@ -7,65 +7,56 @@
   display: flex;
   flex-direction: column;
 }
-.login-title[data-v-cebd4568] {
+.register-title[data-v-e10ddd9f] {
   font-size: 1.125rem;
   font-weight: bold;
   color: #333;
   text-align: center;
-  margin: 2.5rem 0;
+  margin: 1.25rem 0 1.875rem;
 }
-.input-item[data-v-cebd4568] {
+.input-item[data-v-e10ddd9f] {
   display: flex;
   align-items: center;
   background-color: #fff;
   border-radius: 0.3125rem;
   padding: 0 0.625rem;
   margin-bottom: 0.625rem;
-  height: 2.5rem;
+  height: 2.8125rem;
   box-shadow: 0 0.0625rem 0.15625rem rgba(0,0,0,0.05);
 }
-.input-icon[data-v-cebd4568] {
-  color: #2D81FF;
-  margin-right: 0.625rem;
-  font-size: 0.9375rem;
+.input-icon[data-v-e10ddd9f] {
+  width: 1.875rem;
+  text-align: center;
+  font-size: 1rem;
+  color: #555;
 }
-.placeholder-style[data-v-cebd4568] {
+.placeholder-style[data-v-e10ddd9f] {
   color: #ccc;
   font-size: 0.875rem;
 }
-
-/* 角色选择样式优化 */
-.role-group[data-v-cebd4568] {
-  display: flex;
-  justify-content: center;
-  margin: 1.25rem 0 1.875rem;
-}
-.radio-group[data-v-cebd4568] {
-  display: flex;
-  gap: 1.875rem;
+uni-input[data-v-e10ddd9f] {
+  flex: 1;
   font-size: 0.875rem;
   color: #333;
 }
-.role-item[data-v-cebd4568] {
-  display: flex;
-  align-items: center;
-  gap: 0.3125rem;
-}
-.login-btn[data-v-cebd4568] {
+.register-btn[data-v-e10ddd9f] {
   background-color: #2D81FF;
   color: #fff;
   font-size: 0.9375rem;
   height: 2.8125rem;
+  line-height: 2.8125rem;
   border-radius: 1.40625rem;
-  margin-top: 1.25rem;
+  margin-top: 1.875rem;
+  width: 100%;
 }
-.login-btn[disabled][data-v-cebd4568] {
+.register-btn[disabled][data-v-e10ddd9f] {
   background-color: #89bfff;
   opacity: 0.8;
 }
-.register-link[data-v-cebd4568] {
+.login-link[data-v-e10ddd9f] {
   text-align: center;
-  margin-top: 0.9375rem;
+  margin-top: 1.25rem;
   color: #2D81FF;
   font-size: 0.875rem;
+  text-decoration: underline;
 }

@@ -6,6 +6,22 @@
     currentPage="/admin/pages/admin/complaint-manage"
   >
     <view class="manage-container">
+      <!-- 统计卡片 -->
+      <view class="stats-card-container">
+        <view class="stats-card" @click="handleStatsClick('')">
+          <text class="stats-number">{{ stats.total }}</text>
+          <text class="stats-label">总投诉数</text>
+        </view>
+        <view class="stats-card status-pending" @click="handleStatsClick('pending')">
+          <text class="stats-number">{{ stats.pending }}</text>
+          <text class="stats-label">待处理</text>
+        </view>
+        <view class="stats-card status-processed" @click="handleStatsClick('processed')">
+          <text class="stats-number">{{ stats.processed }}</text>
+          <text class="stats-label">已处理</text>
+        </view>
+      </view>
+
       <!-- 搜索和筛选栏 -->
       <view class="search-filter-bar">
         <view class="search-box">
@@ -69,16 +85,14 @@
             <view class="item-info">
                 <view class="info-row">
                   <text class="label">投诉人：</text>
-                  <!-- 优先使用 ownerName (业主实名)，如果没有则用 userName (用户名)，再没有则显示 '匿名' -->
                   <text class="value">{{ item.ownerName || item.userName || '匿名' }} <text class="phone" v-if="item.phone" @click="makeCall(item.phone)">{{ item.phone }}</text></text>
                 </view>
                 <view class="info-row">
                   <text class="label">房号：</text>
-                  <!-- 如果有楼栋号和房号则显示，否则显示 '未绑定房屋' -->
                   <text class="value" v-if="item.buildingNo && item.houseNo">{{ item.buildingNo }}栋{{ item.houseNo }}室</text>
                   <text class="value" v-else>未绑定房屋</text>
                 </view>
-              <view v-if="item.status === 'processed'" class="result-box">
+              <view v-if="item.status === 'DONE'" class="result-box">
                 <text class="label">处理结果：</text>
                 <text class="value">{{ item.result }}</text>
               </view>
@@ -86,11 +100,10 @@
             
             <view class="item-footer">
               <button 
-                v-if="item.status === 'pending'" 
                 class="action-btn handle" 
                 @click="openHandleModal(item)"
               >
-                立即处理
+                {{ String(item.status) === 'PENDING' ? '立即处理' : '重新处理' }}
               </button>
               <button 
                 class="action-btn call" 
@@ -105,6 +118,31 @@
         
         <view v-else class="empty-state">
           <text>暂无投诉记录</text>
+        </view>
+
+        <!-- 分页组件 -->
+        <view v-if="total > 0" class="pagination">
+          <button 
+            class="page-btn" 
+            :disabled="currentPage === 1"
+            @click="handlePrevPage"
+          >
+            上一页
+          </button>
+          
+          <view class="page-info">
+            <text>{{ currentPage }}</text>
+            <text class="page-separator">/</text>
+            <text>{{ totalPages }}</text>
+          </view>
+          
+          <button 
+            class="page-btn" 
+            :disabled="currentPage === totalPages"
+            @click="handleNextPage"
+          >
+            下一页
+          </button>
         </view>
       </view>
       
@@ -148,19 +186,37 @@ export default {
       loading: false,
       statusOptions: [
         { value: '', label: '全部状态' },
-        { value: 'pending', label: '待处理' },
-        { value: 'processed', label: '已处理' }
+        { value: 'PENDING', label: '待处理' },
+        { value: 'DONE', label: '已处理' }
       ],
       complaintList: [],
       
+      // 分页相关
+      currentPage: 1,
+      pageSize: 10,
+      total: 0,
+      
+      // 统计数据
+      stats: {
+        total: 0,
+        pending: 0,
+        processed: 0
+      },
+
       // 处理弹窗
       showHandleModal: false,
       currentComplaint: null,
       handleResult: ''
     }
   },
+  computed: {
+    totalPages() {
+      return Math.ceil(this.total / this.pageSize) || 1
+    }
+  },
   onLoad() {
     this.loadData()
+    this.loadStats()
   },
   methods: {
     async loadData() {
@@ -168,41 +224,96 @@ export default {
       try {
         const params = {
           keyword: this.searchQuery || undefined,
-          status: this.statusFilter || undefined
+          status: this.statusFilter || undefined,
+          pageNum: this.currentPage,
+          pageSize: this.pageSize
         }
         
         // 调用后端接口
         const data = await request('/api/complaint/list', { params }, 'GET')
         
-        this.complaintList = (data.records || []).map(item => ({
+        // 兼容处理返回结构
+        const records = Array.isArray(data) ? data : (data.records || data.data?.records || data.rows || [])
+        this.total = typeof data.total === 'number' ? data.total : (data.data?.total || records.length || 0)
+        
+        this.complaintList = records.map(item => ({
           id: item.id,
           type: item.type,
           content: item.content,
-          images: item.images, // 需要后端返回图片URL
-          ownerName: item.ownerName, // 业主实名 (可能为空)
-          userName: item.userName,   // 登录用户名 (通常不为空)
-          phone: item.phone, // 需要后端返回手机号
+          images: item.images,
+          ownerName: item.ownerName,
+          userName: item.userName,
+          phone: item.phone,
           buildingNo: item.buildingNo,
           houseNo: item.houseNo,
           createTime: item.createTime,
-          status: item.status, // pending/processed
+          status: item.status, // PENDING/DONE
           result: item.result
         }))
       } catch (e) {
         console.error('加载投诉列表失败', e)
         uni.showToast({ title: '加载失败', icon: 'none' })
+        this.complaintList = []
+        this.total = 0
       } finally {
         this.loading = false
       }
     },
     
+    // 加载统计数据
+    async loadStats() {
+      try {
+        // 使用 loadData 的逻辑来获取统计数据，确保接口调用一致
+        // 1. 获取总数
+        const totalReq = request('/api/complaint/list', { params: { pageNum: 1, pageSize: 1 } }, 'GET')
+        // 2. 获取待处理数
+        const pendingReq = request('/api/complaint/list', { params: { pageNum: 1, pageSize: 1, status: 'PENDING' } }, 'GET')
+        // 3. 获取已处理数
+        const processedReq = request('/api/complaint/list', { params: { pageNum: 1, pageSize: 1, status: 'DONE' } }, 'GET')
+        
+        const [totalRes, pendingRes, processedRes] = await Promise.all([totalReq, pendingReq, processedReq])
+        
+        console.log('Stats Response Data:', { totalRes, pendingRes, processedRes })
+        
+        this.stats = {
+          total: totalRes?.total || 0,
+          pending: pendingRes?.total || 0,
+          processed: processedRes?.total || 0
+        }
+      } catch (e) {
+        console.error('加载统计数据失败', e)
+      }
+    },
+    
+    handleStatsClick(status) {
+      this.statusFilter = status
+      this.currentPage = 1
+      this.loadData()
+    },
+    
     handleSearch() {
+      this.currentPage = 1
       this.loadData()
     },
     
     handleStatusChange(e) {
       this.statusFilter = this.statusOptions[e.detail.value].value
+      this.currentPage = 1
       this.loadData()
+    },
+    
+    handlePrevPage() {
+      if (this.currentPage > 1) {
+        this.currentPage--
+        this.loadData()
+      }
+    },
+    
+    handleNextPage() {
+      if (this.currentPage < this.totalPages) {
+        this.currentPage++
+        this.loadData()
+      }
     },
     
     openHandleModal(item) {
@@ -216,14 +327,6 @@ export default {
       this.currentComplaint = null
     },
     
-    viewDetail(item) {
-      uni.showModal({
-        title: '投诉详情',
-        content: `投诉内容：${item.content}\n\n处理结果：${item.result || '暂无'}`,
-        showCancel: false
-      })
-    },
-    
     async submitHandle() {
       if (!this.handleResult) {
         uni.showToast({ title: '请输入处理结果', icon: 'none' })
@@ -232,21 +335,24 @@ export default {
       
       uni.showLoading({ title: '提交中...' })
       try {
-        // 调用处理接口
-        await request('/api/complaint/handle', {
-          id: this.currentComplaint.id,
-          result: this.handleResult
-        }, 'PUT')
+        // 调用处理接口，注意后端接收的是 query param 而不是 json body
+        // 这里的 request 封装默认如果是 POST/PUT 且 data 是对象，会序列化为 JSON body
+        // 但后端的 @RequestParam 需要的是 query parameters 或者 form-data
+        // 所以我们需要手动拼接参数到 URL，或者修改 request 封装（这里选择拼接 URL 最稳妥）
+        const url = `/api/complaint/handle?id=${this.currentComplaint.id}&result=${encodeURIComponent(this.handleResult)}`
+        
+        await request(url, {}, 'PUT')
         
         // 本地更新状态
         const item = this.complaintList.find(i => i.id === this.currentComplaint.id)
         if (item) {
-          item.status = 'processed'
+          item.status = 'DONE'
           item.result = this.handleResult
         }
         
         uni.showToast({ title: '处理成功', icon: 'success' })
         this.closeHandleModal()
+        this.loadStats() // 重新加载统计
       } catch (e) {
         console.error('处理投诉失败', e)
         uni.showToast({ title: '提交失败', icon: 'none' })
@@ -271,21 +377,22 @@ export default {
 
     getStatusClass(status) {
       return {
-        'status-pending': status === 'pending',
-        'status-processed': status === 'processed'
+        'status-pending': status === 'PENDING',
+        'status-processed': status === 'DONE'
       }
     },
     
     getStatusText(status) {
       const map = {
-        'pending': '待处理',
-        'processed': '已处理'
+        'PENDING': '待处理',
+        'DONE': '已处理'
       }
       return map[status] || status
     },
     
     formatTime(time) {
-      return time
+      if (!time) return ''
+      return new Date(time).toLocaleString()
     }
   }
 }
@@ -296,6 +403,47 @@ export default {
   padding: 30rpx;
   background-color: #f5f7fa;
   min-height: 100vh;
+  padding-top: 100rpx;
+}
+
+/* 统计卡片样式 */
+.stats-card-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.stats-card {
+  background-color: #fff;
+  padding: 30rpx;
+  border-radius: 15rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+  text-align: center;
+  cursor: pointer;
+  border-left: 6rpx solid #2D81FF;
+}
+
+.stats-card.status-pending {
+  border-left-color: #ff4757;
+}
+
+.stats-card.status-processed {
+  border-left-color: #2ed573;
+}
+
+.stats-number {
+  display: block;
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+
+.stats-label {
+  display: block;
+  font-size: 24rpx;
+  color: #999;
 }
 
 /* 搜索栏 */
@@ -490,6 +638,46 @@ export default {
   background: #e6f7ff;
   color: #1890ff;
   border: 1rpx solid #91d5ff;
+}
+
+/* 分页组件样式 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20rpx;
+  margin-top: 40rpx;
+  padding: 20rpx 0;
+  background-color: #fff;
+  border-radius: 10rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+}
+
+.page-btn {
+  padding: 10rpx 20rpx;
+  background-color: #f5f7fa;
+  color: #333;
+  border: 1rpx solid #e4e7ed;
+  border-radius: 6rpx;
+  font-size: 28rpx;
+  min-width: 100rpx;
+}
+
+.page-btn[disabled] {
+  opacity: 0.5;
+  color: #909399;
+}
+
+.page-info {
+  display: flex;
+  align-items: center;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.page-separator {
+  margin: 0 10rpx;
+  color: #909399;
 }
 
 /* 弹窗 */

@@ -83,7 +83,10 @@ export default {
   methods: {
     async loadCommunities() {
       try {
-        const res = await request.get('/api/community/list')
+        const res = await request({
+          url: '/api/community/list',
+          method: 'GET'
+        })
         // 兼容返回格式：可能是数组直接返回，也可能是分页对象的records
         this.communities = Array.isArray(res) ? res : (res.records || [])
       } catch (e) {

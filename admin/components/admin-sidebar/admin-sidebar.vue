@@ -73,6 +73,7 @@ export default {
       adminName: '管理员',
       roleName: '管理员',
       menuList: [
+        { text: '仪表盘', icon: '📊', path: '/admin/pages/admin/dashboard/index' },
         { text: '报修管理', icon: '🛠️', path: '/admin/pages/admin/repair-manage' },
         { text: '公告管理', icon: '📢', path: '/admin/pages/admin/notice-manage' },
         { text: '费用管理', icon: '💰', path: '/admin/pages/admin/fee-manage' },

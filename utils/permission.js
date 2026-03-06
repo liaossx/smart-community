@@ -148,7 +148,7 @@ export function goToHomeByRole() {
   
   if (userInfo.role === 'admin' || userInfo.role === 'super_admin') {
     // 管理员首页
-    uni.redirectTo({ url: '/admin/pages/admin/repair-manage' })
+    uni.redirectTo({ url: '/admin/pages/admin/dashboard/index' })
   } else {
     // 普通用户首页
     uni.switchTab({ url: '/owner/pages/index/index' })

@@ -383,6 +383,14 @@
 .notice-list[data-v-e729d483] {
   margin-bottom: 1.25rem;
 }
+.list-header[data-v-e729d483] {
+  margin-bottom: 0.625rem;
+  padding: 0 0.3125rem;
+}
+.total-count[data-v-e729d483] {
+  font-size: 0.8125rem;
+  color: #666;
+}
 .notice-item[data-v-e729d483] {
   background: white;
   border-radius: 0.625rem;
@@ -503,29 +511,40 @@
 }
 
 /* 分页组件样式 */
-.pagination[data-v-e729d483] {
+.pagination-container[data-v-e729d483] {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 0.625rem;
   margin-top: 1.25rem;
-  padding: 0.625rem 0;
+  padding: 0.9375rem 0;
   background-color: #fff;
   border-radius: 0.3125rem;
   box-shadow: 0 0.0625rem 0.3125rem rgba(0,0,0,0.05);
 }
+.page-info[data-v-e729d483] {
+  font-size: 0.8125rem;
+  color: #666;
+}
+.pagination-btns[data-v-e729d483] {
+  display: flex;
+  gap: 0.9375rem;
+}
 .page-btn[data-v-e729d483] {
-  padding: 0.3125rem 0.625rem;
-  background-color: #f5f7fa;
+  padding: 0 1.25rem;
+  height: 2.1875rem;
+  line-height: 2.1875rem;
+  background-color: #fff;
   color: #333;
   border: 0.03125rem solid #e4e7ed;
-  border-radius: 0.1875rem;
+  border-radius: 1.09375rem;
   font-size: 0.875rem;
-  min-width: 3.125rem;
+  min-width: 5rem;
   margin: 0;
 }
 .page-btn[disabled][data-v-e729d483] {
-  opacity: 0.5;
-  color: #909399;
+  background-color: #f5f7fa;
+  color: #c0c4cc;
+  border-color: #ebeef5;
 }
 

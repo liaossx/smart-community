@@ -55,8 +55,8 @@ export default {
       bills: []
     }
   },
-  onLoad() {
-    // 页面加载时获取数据
+  onShow() {
+    // 每次页面显示时重新获取数据，解决切换账号数据不刷新的问题
     this.fetchUserData()
     this.fetchHouseData()
     this.fetchBillData()

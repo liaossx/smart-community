@@ -77,7 +77,10 @@ export default {
     // 查询余额
     async loadBalance() {
       try {
-        const res = await request.get('/api/parking/account/balance')
+        const res = await request({
+          url: '/api/parking/account/balance',
+          method: 'GET'
+        })
         // 兼容处理：可能返回数字或对象
         if (typeof res === 'number') {
           this.balance = res

@@ -6,6 +6,22 @@
     currentPage="/admin/pages/admin/user-manage"
   >
     <view class="manage-container">
+      <!-- 统计卡片 -->
+      <view class="stats-card-container">
+        <view class="stats-card" @click="handleStatsClick('')">
+          <text class="stats-number">{{ stats.total }}</text>
+          <text class="stats-label">总用户数</text>
+        </view>
+        <view class="stats-card status-admin" @click="handleStatsClick('admin')">
+          <text class="stats-number">{{ stats.admin }}</text>
+          <text class="stats-label">管理员</text>
+        </view>
+        <view class="stats-card status-owner" @click="handleStatsClick('owner')">
+          <text class="stats-number">{{ stats.owner }}</text>
+          <text class="stats-label">业主</text>
+        </view>
+      </view>
+
       <view class="search-section">
         <view class="search-left">
           <input 
@@ -86,6 +102,31 @@
             </button>
           </view>
         </view>
+
+        <!-- 分页组件 -->
+        <view v-if="total > 0" class="pagination">
+          <button 
+            class="page-btn" 
+            :disabled="currentPage === 1"
+            @click="handlePrevPage"
+          >
+            上一页
+          </button>
+          
+          <view class="page-info">
+            <text>{{ currentPage }}</text>
+            <text class="page-separator">/</text>
+            <text>{{ totalPages }}</text>
+          </view>
+          
+          <button 
+            class="page-btn" 
+            :disabled="currentPage === totalPages"
+            @click="handleNextPage"
+          >
+            下一页
+          </button>
+        </view>
       </view>
 
       <view v-else class="empty-state">
@@ -160,16 +201,32 @@ export default {
         phone: '',
         role: ''
       },
-      saving: false
+      saving: false,
+      
+      // 分页相关
+      currentPage: 1,
+      pageSize: 10,
+      total: 0,
+      
+      // 统计数据
+      stats: {
+        total: 0,
+        admin: 0,
+        owner: 0
+      }
     }
   },
   computed: {
     roleFilterValue() {
       return this.roleFilter || ''
+    },
+    totalPages() {
+      return Math.ceil(this.total / this.pageSize) || 1
     }
   },
   onLoad() {
     this.loadUserList()
+    this.loadStats()
   },
   methods: {
     getRoleLabel(role) {
@@ -189,13 +246,24 @@ export default {
       const index = Number(e.detail.value)
       const option = this.roleOptions[index]
       this.roleFilter = option ? option.value : ''
+      this.currentPage = 1
+      this.loadUserList()
+    },
+    
+    handleStatsClick(role) {
+      this.roleFilter = role
+      this.currentPage = 1
       this.loadUserList()
     },
 
     async loadUserList() {
       this.loading = true
       try {
-        const params = { pageNum: 1, pageSize: 20, keyword: this.searchKey }
+        const params = { 
+          pageNum: this.currentPage, 
+          pageSize: this.pageSize, 
+          keyword: this.searchKey 
+        }
         if (this.roleFilterValue) {
           params.role = this.roleFilterValue
         }
@@ -206,16 +274,53 @@ export default {
         )
         const records = res?.records || res?.data?.records || []
         this.userList = Array.isArray(records) ? records : []
+        this.total = res?.total || res?.data?.total || 0
       } catch (err) {
         console.error('加载用户列表失败:', err)
         uni.showToast({ title: '加载失败', icon: 'none' })
+        this.userList = []
+        this.total = 0
       } finally {
         this.loading = false
       }
     },
     
+    // 加载统计数据
+    async loadStats() {
+      try {
+        const totalReq = request('/api/admin/user/list', { params: { pageSize: 1 } }, 'GET')
+        const adminReq = request('/api/admin/user/list', { params: { pageSize: 1, role: 'admin' } }, 'GET')
+        const ownerReq = request('/api/admin/user/list', { params: { pageSize: 1, role: 'owner' } }, 'GET')
+        
+        const [totalRes, adminRes, ownerRes] = await Promise.all([totalReq, adminReq, ownerReq])
+        
+        this.stats = {
+          total: totalRes.total || totalRes.data?.total || 0,
+          admin: adminRes.total || adminRes.data?.total || 0,
+          owner: ownerRes.total || ownerRes.data?.total || 0
+        }
+      } catch (e) {
+        console.error('加载统计数据失败', e)
+      }
+    },
+    
     handleSearch() {
+      this.currentPage = 1
       this.loadUserList()
+    },
+    
+    handlePrevPage() {
+      if (this.currentPage > 1) {
+        this.currentPage--
+        this.loadUserList()
+      }
+    },
+    
+    handleNextPage() {
+      if (this.currentPage < this.totalPages) {
+        this.currentPage++
+        this.loadUserList()
+      }
     },
     
     handleEditUser(user) {
@@ -318,9 +423,50 @@ export default {
 
 <style scoped>
 .manage-container {
-  padding: 120rpx 30rpx 30rpx;
+  padding: 30rpx;
   background-color: #f5f6fa;
   min-height: 100vh;
+  padding-top: 100rpx;
+}
+
+/* 统计卡片样式 */
+.stats-card-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.stats-card {
+  background-color: #fff;
+  padding: 30rpx;
+  border-radius: 15rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+  text-align: center;
+  cursor: pointer;
+  border-left: 6rpx solid #2D81FF;
+}
+
+.stats-card.status-admin {
+  border-left-color: #722ed1;
+}
+
+.stats-card.status-owner {
+  border-left-color: #faad14;
+}
+
+.stats-number {
+  display: block;
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+
+.stats-label {
+  display: block;
+  font-size: 24rpx;
+  color: #999;
 }
 
 .search-section {
@@ -570,5 +716,45 @@ export default {
 .role-picker-text {
   font-size: 26rpx;
   color: #333;
+}
+
+/* 分页组件样式 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20rpx;
+  margin-top: 40rpx;
+  padding: 20rpx 0;
+  background-color: #fff;
+  border-radius: 10rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+}
+
+.page-btn {
+  padding: 10rpx 20rpx;
+  background-color: #f5f7fa;
+  color: #333;
+  border: 1rpx solid #e4e7ed;
+  border-radius: 6rpx;
+  font-size: 28rpx;
+  min-width: 100rpx;
+}
+
+.page-btn[disabled] {
+  opacity: 0.5;
+  color: #909399;
+}
+
+.page-info {
+  display: flex;
+  align-items: center;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.page-separator {
+  margin: 0 10rpx;
+  color: #909399;
 }
 </style>

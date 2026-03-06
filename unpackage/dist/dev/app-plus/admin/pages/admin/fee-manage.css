@@ -283,7 +283,42 @@
 
 /* 顶部搜索 */
 .header[data-v-764c8d8b] {
+  margin-bottom: 0.625rem;
+}
+
+/* 统计卡片样式 */
+.stats-card-container[data-v-764c8d8b] {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.625rem;
   margin-bottom: 0.9375rem;
+}
+.stats-card[data-v-764c8d8b] {
+  background-color: #fff;
+  padding: 0.9375rem;
+  border-radius: 0.46875rem;
+  box-shadow: 0 0.0625rem 0.3125rem rgba(0,0,0,0.05);
+  text-align: center;
+  cursor: pointer;
+  border-left: 0.1875rem solid #2D81FF;
+}
+.stats-card.status-unpaid[data-v-764c8d8b] {
+  border-left-color: #ff4757;
+}
+.stats-card.status-paid[data-v-764c8d8b] {
+  border-left-color: #2ed573;
+}
+.stats-number[data-v-764c8d8b] {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 0.3125rem;
+}
+.stats-label[data-v-764c8d8b] {
+  display: block;
+  font-size: 0.75rem;
+  color: #999;
 }
 .search-box[data-v-764c8d8b] {
   display: flex;
@@ -437,6 +472,43 @@
   color: white;
   border-radius: 0.8125rem;
   margin: 0;
+}
+
+/* 分页组件样式 */
+.pagination[data-v-764c8d8b] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  margin-top: 1.25rem;
+  padding: 0.625rem 0;
+  background-color: #fff;
+  border-radius: 0.3125rem;
+  box-shadow: 0 0.0625rem 0.3125rem rgba(0,0,0,0.05);
+}
+.page-btn[data-v-764c8d8b] {
+  padding: 0.3125rem 0.625rem;
+  background-color: #f5f7fa;
+  color: #333;
+  border: 0.03125rem solid #e4e7ed;
+  border-radius: 0.1875rem;
+  font-size: 0.875rem;
+  min-width: 3.125rem;
+  margin: 0;
+}
+.page-btn[disabled][data-v-764c8d8b] {
+  opacity: 0.5;
+  color: #909399;
+}
+.page-info[data-v-764c8d8b] {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #333;
+}
+.page-separator[data-v-764c8d8b] {
+  margin: 0 0.3125rem;
+  color: #909399;
 }
 
 /* 底部统计栏 */

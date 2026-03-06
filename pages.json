@@ -67,6 +67,12 @@
         }
       },
       {
+        "path": "owner/pages/register/register",
+        "style": {
+          "navigationBarTitleText": "用户注册"
+        }
+      },
+      {
         "path": "owner/pages/repair/repair",
         "style": {
           "navigationBarTitleText": "提交报修"
@@ -76,6 +82,13 @@
         "path": "admin/pages/admin/repair-manage",
         "style": {
           "navigationBarTitleText": "报修管理",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/dashboard/index",
+        "style": {
+          "navigationBarTitleText": "仪表盘",
           "navigationStyle": "custom"
         }
       },

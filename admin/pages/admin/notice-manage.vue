@@ -87,6 +87,9 @@
 
       <!-- 列表 -->
       <view v-else-if="noticeList.length" class="notice-list">
+        <view class="list-header">
+          <text class="total-count">共 {{ total }} 条公告</text>
+        </view>
         <view
           v-for="notice in noticeList"
           :key="notice.id"
@@ -148,20 +151,24 @@
       </view>
 
       <!-- 分页 -->
-      <view v-if="total > 0" class="pagination">
-        <button class="page-btn" :disabled="currentPage === 1" @click="prevPage">
-          上一页
-        </button>
-
-        <text>{{ currentPage }} / {{ totalPage }}</text>
-
-        <button
-          class="page-btn"
-          :disabled="currentPage === totalPage"
-          @click="nextPage"
-        >
-          下一页
-        </button>
+      <view v-if="total > 0" class="pagination-container">
+        <text class="page-info">共 {{ total }} 条，当前第 {{ currentPage }}/{{ totalPage }} 页</text>
+        <view class="pagination-btns">
+          <button 
+            class="page-btn" 
+            :disabled="currentPage === 1" 
+            @click="prevPage"
+          >
+            上一页
+          </button>
+          <button
+            class="page-btn"
+            :disabled="currentPage === totalPage"
+            @click="nextPage"
+          >
+            下一页
+          </button>
+        </view>
       </view>
 
     </view>
@@ -244,6 +251,9 @@ export default {
         const params = {
           pageNum: this.currentPage,
           pageSize: this.pageSize,
+          // 优先置顶，其次按发布时间
+          orderByColumn: 'top_flag desc, publish_time', 
+          isAsc: 'desc',
           ...this.filters
         }
         
@@ -632,6 +642,16 @@ export default {
   margin-bottom: 40rpx;
 }
 
+.list-header {
+  margin-bottom: 20rpx;
+  padding: 0 10rpx;
+}
+
+.total-count {
+  font-size: 26rpx;
+  color: #666;
+}
+
 .notice-item {
   background: white;
   border-radius: 20rpx;
@@ -773,32 +793,45 @@ export default {
 }
 
 /* 分页组件样式 */
-.pagination {
+.pagination-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 20rpx;
   margin-top: 40rpx;
-  padding: 20rpx 0;
+  padding: 30rpx 0;
   background-color: #fff;
   border-radius: 10rpx;
   box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
 }
 
+.page-info {
+  font-size: 26rpx;
+  color: #666;
+}
+
+.pagination-btns {
+  display: flex;
+  gap: 30rpx;
+}
+
 .page-btn {
-  padding: 10rpx 20rpx;
-  background-color: #f5f7fa;
+  padding: 0 40rpx;
+  height: 70rpx;
+  line-height: 70rpx;
+  background-color: #fff;
   color: #333;
   border: 1rpx solid #e4e7ed;
-  border-radius: 6rpx;
+  border-radius: 35rpx;
   font-size: 28rpx;
-  min-width: 100rpx;
+  min-width: 160rpx;
   margin: 0;
 }
 
 .page-btn[disabled] {
-  opacity: 0.5;
-  color: #909399;
+  background-color: #f5f7fa;
+  color: #c0c4cc;
+  border-color: #ebeef5;
 }
 
 </style>

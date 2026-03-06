@@ -20,13 +20,10 @@
           <text class="stats-number">{{ stats.processing }}</text>
           <text class="stats-label">处理中</text>
         </view>
-        <view class="stats-card status-completed" @click="handleStatsClick('completed')">
-          <text class="stats-number">{{ stats.completed }}</text>
-          <text class="stats-label">已完成</text>
-        </view>
-        <view class="stats-card status-cancelled" @click="handleStatsClick('cancelled')">
-          <text class="stats-number">{{ stats.cancelled }}</text>
-          <text class="stats-label">已取消</text>
+        <!-- 新增今日数据统计 -->
+        <view class="stats-card status-today">
+          <text class="stats-number">{{ stats.today }}</text>
+          <text class="stats-label">今日新增</text>
         </view>
       </view>
       
@@ -350,7 +347,8 @@ export default {
         pending: 0,
         processing: 0,
         completed: 0,
-        cancelled: 0
+        cancelled: 0,
+        today: 0
       },
       // 导出功能
       exporting: false,
@@ -438,6 +436,7 @@ export default {
         this.total = data.data?.total || data.total || 0
         
         // 直接使用本地计算的统计数据，不调用不存在的统计接口
+        this.loadStats()
         this.calculateStats()
         
         // 数据加载完成后，重置selectAll状态
@@ -457,21 +456,52 @@ export default {
       }
     },
     
-    // 统计数据方法 - 直接使用本地计算，不再调用不存在的接口
-    loadStats() {
-      // 直接使用本地计算的统计数据
-      this.calculateStats()
+    // 统计数据方法 - 尝试调用真实接口获取统计，如果失败则使用本地计算作为保底
+    async loadStats() {
+      try {
+        // 并行请求获取各状态数量（利用 pageSize=1 减少数据传输）
+        // 1. 获取总数
+        const totalReq = request('/api/repair/admin/all', { params: { pageSize: 1 } }, 'GET')
+        // 2. 获取待处理数
+        const pendingReq = request('/api/repair/admin/all', { params: { pageSize: 1, status: 'pending' } }, 'GET')
+        // 3. 获取处理中数
+        const processingReq = request('/api/repair/admin/all', { params: { pageSize: 1, status: 'processing' } }, 'GET')
+        
+        // 尝试获取今日新增（假设后端支持 createTime 参数，或者不做此统计）
+        // const todayStr = new Date().toISOString().split('T')[0]
+        // const todayReq = request('/api/repair/admin/all', { params: { pageSize: 1, createTime: todayStr } }, 'GET')
+        
+        const [totalRes, pendingRes, processingRes] = await Promise.all([totalReq, pendingReq, processingReq])
+        
+        this.stats.total = totalRes.data?.total || totalRes.total || 0
+        this.stats.pending = pendingRes.data?.total || pendingRes.total || 0
+        this.stats.processing = processingRes.data?.total || processingRes.total || 0
+        
+        // 如果今日无法获取，暂时不显示或显示0
+        this.stats.today = 0 // 待定
+        
+      } catch (e) {
+        console.error('加载统计数据失败，切换回本地计算', e)
+        // 失败时使用本地计算作为回退
+        this.calculateStats()
+      }
     },
     
     // 本地计算统计数据（降级方案）
     calculateStats() {
-      this.stats = {
-        total: this.repairList.length,
-        pending: this.repairList.filter(item => item.status === 'pending').length,
-        processing: this.repairList.filter(item => item.status === 'processing').length,
-        completed: this.repairList.filter(item => item.status === 'completed').length,
-        cancelled: this.repairList.filter(item => item.status === 'cancelled').length
-      }
+      // 注意：这只计算当前页的数据，是不准确的，但在没有统计接口时也没办法
+      this.stats.today = this.repairList.filter(item => {
+        if (!item.createTime) return false
+        const date = new Date(item.createTime)
+        const today = new Date()
+        return date.getDate() === today.getDate() &&
+               date.getMonth() === today.getMonth() &&
+               date.getFullYear() === today.getFullYear()
+      }).length
+      
+      // 其他状态只作为增量更新，不覆盖远程获取的值（如果远程成功的话）
+      // 如果远程彻底失败，这里应该全量计算，但因为分页存在，全量计算也不准。
+      // 所以最好的办法是依赖 loadStats 的远程调用。
     },
     
     // 统计卡片点击事件

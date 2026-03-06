@@ -119,7 +119,12 @@ export default {
               this.loadData() // 刷新列表
             } catch (e) {
               uni.hideLoading()
-              uni.showToast({ title: e.message || '报名失败', icon: 'none' })
+              const msg = e.message || ''
+              if (msg.includes('已报名')) {
+                uni.showToast({ title: '您已报名，无需重复操作', icon: 'none' })
+              } else {
+                uni.showToast({ title: msg || '报名失败', icon: 'none' })
+              }
             }
           }
         }

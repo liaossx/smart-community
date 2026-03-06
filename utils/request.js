@@ -106,9 +106,10 @@ function request(options) {
           // HTTP状态码为200，检查业务code
           if (bizCode === 200 || bizCode === 0 || bizCode === undefined || Number.isNaN(bizCode)) {
             // 业务code为200、0、undefined或无法解析时，视为成功
-            // 修复：明确判断 data 是否存在，而不是依赖 || 运算符
-            // 如果 data 是 0 或 false，应该直接返回 data
-            resolve(data !== undefined ? data : responseData);
+            // 修复：明确判断 data 是否存在
+            const resolvedData = data !== undefined ? data : responseData;
+            console.log('Request resolved with:', JSON.stringify(resolvedData).substring(0, 200) + '...');
+            resolve(resolvedData);
           } else {
             // 业务code不为200，视为失败
             
@@ -228,5 +229,13 @@ request.put = (url, data = {}, options = {}) => {
 request.delete = (url, options = {}) => {
   return request({ url, method: 'DELETE', ...options });
 }
+
+// Debug log to ensure methods are attached
+console.log('request.js loaded. Methods attached:', {
+  get: typeof request.get,
+  post: typeof request.post,
+  put: typeof request.put,
+  delete: typeof request.delete
+});
 
 export default request;

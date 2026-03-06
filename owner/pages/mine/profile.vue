@@ -65,7 +65,10 @@ export default {
     async loadData() {
       // 优先从接口获取最新信息
       try {
-        const res = await request.get('/api/user/info')
+        const res = await request({
+          url: '/api/user/info',
+          method: 'GET'
+        })
         this.userInfo = {
           ...this.userInfo,
           ...res,
@@ -126,8 +129,9 @@ export default {
         content: '确定要退出登录吗？',
         success: (res) => {
           if (res.confirm) {
-            uni.removeStorageSync('token')
-            uni.removeStorageSync('userInfo')
+            // 清除所有本地缓存
+            uni.clearStorageSync()
+            // 跳转到登录页
             uni.reLaunch({ url: '/owner/pages/login/login' })
           }
         }

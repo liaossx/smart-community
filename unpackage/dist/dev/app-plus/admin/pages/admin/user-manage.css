@@ -274,9 +274,45 @@
 
 
 .manage-container[data-v-aff5800b] {
-  padding: 3.75rem 0.9375rem 0.9375rem;
+  padding: 0.9375rem;
   background-color: #f5f6fa;
   min-height: 100vh;
+  padding-top: 3.125rem;
+}
+
+/* 统计卡片样式 */
+.stats-card-container[data-v-aff5800b] {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.625rem;
+  margin-bottom: 0.625rem;
+}
+.stats-card[data-v-aff5800b] {
+  background-color: #fff;
+  padding: 0.9375rem;
+  border-radius: 0.46875rem;
+  box-shadow: 0 0.0625rem 0.3125rem rgba(0,0,0,0.05);
+  text-align: center;
+  cursor: pointer;
+  border-left: 0.1875rem solid #2D81FF;
+}
+.stats-card.status-admin[data-v-aff5800b] {
+  border-left-color: #722ed1;
+}
+.stats-card.status-owner[data-v-aff5800b] {
+  border-left-color: #faad14;
+}
+.stats-number[data-v-aff5800b] {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 0.3125rem;
+}
+.stats-label[data-v-aff5800b] {
+  display: block;
+  font-size: 0.75rem;
+  color: #999;
 }
 .search-section[data-v-aff5800b] {
   margin-bottom: 0.9375rem;
@@ -490,4 +526,40 @@
 .role-picker-text[data-v-aff5800b] {
   font-size: 0.8125rem;
   color: #333;
+}
+
+/* 分页组件样式 */
+.pagination[data-v-aff5800b] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  margin-top: 1.25rem;
+  padding: 0.625rem 0;
+  background-color: #fff;
+  border-radius: 0.3125rem;
+  box-shadow: 0 0.0625rem 0.3125rem rgba(0,0,0,0.05);
+}
+.page-btn[data-v-aff5800b] {
+  padding: 0.3125rem 0.625rem;
+  background-color: #f5f7fa;
+  color: #333;
+  border: 0.03125rem solid #e4e7ed;
+  border-radius: 0.1875rem;
+  font-size: 0.875rem;
+  min-width: 3.125rem;
+}
+.page-btn[disabled][data-v-aff5800b] {
+  opacity: 0.5;
+  color: #909399;
+}
+.page-info[data-v-aff5800b] {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #333;
+}
+.page-separator[data-v-aff5800b] {
+  margin: 0 0.3125rem;
+  color: #909399;
 }

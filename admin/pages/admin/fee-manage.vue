@@ -21,6 +21,22 @@
       </view>
     </view>
 
+    <!-- 统计卡片 -->
+    <view class="stats-card-container">
+      <view class="stats-card" @click="handleStatsClick('all')">
+        <text class="stats-number">{{ countStats.total }}</text>
+        <text class="stats-label">总账单数</text>
+      </view>
+      <view class="stats-card status-unpaid" @click="handleStatsClick('unpaid')">
+        <text class="stats-number">{{ countStats.unpaid }}</text>
+        <text class="stats-label">待缴费</text>
+      </view>
+      <view class="stats-card status-paid" @click="handleStatsClick('paid')">
+        <text class="stats-number">{{ countStats.paid }}</text>
+        <text class="stats-label">已缴费</text>
+      </view>
+    </view>
+
     <!-- 筛选栏 -->
     <view class="filter-bar">
       <view class="filter-tabs">
@@ -95,6 +111,31 @@
       <view v-else class="empty-state">
         <image src="/static/empty.png" mode="aspectFit" class="empty-img"></image>
         <text class="empty-text">暂无账单记录</text>
+      </view>
+
+      <!-- 分页组件 -->
+      <view v-if="total > 0" class="pagination">
+        <button 
+          class="page-btn" 
+          :disabled="currentPage === 1"
+          @click="handlePrevPage"
+        >
+          上一页
+        </button>
+        
+        <view class="page-info">
+          <text>{{ currentPage }}</text>
+          <text class="page-separator">/</text>
+          <text>{{ totalPages }}</text>
+        </view>
+        
+        <button 
+          class="page-btn" 
+          :disabled="currentPage === totalPages"
+          @click="handleNextPage"
+        >
+          下一页
+        </button>
       </view>
     </view>
     
@@ -177,6 +218,11 @@ export default {
         paidAmount: 0,
         rate: 0
       },
+      countStats: {
+        total: 0,
+        unpaid: 0,
+        paid: 0
+      },
       
       // 生成账单相关
       showGenerateModal: false,
@@ -191,7 +237,18 @@ export default {
         { label: '停车费', value: 'parking' },
         { label: '水费', value: 'water' },
         { label: '电费', value: 'electric' }
-      ]
+      ],
+      
+      // 分页
+      currentPage: 1,
+      pageSize: 10,
+      total: 0
+    }
+  },
+  
+  computed: {
+    totalPages() {
+      return Math.ceil(this.total / this.pageSize) || 1
     }
   },
   
@@ -202,17 +259,61 @@ export default {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     this.generateForm.month = `${year}-${month}`;
     
+    // onLoad 不自动加载，交给 onShow
+  },
+
+  onShow() {
     this.loadData()
+    this.loadCountStats()
   },
 
   methods: {
+    handleStatsClick(status) {
+      this.typeFilter = status
+      this.loadData()
+    },
+
+    async loadCountStats() {
+      try {
+        const totalReq = request('/api/fee/list', { pageNum: 1, pageSize: 1 }, 'GET')
+        const unpaidReq = request('/api/fee/list', { pageNum: 1, pageSize: 1, status: 'UNPAID' }, 'GET')
+        const paidReq = request('/api/fee/list', { pageNum: 1, pageSize: 1, status: 'PAID' }, 'GET')
+        
+        const [totalRes, unpaidRes, paidRes] = await Promise.all([totalReq, unpaidReq, paidReq])
+        
+        this.countStats = {
+          total: totalRes?.total || 0,
+          unpaid: unpaidRes?.total || 0,
+          paid: paidRes?.total || 0
+        }
+      } catch (e) {
+        console.error('加载统计数据失败', e)
+      }
+    },
+
     onSearch() {
+      this.currentPage = 1
       this.loadData()
     },
 
     switchTab(tabValue) {
       this.typeFilter = tabValue
+      this.currentPage = 1
       this.loadData()
+    },
+    
+    handlePrevPage() {
+      if (this.currentPage > 1) {
+        this.currentPage--
+        this.loadData()
+      }
+    },
+    
+    handleNextPage() {
+      if (this.currentPage < this.totalPages) {
+        this.currentPage++
+        this.loadData()
+      }
     },
 
     async loadData() {
@@ -222,13 +323,17 @@ export default {
         const params = {
           keyword: this.searchQuery || undefined,
           status: isStatusFilter ? (this.typeFilter === 'unpaid' ? 'UNPAID' : 'PAID') : undefined,
-          pageNum: 1,
-          pageSize: 20
+          pageNum: this.currentPage,
+          pageSize: this.pageSize
         }
         
         const data = await request('/api/fee/list', params, 'GET')
         
-        this.feeList = (data.records || []).map(item => {
+        // 处理分页数据
+        const records = data.records || []
+        this.total = typeof data.total === 'number' ? data.total : (data.data?.total || records.length || 0)
+        
+        this.feeList = records.map(item => {
           const feeCycle = item.feeCycle || '';
           const [year, month] = feeCycle.split('-');
           
@@ -353,10 +458,13 @@ export default {
         success: async (res) => {
           if (res.confirm) {
             try {
-              await request(`/api/fee/remind/${item.id}`, {}, 'POST')
+              // 这里的 id 是 path variable，且后端没有 @RequestBody，所以 data 传 null 或空对象均可
+              // 修改为 null 明确表示没有 Body
+              await request(`/api/fee/remind/${item.id}`, null, 'POST')
               uni.showToast({ title: '发送成功', icon: 'success' })
             } catch (e) {
-              // error handled
+              console.error('催缴失败', e)
+              uni.showToast({ title: e.msg || '发送失败，请检查后端日志', icon: 'none' })
             }
           }
         }
@@ -377,7 +485,47 @@ export default {
 
 /* 顶部搜索 */
 .header {
+  margin-bottom: 20rpx;
+}
+
+/* 统计卡片样式 */
+.stats-card-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20rpx;
   margin-bottom: 30rpx;
+}
+
+.stats-card {
+  background-color: #fff;
+  padding: 30rpx;
+  border-radius: 15rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+  text-align: center;
+  cursor: pointer;
+  border-left: 6rpx solid #2D81FF;
+}
+
+.stats-card.status-unpaid {
+  border-left-color: #ff4757;
+}
+
+.stats-card.status-paid {
+  border-left-color: #2ed573;
+}
+
+.stats-number {
+  display: block;
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+
+.stats-label {
+  display: block;
+  font-size: 24rpx;
+  color: #999;
 }
 
 .search-box {
@@ -554,6 +702,47 @@ export default {
   color: white;
   border-radius: 26rpx;
   margin: 0;
+}
+
+/* 分页组件样式 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20rpx;
+  margin-top: 40rpx;
+  padding: 20rpx 0;
+  background-color: #fff;
+  border-radius: 10rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+}
+
+.page-btn {
+  padding: 10rpx 20rpx;
+  background-color: #f5f7fa;
+  color: #333;
+  border: 1rpx solid #e4e7ed;
+  border-radius: 6rpx;
+  font-size: 28rpx;
+  min-width: 100rpx;
+  margin: 0;
+}
+
+.page-btn[disabled] {
+  opacity: 0.5;
+  color: #909399;
+}
+
+.page-info {
+  display: flex;
+  align-items: center;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.page-separator {
+  margin: 0 10rpx;
+  color: #909399;
 }
 
 /* 底部统计栏 */
