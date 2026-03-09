@@ -24,21 +24,6 @@
       />
     </view>
 
-    <!-- 角色选择：修复v-model绑定位置 -->
-    <!-- 正确写法：v-model绑定在radio-group上 -->
-    <view class="role-group">
-     <radio-group @change="onRoleChange">
-       <label class="role-item">
-         <radio value="owner" :checked="form.role === 'owner'" />
-         <text>业主</text>
-       </label>
-       <label class="role-item">
-         <radio value="admin" :checked="form.role === 'admin'" />
-         <text>管理员</text>
-       </label>
-     </radio-group>
-    </view>
-
     <!-- 登录按钮 -->
     <button 
       class="login-btn" 
@@ -63,8 +48,7 @@ export default {
     return {
       form: {
         username: '',
-        password: '',
-        role: 'owner' // 默认选择业主
+        password: ''
       }
     }
   },
@@ -93,9 +77,9 @@ export default {
         })
 
         // 从 Token 中解析角色信息
-         let role = this.form.role; // 默认使用选择的角色
-         let fullRole = ''; // 保存完整角色名
-         if (result.token) {
+        let role = ''; // 默认角色
+        let fullRole = ''; // 保存完整角色名
+        if (result.token) {
            try {
              const payload = JSON.parse(atob(result.token.split('.')[1]))
              console.log('Token 中的信息:', payload)
@@ -190,11 +174,9 @@ export default {
   font-size: 28rpx;
 }
 
-/* 角色选择样式优化 */
+/* 角色选择样式优化 - 已移除，保留类名防止报错或后续恢复 */
 .role-group {
-  display: flex;
-  justify-content: center;
-  margin: 40rpx 0 60rpx;
+  display: none;
 }
 
 .radio-group {

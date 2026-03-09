@@ -170,14 +170,21 @@
         }
       },
       {
-    "path": "admin/pages/admin/car-audit",
-    "style": {
-      "navigationBarTitleText": "车辆审核",
-      "navigationStyle": "default"
-    }
-  },
-  {
-    "path": "owner/pages/notice/list",
+        "path": "admin/pages/admin/car-audit",
+        "style": {
+          "navigationBarTitleText": "车辆审核",
+          "navigationStyle": "default"
+        }
+      },
+      {
+        "path": "admin/pages/admin/oper-log",
+        "style": {
+          "navigationBarTitleText": "操作日志",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "owner/pages/notice/list",
         "style": {
           "navigationBarTitleText": "公告列表"
         }

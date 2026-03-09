@@ -3,24 +3,20 @@
     <!-- 标题 -->
     <view class="repair-title">提交报修</view>
 
-    <!-- 楼栋号输入框 -->
+    <!-- 房屋选择 -->
     <view class="input-item">
-      <text class="input-icon">🏢</text>
-      <input 
-        v-model="form.buildingNo" 
-        placeholder="请输入楼栋号（如：1栋）" 
-        placeholder-class="placeholder-style"
-      />
-    </view>
-
-    <!-- 房屋号输入框 -->
-    <view class="input-item">
-      <text class="input-icon">🏠</text>
-      <input 
-        v-model="form.houseNo" 
-        placeholder="请输入房屋号（如：101）" 
-        placeholder-class="placeholder-style"
-      />
+      <text class="input-icon">�</text>
+      <picker 
+        mode="selector" 
+        :range="myHouses" 
+        range-key="displayText"
+        @change="handleHouseChange"
+        :disabled="myHouses.length === 0"
+      >
+        <view :class="['picker-view', !form.houseId ? 'placeholder-style' : '']">
+          {{ form.houseId ? selectedHouseText : (myHouses.length > 0 ? '请选择房屋' : '暂无绑定房屋，请先去绑定') }}
+        </view>
+      </picker>
     </view>
 
     <!-- 故障类型输入框 -->
@@ -95,17 +91,19 @@ export default {
       form: {
         buildingNo: '',      // 楼栋号
         houseNo: '',         // 房屋号（纯房号）
+        houseId: '',         // 房屋ID
         faultType: '',
         faultDesc: '',
         faultImgs: [],       // 图片URL数组
         userId: ''
-      }
+      },
+      myHouses: [], // 用户绑定的房屋列表
+      selectedHouseText: ''
     }
   },
   computed: {
     isFormValid() {
-      return this.form.buildingNo && 
-             this.form.houseNo && 
+      return this.form.houseId && 
              this.form.faultType
     }
   },
@@ -114,11 +112,53 @@ export default {
     console.log('用户信息:', userInfo)
     if (userInfo && userInfo.userId) {
       this.form.userId = userInfo.userId
+      this.loadMyHouses()
     } else {
       uni.redirectTo({ url: '/pages/login/login' })
     }
   },
   methods: {
+    // 加载用户房屋列表
+    async loadMyHouses() {
+      try {
+        const res = await request({
+          url: '/api/house/getHouseInfoByUserId',
+          method: 'GET',
+          // 后端从Token中获取userId，无需传参
+        })
+        
+        // 兼容不同的返回结构
+        const list = Array.isArray(res) ? res : (res.data || [])
+        
+        if (list.length > 0) {
+          this.myHouses = list.map(house => ({
+            ...house,
+            displayText: `${house.buildingNo}栋 ${house.houseNo}室`
+          }))
+          
+          // 如果只有一个房屋，自动选中
+          if (this.myHouses.length === 1) {
+            this.selectHouse(this.myHouses[0])
+          }
+        }
+      } catch (e) {
+        console.error('加载房屋列表失败', e)
+        uni.showToast({ title: '加载房屋信息失败', icon: 'none' })
+      }
+    },
+    
+    handleHouseChange(e) {
+      const index = e.detail.value
+      this.selectHouse(this.myHouses[index])
+    },
+    
+    selectHouse(house) {
+      this.form.houseId = house.id
+      this.form.buildingNo = house.buildingNo
+      this.form.houseNo = house.houseNo
+      this.selectedHouseText = house.displayText
+    },
+
     async handleSubmit() {
       try {
         // 准备提交数据
@@ -177,12 +217,15 @@ export default {
 
     // 重置表单
     resetForm() {
-      this.form.buildingNo = ''
-      this.form.houseNo = ''
+      // 保留房屋信息，因为通常用户只住在一个地方
+      // this.form.buildingNo = ''
+      // this.form.houseNo = ''
+      // this.form.houseId = ''
+      // this.selectedHouseText = ''
+      
       this.form.faultType = ''
       this.form.faultDesc = ''
       this.form.faultImgs = []
-      // 保留userId
     },
 
     handleBackLogin() {
@@ -294,7 +337,11 @@ input, textarea {
   color: #999;
 }
 
-.submit-btn {
+.picker-view {
+  flex: 1;
+  font-size: 32rpx;
+  color: #333;
+}
   background: #2D81FF;
   color: white;
   border-radius: 50rpx;

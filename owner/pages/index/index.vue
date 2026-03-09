@@ -2,11 +2,21 @@
   <view class="page">
     <!-- 顶部欢迎卡片 -->
     <view class="hero-card">
-      <view>
-        <text class="hello">您好，{{ userInfo?.username || '访客' }}</text>
-        <view class="sub">社区服务实时在线</view>
-        <view class="user-role" v-if="userInfo">
-          <text>{{ (userInfo.role === 'admin' || userInfo.role === 'super_admin') ? '管理员' : '业主' }}账号</text>
+      <view class="hero-content">
+        <view class="hero-text-area">
+          <text class="hello">您好，{{ userInfo?.username || '访客' }}</text>
+          <view class="sub">社区服务实时在线</view>
+          <view class="user-role" v-if="userInfo">
+            <text>{{ (userInfo.role === 'admin' || userInfo.role === 'super_admin') ? '管理员' : '业主' }}账号</text>
+          </view>
+        </view>
+        
+        <!-- 消息提醒 -->
+        <view class="notification-area" @tap="gotoNoticeList" v-if="userInfo">
+          <view class="bell-icon">🔔</view>
+          <view class="badge" v-if="unreadCount > 0">
+            <text>{{ unreadCount > 99 ? '99+' : unreadCount }}</text>
+          </view>
         </view>
       </view>
 
@@ -77,6 +87,7 @@ export default {
     return {
       userInfo: null,
       notices: [],
+      unreadCount: 0,
       shortcuts: [
         {
           id: 1,
@@ -127,9 +138,32 @@ export default {
   onShow() {
     this.loadUser()
     this.loadNotices()
+    this.loadUnreadCount()
   },
 
   methods: {
+    async loadUnreadCount() {
+      const user = uni.getStorageSync("userInfo")
+      if (!user?.id) return
+      
+      try {
+        const res = await request({
+          url: "/api/notice/unread-count",
+          method: "GET",
+          params: { userId: user.id }
+        })
+        console.log('未读消息接口返回:', res)
+        if (res.code === 200) {
+          // 兼容后端直接返回数字或返回 { data: 5 } 的情况
+          this.unreadCount = (typeof res.data === 'number' ? res.data : res) || 0
+        } else if (typeof res === 'number') {
+           // 如果后端直接返回数字而不是标准结构
+           this.unreadCount = res
+        }
+      } catch (err) {
+        console.error("加载未读数失败", err)
+      }
+    },
     jump(url) {
       if (url) uni.navigateTo({ url })
     },
@@ -261,6 +295,46 @@ export default {
   background: linear-gradient(135deg, #5ba8ff, #386bff);
   color: #fff;
   margin-bottom: 32rpx;
+}
+
+.hero-content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.hero-text-area {
+  flex: 1;
+}
+
+.notification-area {
+  position: relative;
+  margin-right: 30rpx;
+  padding: 10rpx;
+}
+
+.bell-icon {
+  font-size: 40rpx;
+}
+
+.badge {
+  position: absolute;
+  top: -10rpx;
+  right: -10rpx;
+  background-color: #ff4d4f;
+  color: #fff;
+  font-size: 20rpx;
+  padding: 0 8rpx;
+  border-radius: 20rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  text-align: center;
+  border: 2rpx solid #fff;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hello {

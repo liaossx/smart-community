@@ -110,3 +110,31 @@
   font-size: 0.8125rem;
   color: #666;
 }
+.charts-section[data-v-21c44072] {
+  margin-bottom: 1.25rem;
+}
+.charts-container[data-v-21c44072] {
+  display: flex;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+.chart-box[data-v-21c44072] {
+  flex: 1;
+  min-width: 9.375rem;
+  background: white;
+  padding: 0.9375rem;
+  border-radius: 0.625rem;
+  box-shadow: 0 0.125rem 0.3125rem rgba(0,0,0,0.05);
+}
+.chart-title[data-v-21c44072] {
+  font-size: 0.875rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 0.625rem;
+  border-left: 0.1875rem solid #84fab0;
+  padding-left: 0.5rem;
+}
+.echart-container[data-v-21c44072] {
+  width: 100%;
+  height: 12.5rem;
+}

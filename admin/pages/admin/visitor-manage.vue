@@ -6,6 +6,22 @@
     currentPage="/admin/pages/admin/visitor-manage"
   >
     <view class="manage-container">
+      <!-- 统计卡片 -->
+      <view class="stats-card-container">
+        <view class="stats-card" @click="handleStatsClick('')">
+          <text class="stats-number">{{ stats.total }}</text>
+          <text class="stats-label">总访问数</text>
+        </view>
+        <view class="stats-card status-pending" @click="handleStatsClick('PENDING')">
+          <text class="stats-number">{{ stats.pending }}</text>
+          <text class="stats-label">待审核</text>
+        </view>
+        <view class="stats-card status-approved" @click="handleStatsClick('APPROVED')">
+          <text class="stats-number">{{ stats.approved }}</text>
+          <text class="stats-label">已通过</text>
+        </view>
+      </view>
+
       <!-- 搜索和筛选栏 -->
       <view class="search-filter-bar">
         <view class="search-box">
@@ -79,7 +95,7 @@
             
             <view class="item-footer">
                <button class="action-btn call" @click="makeCall(item.visitorPhone)">联系访客</button>
-               <view class="audit-btns" v-if="item.status === 'pending'">
+               <view class="audit-btns" v-if="item.status === 'PENDING'">
                   <button class="action-btn reject" @click="handleReject(item)">拒绝</button>
                   <button class="action-btn approve" @click="handleApprove(item)">通过</button>
                </view>
@@ -136,9 +152,10 @@ export default {
       loading: false,
       statusOptions: [
         { value: '', label: '全部状态' },
-        { value: 'pending', label: '待审核' },
-        { value: 'approved', label: '已通过' },
-        { value: 'rejected', label: '已拒绝' }
+        { value: 'PENDING', label: '待审核' },
+        { value: 'APPROVED', label: '已通过' },
+        { value: 'REJECTED', label: '已拒绝' },
+        { value: 'EXPIRED', label: '已过期' }
       ],
       visitorList: [],
       
@@ -190,7 +207,7 @@ export default {
           visitTime: item.visitTime,
           reason: item.reason,
           carNo: item.carNo,
-          status: item.status // pending/approved/rejected
+          status: item.status // PENDING/APPROVED/REJECTED/EXPIRED
         }))
       } catch (e) {
         console.error('加载访客列表失败', e)
@@ -206,8 +223,8 @@ export default {
     async loadStats() {
       try {
         const totalReq = request('/api/visitor/list', { params: { pageSize: 1 } }, 'GET')
-        const pendingReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'pending' } }, 'GET')
-        const approvedReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'approved' } }, 'GET')
+        const pendingReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'PENDING' } }, 'GET')
+        const approvedReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'APPROVED' } }, 'GET')
         
         const [totalRes, pendingRes, approvedRes] = await Promise.all([totalReq, pendingReq, approvedReq])
         
@@ -223,6 +240,7 @@ export default {
     
     handleStatsClick(status) {
       this.statusFilter = status
+      this.searchQuery = ''
       this.currentPage = 1
       this.loadData()
     },
@@ -259,11 +277,13 @@ export default {
         success: async (res) => {
           if (res.confirm) {
             try {
-              await request('/api/visitor/audit', {
-                id: item.id,
-                status: 'approved'
-              }, 'PUT')
-              item.status = 'approved'
+              // 后端接口: @PutMapping("/audit")
+              // 参数: @RequestParam("id") Long id, @RequestParam("status") String status
+              // 注意: @RequestParam 需要 Query Parameters (URL参数) 或 Form Data
+              const url = `/api/visitor/audit?id=${item.id}&status=APPROVED`
+              await request(url, {}, 'PUT')
+              
+              item.status = 'APPROVED'
               uni.showToast({ title: '审核通过', icon: 'success' })
               this.loadStats() // 刷新统计
             } catch (e) {
@@ -281,11 +301,12 @@ export default {
         success: async (res) => {
           if (res.confirm) {
             try {
-              await request('/api/visitor/audit', {
-                id: item.id,
-                status: 'rejected'
-              }, 'PUT')
-              item.status = 'rejected'
+              // 后端接口: @PutMapping("/audit")
+              // 参数: @RequestParam("id") Long id, @RequestParam("status") String status
+              const url = `/api/visitor/audit?id=${item.id}&status=REJECTED`
+              await request(url, {}, 'PUT')
+              
+              item.status = 'REJECTED'
               uni.showToast({ title: '已拒绝', icon: 'none' })
               this.loadStats() // 刷新统计
             } catch (e) {
@@ -303,17 +324,19 @@ export default {
     
     getStatusClass(status) {
       return {
-        'status-pending': status === 'pending',
-        'status-approved': status === 'approved',
-        'status-rejected': status === 'rejected'
+        'status-pending': status === 'PENDING',
+        'status-approved': status === 'APPROVED',
+        'status-rejected': status === 'REJECTED',
+        'status-expired': status === 'EXPIRED'
       }
     },
     
     getStatusText(status) {
       const map = {
-        'pending': '待审核',
-        'approved': '已通过',
-        'rejected': '已拒绝'
+        'PENDING': '待审核',
+        'APPROVED': '已通过',
+        'REJECTED': '已拒绝',
+        'EXPIRED': '已过期'
       }
       return map[status] || status
     },
@@ -476,6 +499,19 @@ export default {
 .status-tag.status-rejected {
   background: rgba(255, 71, 87, 0.1);
   color: #ff4757;
+}
+
+.status-tag.status-expired {
+  background: rgba(144, 147, 153, 0.1);
+  color: #909399;
+}
+
+.stats-card.status-pending {
+  border-left-color: #ffa502;
+}
+
+.stats-card.status-approved {
+  border-left-color: #2ed573;
 }
 
 .item-body {
