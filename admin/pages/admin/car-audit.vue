@@ -179,8 +179,10 @@ export default {
         content: `确认通过车辆 ${item.plateNo} 的绑定申请吗？\n通过后业主将需要进行缴费。`,
         success: async (res) => {
           if (res.confirm) {
-            // 注意：这里将状态改为 AWAITING_PAYMENT (待缴费)
-            await this.submitAudit(item.id, 'AWAITING_PAYMENT')
+            // 注意：这里将状态改为 APPROVED (审核通过)
+            // 根据后端要求，车辆审核通过后直接变成 APPROVED 或 ACTIVE，
+            // 缴费是后续针对车位租赁订单的操作，而不是针对车辆绑定的操作
+            await this.submitAudit(item.id, 'APPROVED')
           }
         }
       })

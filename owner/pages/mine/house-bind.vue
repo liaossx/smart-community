@@ -84,7 +84,7 @@ export default {
     async loadCommunities() {
       try {
         const res = await request({
-          url: '/api/community/list',
+          url: '/api/house/community/list',
           method: 'GET'
         })
         // 兼容返回格式：可能是数组直接返回，也可能是分页对象的records

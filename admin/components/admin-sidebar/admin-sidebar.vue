@@ -20,7 +20,7 @@
       <!-- 导航菜单 -->
       <view class="menu-list">
         <view 
-          v-for="(menu, index) in menuList" 
+          v-for="(menu, index) in filteredMenuList" 
           :key="index"
           class="menu-item"
           :class="{ 'active': currentPage === menu.path }"
@@ -73,17 +73,31 @@ export default {
       adminName: '管理员',
       roleName: '管理员',
       menuList: [
-        { text: '仪表盘', icon: '📊', path: '/admin/pages/admin/dashboard/index' },
-        { text: '报修管理', icon: '🛠️', path: '/admin/pages/admin/repair-manage' },
-        { text: '公告管理', icon: '📢', path: '/admin/pages/admin/notice-manage' },
-        { text: '费用管理', icon: '💰', path: '/admin/pages/admin/fee-manage' },
-        { text: '投诉处理', icon: '🗣️', path: '/admin/pages/admin/complaint-manage' },
-        { text: '访客审核', icon: '👁️', path: '/admin/pages/admin/visitor-manage' },
-        { text: '社区活动', icon: '🎉', path: '/admin/pages/admin/activity-manage' },
-        { text: '停车管理', icon: '🚗', path: '/admin/pages/admin/parking-manage' },
-        { text: '用户管理', icon: '👥', path: '/admin/pages/admin/user-manage' },
-        { text: '社区管理', icon: '🏘️', path: '/admin/pages/admin/community-manage' }
+        { text: '仪表盘', icon: '📊', path: '/admin/pages/admin/dashboard/index', roles: ['admin', 'super_admin'] },
+        { text: '任务中心', icon: '🛠️', path: '/admin/pages/admin/worker-tasks', roles: ['worker'] },
+        { text: '报修管理', icon: '🛠️', path: '/admin/pages/admin/repair-manage', roles: ['admin', 'super_admin'] },
+        { text: '工单管理', icon: '📋', path: '/admin/pages/admin/work-order-manage', roles: ['admin', 'super_admin'] },
+        { text: '公告管理', icon: '📢', path: '/admin/pages/admin/notice-manage', roles: ['admin', 'super_admin'] },
+        { text: '费用管理', icon: '💰', path: '/admin/pages/admin/fee-manage', roles: ['admin', 'super_admin'] },
+        { text: '投诉处理', icon: '🗣️', path: '/admin/pages/admin/complaint-manage', roles: ['admin', 'super_admin'] },
+        { text: '访客审核', icon: '👁️', path: '/admin/pages/admin/visitor-manage', roles: ['admin', 'super_admin'] },
+        { text: '社区活动', icon: '🎉', path: '/admin/pages/admin/activity-manage', roles: ['admin', 'super_admin'] },
+        { text: '停车管理', icon: '🚗', path: '/admin/pages/admin/parking-manage', roles: ['admin', 'super_admin'] },
+        { text: '用户管理', icon: '👥', path: '/admin/pages/admin/user-manage', roles: ['admin', 'super_admin'] },
+        { text: '系统配置', icon: '⚙️', path: '/admin/pages/admin/system-config', roles: ['super_admin'] }
       ]
+    }
+  },
+  computed: {
+    filteredMenuList() {
+      const userInfo = uni.getStorageSync('userInfo')
+      const role = userInfo ? userInfo.role : ''
+      
+      return this.menuList.filter(item => {
+        // 如果没有定义 roles，默认所有人可见
+        if (!item.roles) return true
+        return item.roles.includes(role)
+      })
     }
   },
   mounted() {
@@ -93,6 +107,8 @@ export default {
     }
     if (userInfo && userInfo.role === 'super_admin') {
       this.roleName = '超级管理员'
+    } else if (userInfo && userInfo.role === 'worker') {
+      this.roleName = '维修员'
     } else {
       this.roleName = '普通管理员'
     }

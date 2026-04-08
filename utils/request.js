@@ -1,6 +1,6 @@
 // @/utils/request.js（最终版：修复header合并+跨域兼容）
-const baseUrl = 'http://192.168.1.65:8081' // 后端服务地址
-// const baseUrl = 'http://localhost:8081' 
+const baseUrl = 'http://192.168.1.65:80'
+// const baseUrl = 'http://localhost:80' 
 function request(options) {
   // 1. 兼容两种调用方式
   let finalOptions = {};
@@ -86,6 +86,7 @@ function request(options) {
     console.log('发送请求:', requestUrl, finalOptions.method, finalOptions.data)
     console.log('请求头已带授权:', Boolean(finalOptions.header && finalOptions.header.Authorization))
     
+    // 返回 task 对象以便外部可以 abort
     const requestTask = uni.request({
       url: requestUrl,
       data: finalOptions.data,
@@ -106,8 +107,7 @@ function request(options) {
           // HTTP状态码为200，检查业务code
           if (bizCode === 200 || bizCode === 0 || bizCode === undefined || Number.isNaN(bizCode)) {
             // 业务code为200、0、undefined或无法解析时，视为成功
-            // 修复：明确判断 data 是否存在
-            const resolvedData = data !== undefined ? data : responseData;
+            const resolvedData = data != null ? data : responseData;
             console.log('Request resolved with:', JSON.stringify(resolvedData).substring(0, 200) + '...');
             resolve(resolvedData);
           } else {

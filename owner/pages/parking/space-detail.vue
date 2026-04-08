@@ -52,14 +52,16 @@
 
     <!-- 操作按钮 -->
     <view class="action-buttons">
-      <button class="btn primary" @click="renew">续费</button>
-      <button class="btn success" @click="openGate">开闸</button>
+      <button class="btn primary" :class="{ disabled: car.leaseStatus === 'PENDING' }" @click="renew">续费</button>
+      <button class="btn success" :class="{ disabled: car.leaseStatus === 'PENDING' }" @click="openGate">开闸</button>
       <button
         class="btn warning"
+        :class="{ disabled: car.leaseStatus === 'PENDING' }"
         @click="bindPlate"
       >绑定车牌</button>
       <button
         class="btn danger"
+        :class="{ disabled: car.leaseStatus === 'PENDING' }"
         @click="unbindPlate"
       >解绑车牌</button>
       <button class="btn default" @click="goBack">返回</button>
@@ -90,6 +92,10 @@ export default {
 
   methods: {
     async renew() {
+      if (this.car.leaseStatus === 'PENDING') {
+        uni.showToast({ title: '车位审核中，不可续费', icon: 'none' })
+        return
+      }
       if (!this.car.id) {
         uni.showToast({ title: '车位数据为空', icon: 'none' })
         return
@@ -131,6 +137,10 @@ export default {
     },
 
     async openGate() {
+      if (this.car.leaseStatus === 'PENDING') {
+        uni.showToast({ title: '车位正在审核中，无法开闸', icon: 'none' })
+        return
+      }
       if (!this.car.plateNo) {
         uni.showToast({ title: '未绑定车牌', icon: 'none' })
         return
@@ -164,6 +174,10 @@ export default {
     },
 
     async bindPlate() {
+      if (this.car.leaseStatus === 'PENDING') {
+        uni.showToast({ title: '车位审核中，不可绑定', icon: 'none' })
+        return
+      }
       console.log('🔹 点击绑定车牌按钮', this.car, this.userInfo)
     
       if (!this.car || !this.car.id) {
@@ -209,6 +223,10 @@ export default {
     },
 
     async unbindPlate() {
+      if (this.car.leaseStatus === 'PENDING') {
+        uni.showToast({ title: '车位审核中，不可解绑', icon: 'none' })
+        return
+      }
       if (!this.car.plateNo) {
         uni.showToast({ title: '当前未绑定车牌', icon: 'none' })
         return
@@ -290,4 +308,8 @@ export default {
 .btn.warning { background-color: #e6a23c; }
 .btn.danger { background-color: #f56c6c; }
 .btn.default { background-color: #909399; }
+.btn.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
 </style>

@@ -404,13 +404,78 @@ export default {
   },
   onLoad() {
     this.checkAdminRole()
+    this.loadAllStats()
     this.loadParkingList()
   },
   onShow() {
+    this.loadAllStats()
     this.loadParkingList()
   },
     
   methods: {
+    // 加载全局统计信息
+    async loadAllStats() {
+      // 停车订单统计（基于当前筛选条件的总数）
+      this.loadOrderStats()
+      // 车位状态统计（基于当前筛选条件的所有数据）
+      this.loadSpaceStats()
+    },
+
+    async loadOrderStats() {
+      try {
+        const params = {
+          pageNum: 1,
+          pageSize: 1
+        }
+        if (this.queryParams.plateNo) params.plateNo = this.queryParams.plateNo
+        if (this.queryParams.status) params.status = this.queryParams.status
+
+        const res = await request('/api/parking/order/admin/list', {
+          params
+        }, 'GET')
+        if (res && typeof res.total === 'number') {
+          this.total = res.total
+        }
+      } catch (err) {
+        console.error('加载订单统计失败:', err)
+      }
+    },
+
+    async loadSpaceStats() {
+      try {
+        const params = {
+          pageNum: 1,
+          pageSize: 1000 // 获取足够多的数据以进行状态统计
+        }
+        if (this.spaceQueryParams.spaceNo) params.spaceNo = this.spaceQueryParams.spaceNo
+        if (this.spaceQueryParams.status) params.status = this.spaceQueryParams.status
+
+        const res = await request('/api/parking/space/admin/list', {
+          params
+        }, 'GET')
+
+        const records = Array.isArray(res && res.records) ? res.records : []
+        const stats = {
+          total: res.total || records.length,
+          available: 0,
+          occupied: 0,
+          reserved: 0,
+          disabled: 0
+        }
+        
+        // 注意：这里统计的是符合当前筛选条件的所有数据
+        records.forEach(item => {
+          const val = (item.status || '').toString().toUpperCase()
+          if (val === 'AVAILABLE' || val === 'FREE') stats.available += 1
+          else if (val === 'OCCUPIED') stats.occupied += 1
+          else if (val === 'RESERVED') stats.reserved += 1
+          else if (val === 'DISABLED') stats.disabled += 1
+        })
+        this.spaceStats = stats
+      } catch (err) {
+        console.error('加载车位统计失败:', err)
+      }
+    },
     checkAdminRole() {
       const userInfo = uni.getStorageSync('userInfo')
       if (!userInfo || (userInfo.role !== 'admin' && userInfo.role !== 'super_admin')) {
@@ -444,6 +509,7 @@ export default {
 
     handleSearch() {
       this.currentPage = 1
+      this.loadOrderStats()
       this.loadParkingList()
     },
 
@@ -537,6 +603,7 @@ export default {
         }, 'PUT')
         
         uni.showToast({ title: '支付成功', icon: 'success' })
+        this.loadOrderStats()
         this.loadParkingList()
         
       } catch (err) {
@@ -599,6 +666,7 @@ export default {
     // --- 车位管理相关方法 ---
     handleSpaceSearch() {
       this.spacePageNum = 1
+      this.loadSpaceStats()
       this.loadSpaceList()
     },
 
@@ -720,21 +788,6 @@ export default {
           : uniqueRecords
         this.spaceList = finalList
 
-        const stats = {
-          total: uniqueRecords.length,
-          available: 0,
-          occupied: 0,
-          reserved: 0,
-          disabled: 0
-        }
-        uniqueRecords.forEach(item => {
-          const val = (item.status || '').toString().toUpperCase()
-          if (val === 'AVAILABLE' || val === 'FREE') stats.available += 1
-          else if (val === 'OCCUPIED') stats.occupied += 1
-          else if (val === 'RESERVED') stats.reserved += 1
-          else if (val === 'DISABLED') stats.disabled += 1
-        })
-        this.spaceStats = stats
       } catch (err) {
         console.error('加载车位列表失败:', err)
       } finally {
@@ -765,6 +818,7 @@ export default {
               }
             }, 'POST')
             uni.showToast({ title: '预订成功', icon: 'success' })
+            this.loadSpaceStats()
             this.loadSpaceList()
           } catch (e) {
             console.error('预订失败:', e)
@@ -852,6 +906,7 @@ export default {
 
         uni.showToast({ title: '办理成功', icon: 'success' })
         this.showLeaseDialog = false
+        this.loadSpaceStats()
         this.loadSpaceList()
       } catch (err) {
         console.error('办理失败:', err)

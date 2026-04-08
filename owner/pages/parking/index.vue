@@ -165,10 +165,16 @@ export default {
 
   onLoad() {
     this.loadUser()
-    this.loadCars()
   },
   onShow() {
     this.loadBalance()
+    this.loadCars()
+  },
+  // 监听下拉刷新
+  onPullDownRefresh() {
+    Promise.all([this.loadBalance(), this.loadCars()]).finally(() => {
+      uni.stopPullDownRefresh()
+    })
   },
 
   methods: {

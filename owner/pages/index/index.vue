@@ -44,10 +44,11 @@
           @tap="openNoticeDetail(item)"
         >
           <view class="notice-main">
-            <text class="notice-title">
-              <text :style="{ fontWeight: item.readFlag === 0 ? '600' : '400', color: item.readFlag === 0 ? '#ff4d4f' : '#1f2430' }">
-                {{ item.title }}
-              </text>
+            <text 
+              class="notice-title" 
+              :style="{ color: item.readFlag === 0 ? '#ff4d4f' : '#1f2430', fontWeight: item.readFlag === 0 ? '600' : '400' }"
+            >
+              {{ item.title }}
             </text>
     
             <text class="notice-time">{{ item.time }}</text>
@@ -97,13 +98,6 @@ export default {
           path: "/owner/pages/repair/repair"
         },
         {
-          id: 2,
-          title: "快递代收",
-          desc: "扫码取件",
-          icon: "递",
-          path: "/owner/pages/communityService/index"
-        },
-        {
           id: 3,
           title: "费用缴纳",
           desc: "在线支付",
@@ -147,6 +141,7 @@ export default {
       if (!user?.id) return
       
       try {
+        // 尝试调用未读数接口，若403则静默失败
         const res = await request({
           url: "/api/notice/unread-count",
           method: "GET",
@@ -161,7 +156,8 @@ export default {
            this.unreadCount = res
         }
       } catch (err) {
-        console.error("加载未读数失败", err)
+        // console.error("加载未读数失败", err)
+        // 403 权限错误时不打扰控制台
       }
     },
     jump(url) {
@@ -171,11 +167,6 @@ export default {
     gotoNoticeList() {
       uni.navigateTo({ 
         url: "/owner/pages/notice/list"
-      })
-    },
-    openNoticeDetail(item) {
-      uni.navigateTo({
-        url: `/owner/pages/notice/detail?notice=${encodeURIComponent(JSON.stringify(item))}`
       })
     },
 
@@ -193,10 +184,11 @@ export default {
    async loadNotices() {
      const user = uni.getStorageSync("userInfo")
    
+     // 如果用户未登录，或者不是业主/管理员角色（理论上这里能进来的都是已登录）
      if (!user?.id) return
    
      try {
-       const data = await request({
+       const res = await request({
          url: "/api/notice/list",
          method: "GET",
          params: {
@@ -206,40 +198,59 @@ export default {
          }
        })
    
-       const records = data.records || []
+       // 兼容后端返回结构：可能是 { records: [] } 或者是 []
+       const records = Array.isArray(res) ? res : (res.records || [])
+       const readCacheRaw = uni.getStorageSync('noticeReadIds')
+       const readCacheSet = new Set((Array.isArray(readCacheRaw) ? readCacheRaw : []).map(v => String(v)))
    
        this.notices = records.slice(0, 4).map(n => ({
          id: n.id,
          title: n.title,
-         content: n.content,              // ✅ 关键
-         publishTime: n.publishTime,      // ✅ 关键
-         readFlag: n.readFlag,
+         content: n.content,
+         publishTime: n.publishTime,
+         // 🔴 修复映射：强制检查 readFlag 或 read_flag，且默认设为 0 (未读) 
+         // 如果字段不存在或为 null，则视为未读，以便显示红色
+         readFlag: readCacheSet.has(String(n.id))
+           ? 1
+           : ((n.readFlag !== undefined && n.readFlag !== null) ? Number(n.readFlag) :
+              (n.read_flag !== undefined && n.read_flag !== null ? Number(n.read_flag) : 0)),
+         time: this.formatTime(n.publishTime),
          tag: this.getTag(n.targetType)
        }))
    
      } catch (err) {
        console.error("公告加载失败", err)
+       // 如果是 403，说明当前账号角色无权访问该接口
+       if (err.code === 403 || (err.msg && err.msg.includes('权限'))) {
+          this.notices = []
+       }
      }
    },
    
-   
-   
    async openNoticeDetail(item) {
-     // 未读先标记已读
      if (item.readFlag === 0) {
        try {
+         const user = uni.getStorageSync('userInfo')
+         const userId = user?.id || user?.userId
          await request({
            url: `/api/notice/${item.id}/read`,
-           method: "PUT"
+           method: 'POST',
+           params: userId ? { userId } : {}
          })
+         const raw = uni.getStorageSync('noticeReadIds')
+         const arr = Array.isArray(raw) ? raw.map(v => String(v)) : []
+         const sid = String(item.id)
+         if (!arr.includes(sid)) {
+           arr.push(sid)
+           uni.setStorageSync('noticeReadIds', arr)
+         }
          item.readFlag = 1
          this.notices = [...this.notices]
        } catch (err) {
-         console.error("标记已读失败", err)
+         console.error('标记已读失败', err)
        }
      }
-   
-     // 把完整公告对象传过去
+
      uni.navigateTo({
        url: `/owner/pages/notice/detail?notice=${encodeURIComponent(
          JSON.stringify(item)
@@ -379,6 +390,17 @@ export default {
   font-size: 30rpx;
   font-weight: 600;
   color: #1f2430;
+}
+
+.notice-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #1f2430;
+}
+
+.notice-title.unread {
+  font-weight: 600;
+  color: #ff4d4f;
 }
 
 .section-link {

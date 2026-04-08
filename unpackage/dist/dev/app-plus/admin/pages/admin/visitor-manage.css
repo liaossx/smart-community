@@ -287,6 +287,28 @@
   gap: 0.625rem;
   margin-bottom: 0.625rem;
 }
+.stats-filter[data-v-20feed08] {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.625rem;
+}
+.stats-filter-btn[data-v-20feed08] {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  padding: 0.375rem 0.5625rem;
+  border-radius: 31.21875rem;
+  box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.06);
+}
+.stats-filter-text[data-v-20feed08] {
+  font-size: 0.75rem;
+  color: #333;
+}
+.stats-filter-arrow[data-v-20feed08] {
+  margin-left: 0.3125rem;
+  font-size: 0.6875rem;
+  color: #999;
+}
 .stats-card[data-v-20feed08] {
   background-color: #fff;
   padding: 0.9375rem;

@@ -4,7 +4,7 @@
     "iPhone",
     "iPad"
   ],
-  "id": "",
+  "id": "__UNI__8536510",
   "name": "smart-community",
   "version": {
     "name": "1.0.0",
@@ -136,11 +136,7 @@
       ],
       "backgroundColor": "#ffffff",
       "selectedIndex": 0,
-      "shown": true,
-      "child": [
-        "lauchwebview"
-      ],
-      "selected": 0
+      "shown": true
     }
   },
   "app-harmony": {

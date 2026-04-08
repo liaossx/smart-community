@@ -26,6 +26,15 @@
           <text class="stats-label">今日新增</text>
         </view>
       </view>
+
+      <view class="stats-filter">
+        <picker mode="selector" :range="monthOptions" range-key="label" @change="handleMonthChange">
+          <view class="stats-filter-btn">
+            <text class="stats-filter-text">{{ currentMonthLabel }}</text>
+            <text class="stats-filter-arrow">▼</text>
+          </view>
+        </picker>
+      </view>
       
       <!-- 搜索和筛选栏 -->
       <view class="search-filter-bar">
@@ -135,7 +144,10 @@
           
           <!-- 报修信息 -->
           <view class="repair-info" @click="openDetail(item)">
-            <text class="building-info">{{ item.buildingNo }}{{ item.houseNo }}</text>
+            <text class="building-info">
+              {{ item.buildingNo }}{{ item.houseNo }}
+              <text v-if="isTimeout(item)" class="timeout-badge">已超时</text>
+            </text>
             <text class="fault-type">{{ item.faultType }}</text>
             <text class="fault-desc">{{ item.faultDesc }}</text>
             <text class="status" :class="getStatusClass(item.status)">
@@ -151,7 +163,7 @@
                 class="handle-btn primary"
                 @click="handleSetProcessing(item.id)"
               >
-                设为处理中
+                受理
               </button>
               <button 
                 class="handle-btn secondary"
@@ -165,15 +177,15 @@
             <template v-else-if="item.status === 'processing'">
               <button 
                 class="handle-btn primary"
-                @click="handleSetCompleted(item.id)"
+                @click="goToWorkOrderManage('PENDING', item.id)"
               >
-                设为已完成
+                去指派
               </button>
               <button 
                 class="handle-btn secondary"
-                @click="handleCancelRepair(item.id)"
+                @click="goToWorkOrderManage('', item.id)"
               >
-                取消报修
+                查看工单
               </button>
             </template>
             
@@ -288,6 +300,30 @@
             <text class="detail-label">处理备注:</text>
             <text class="detail-value detail-desc">{{ currentRepair.remark }}</text>
           </view>
+          
+          <view class="detail-actions">
+            <button
+              v-if="currentRepair.status === 'pending'"
+              class="detail-btn primary"
+              @click="handleAcceptFromDetail"
+            >
+              受理并生成工单
+            </button>
+            <button
+              v-else-if="currentRepair.status === 'processing'"
+              class="detail-btn primary"
+              @click="goToWorkOrderManage('PENDING', currentRepair.id)"
+            >
+              去工单指派
+            </button>
+            <button
+              v-else-if="currentRepair.status === 'completed'"
+              class="detail-btn secondary"
+              @click="goToWorkOrderManage('', currentRepair.id)"
+            >
+              查看工单
+            </button>
+          </view>
         </view>
       </view>
     </view>
@@ -297,6 +333,7 @@
 <script>
 import request from '@/utils/request'
 import adminSidebar from '@/admin/components/admin-sidebar/admin-sidebar'
+import { getConfigByKey } from '@/api/system/config' // 引入配置接口
 
 export default {
   components: {
@@ -304,13 +341,16 @@ export default {
   },
   data() {
     return {
-      repairList: [],
       showSidebar: false,
+      repairList: [],
       // 搜索和筛选
       searchQuery: '',
       statusFilter: '',
       faultTypeFilter: '',
       dateRange: [], // 日期范围筛选
+      monthOptions: [],
+      monthIndex: 0,
+      monthValue: '',
       // 加载状态
       loading: false,
       loadingStats: false,
@@ -358,11 +398,14 @@ export default {
       // 自动刷新功能
       autoRefresh: true, // 是否开启自动刷新
       autoRefreshInterval: 30, // 自动刷新间隔（秒）
-      timerId: null // 定时器ID
+      timerId: null, // 定时器ID
+      repairTimeout: 24 // 默认超时时间（小时）
     }
   },
   onLoad() {
     this.checkAdminRole()
+    this.initMonthOptions()
+    this.loadRepairConfig() // 加载超时配置
     this.loadRepairs()
   },
   onShow() {
@@ -375,8 +418,81 @@ export default {
   onUnload() {
     this.stopAutoRefresh() // 页面卸载时清除定时器
   },
-    
   methods: {
+    initMonthOptions() {
+      const now = new Date()
+      const y = now.getFullYear()
+      const m = now.getMonth() + 1
+      const current = `${y}-${String(m).padStart(2, '0')}`
+      const opts = []
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(y, m - 1 - i, 1)
+        const yy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const value = `${yy}-${mm}`
+        opts.push({ label: value, value })
+      }
+      this.monthOptions = opts
+      this.monthValue = current
+      this.monthIndex = Math.max(0, opts.findIndex(o => o.value === current))
+    },
+    handleMonthChange(e) {
+      const idx = Number(e && e.detail ? e.detail.value : 0)
+      const option = this.monthOptions && this.monthOptions[idx]
+      if (!option) return
+      this.monthIndex = idx
+      this.monthValue = option.value
+      this.currentPage = 1
+      this.loadRepairs()
+    },
+    // 加载报修超时配置
+    async loadRepairConfig() {
+      try {
+        const res = await getConfigByKey('repair.timeout')
+        const list = res.rows || res.data || res.records || []
+        
+        // 兼容不同的返回结构，确保能取到值
+        let configValue = null
+        if (Array.isArray(list) && list.length > 0) {
+            configValue = list[0].configValue
+        } else if (res.data && res.data.configValue) {
+            // 如果后端直接返回单个对象
+            configValue = res.data.configValue
+        }
+        
+        if (configValue !== null) {
+          this.repairTimeout = parseFloat(configValue) || 24
+          console.log('获取到报修超时配置:', this.repairTimeout, '小时')
+        }
+      } catch (e) {
+        console.error('获取报修配置失败，使用默认值24小时', e)
+        // 失败时保持默认值，不中断流程
+      }
+    },
+
+    // 判断是否超时
+    isTimeout(item) {
+      if (item.status !== 'pending') return false
+      if (!item.createTime) return false
+      
+      const createTime = new Date(item.createTime).getTime()
+      const now = new Date().getTime()
+      const diffHours = (now - createTime) / (1000 * 60 * 60)
+      
+      return diffHours > this.repairTimeout
+    },
+    getRepairUrgencyRank(item) {
+      if (!item) return 1
+      if (item.priority !== undefined && item.priority !== null) {
+        const n = Number(item.priority)
+        if (Number.isFinite(n) && n > 0) return n
+      }
+      const urgentFlag = item.urgent ?? item.isUrgent ?? item.emergency ?? item.isEmergency
+      if (urgentFlag === true || urgentFlag === 1 || urgentFlag === '1') return 4
+      if (this.isTimeout(item)) return 4
+      return 1
+    },
+
 	testSelectAll() {
 	  console.log('=== 全选/取消功能 ===')
 	  
@@ -421,7 +537,8 @@ export default {
           pageSize: this.pageSize,
           status: this.statusFilter || undefined, // 传递状态筛选
           faultType: this.faultTypeFilter || undefined, // 添加故障类型筛选
-          keyword: this.searchQuery || undefined  // 传递关键词参数
+          keyword: this.searchQuery || undefined,  // 传递关键词参数
+          month: this.monthValue || undefined
         }
         
         console.log('搜索参数:', params)
@@ -432,7 +549,12 @@ export default {
         console.log('真实接口返回的搜索结果:', data)
         
         // 根据Result结构处理响应
-        this.repairList = data.data?.records || data.records || []
+        const list = data.data?.records || data.records || []
+        this.repairList = list.slice().sort((a, b) => {
+          const diff = this.getRepairUrgencyRank(b) - this.getRepairUrgencyRank(a)
+          if (diff !== 0) return diff
+          return new Date(b.createTime || 0).getTime() - new Date(a.createTime || 0).getTime()
+        })
         this.total = data.data?.total || data.total || 0
         
         // 直接使用本地计算的统计数据，不调用不存在的统计接口
@@ -459,13 +581,14 @@ export default {
     // 统计数据方法 - 尝试调用真实接口获取统计，如果失败则使用本地计算作为保底
     async loadStats() {
       try {
+        const month = this.monthValue || undefined
         // 并行请求获取各状态数量（利用 pageSize=1 减少数据传输）
         // 1. 获取总数
-        const totalReq = request('/api/repair/admin/all', { params: { pageSize: 1 } }, 'GET')
+        const totalReq = request('/api/repair/admin/all', { params: { pageSize: 1, month } }, 'GET')
         // 2. 获取待处理数
-        const pendingReq = request('/api/repair/admin/all', { params: { pageSize: 1, status: 'pending' } }, 'GET')
+        const pendingReq = request('/api/repair/admin/all', { params: { pageSize: 1, status: 'pending', month } }, 'GET')
         // 3. 获取处理中数
-        const processingReq = request('/api/repair/admin/all', { params: { pageSize: 1, status: 'processing' } }, 'GET')
+        const processingReq = request('/api/repair/admin/all', { params: { pageSize: 1, status: 'processing', month } }, 'GET')
         
         // 尝试获取今日新增（假设后端支持 createTime 参数，或者不做此统计）
         // const todayStr = new Date().toISOString().split('T')[0]
@@ -814,11 +937,19 @@ export default {
     },
 
     async handleSetProcessing(repairId) {
-      await this.updateRepairStatus(repairId, 'processing', '设为处理中')
+      const result = await this.updateRepairStatus(repairId, 'processing', '受理')
+      if (result && result.success) {
+        this.promptGoAssign(repairId)
+      }
     },
-    
-    async handleSetCompleted(repairId) {
-      await this.updateRepairStatus(repairId, 'completed', '设为已完成')
+    async handleAcceptFromDetail() {
+      if (!this.currentRepair || !this.currentRepair.id) return
+      const repairId = this.currentRepair.id
+      const result = await this.updateRepairStatus(repairId, 'processing', '受理')
+      if (result && result.success) {
+        this.closeDetail()
+        this.promptGoAssign(repairId)
+      }
     },
     
     async handleCancelRepair(repairId) {
@@ -848,6 +979,7 @@ export default {
         
         uni.showToast({ title: actionName + '成功', icon: 'success' })
         this.loadRepairs()
+        return { success: true }
         
       } catch (err) {
         console.error(actionName + '失败:', err)
@@ -863,11 +995,13 @@ export default {
               title: actionName + '成功（本地模拟）', 
               icon: 'success' 
             })
+            return { success: true, local: true }
           } else {
             uni.showToast({ 
               title: actionName + '失败，记录不存在', 
               icon: 'none' 
             })
+            return { success: false }
           }
         } else {
           // 其他错误直接显示
@@ -875,10 +1009,31 @@ export default {
             title: errorMsg || actionName + '失败', 
             icon: 'none' 
           })
+          return { success: false }
         }
       } finally {
         uni.hideLoading()
       }
+    },
+    promptGoAssign(repairId) {
+      uni.showModal({
+        title: '受理成功',
+        content: '已生成工单，是否前往工单管理进行指派？',
+        confirmText: '去指派',
+        cancelText: '留在此页',
+        success: (res) => {
+          if (res.confirm) {
+            this.goToWorkOrderManage('PENDING', repairId)
+          }
+        }
+      })
+    },
+    goToWorkOrderManage(status, repairId) {
+      const query = []
+      if (status) query.push(`status=${encodeURIComponent(status)}`)
+      if (repairId) query.push(`repairId=${encodeURIComponent(repairId)}`)
+      const url = `/admin/pages/admin/work-order-manage${query.length ? `?${query.join('&')}` : ''}`
+      uni.navigateTo({ url })
     },
 
     getStatusClass(status) {
@@ -931,6 +1086,10 @@ export default {
     // 总页数
     totalPages() {
       return Math.ceil(this.total / this.pageSize)
+    },
+    currentMonthLabel() {
+      const opt = this.monthOptions && this.monthOptions[this.monthIndex]
+      return (opt && opt.label) || this.monthValue || '选择月份'
     },
     // 当前每页条数在选项中的索引
     pageSizeIndex() {
@@ -1018,6 +1177,32 @@ export default {
   grid-template-columns: repeat(auto-fit, minmax(150rpx, 1fr));
   gap: 20rpx;
   margin-bottom: 20rpx;
+}
+
+.stats-filter {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20rpx;
+}
+
+.stats-filter-btn {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  padding: 12rpx 18rpx;
+  border-radius: 999rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
+}
+
+.stats-filter-text {
+  font-size: 24rpx;
+  color: #333;
+}
+
+.stats-filter-arrow {
+  margin-left: 10rpx;
+  font-size: 22rpx;
+  color: #999;
 }
 
 .stats-card {
@@ -1148,10 +1333,17 @@ export default {
   padding-top: 10rpx;
 }
 
-/* 报修信息样式 */
-.repair-info {
-  flex: 1;
-  cursor: pointer;
+/* 超时标签 */
+.timeout-badge {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #fff;
+  background-color: #ff4757;
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
+  margin-left: 10rpx;
+  vertical-align: middle;
+  line-height: 1.2;
 }
 
 /* 操作按钮样式 */
@@ -1403,6 +1595,31 @@ export default {
 .detail-desc {
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.detail-actions {
+  margin-top: 30rpx;
+  display: flex;
+  gap: 20rpx;
+}
+
+.detail-btn {
+  flex: 1;
+  border: none;
+  border-radius: 10rpx;
+  padding: 16rpx 32rpx;
+  font-size: 28rpx;
+  text-align: center;
+}
+
+.detail-btn.primary {
+  background: #2D81FF;
+  color: white;
+}
+
+.detail-btn.secondary {
+  background: #f0f2f5;
+  color: #333;
 }
 
 /* 加载状态样式 */

@@ -49,27 +49,82 @@ export default {
       if (!user?.id) return
 
       try {
+        const params = {
+          userId: user.id,
+          pageNum: 1,
+          pageSize: 100
+        }
+        console.log("【NOTICE_DEBUG】请求公告列表 params =", params)
         const data = await request({
           url: "/api/notice/list",
           method: "GET",
-          params: {
-            userId: user.id,
-            pageNum: 1,
-            pageSize: 100
-          }
+          params
         })
 
-        const records = data.records || []
+        console.log("【NOTICE_DEBUG】公告列表原始响应 =", data)
+        const records = Array.isArray(data && data.records) ? data.records : []
+        console.log("【NOTICE_DEBUG】公告 records.length =", records.length)
+        const readCacheRaw = uni.getStorageSync('noticeReadIds')
+        const readCacheSet = new Set((Array.isArray(readCacheRaw) ? readCacheRaw : []).map(v => String(v)))
 
-        this.notices = records.map(item => ({
-          id: item.id,
-          title: item.title,
-          content: item.content,
-          publishTime: item.publishTime,
-          readFlag: item.readFlag,
-          time: this.formatTime(item.publishTime),
-          tag: this.getTag(item.targetType)
-        }))
+        const uid = String(user.id)
+        const getTargetUserId = (item) => {
+          return item?.targetUserId ??
+            item?.target_user_id ??
+            item?.target_userId ??
+            item?.targetUserID ??
+            item?.toUserId ??
+            item?.to_user_id ??
+            item?.userId ??
+            item?.user_id ??
+            null
+        }
+        const isUserTarget = (item) => {
+          const t = item?.targetType ?? item?.target_type ?? ''
+          return String(t).toUpperCase() === 'USER'
+        }
+        const userTypeItems = records.filter(isUserTarget)
+        const mismatchUserTargets = userTypeItems.filter(item => {
+          const t = getTargetUserId(item)
+          if (t === null || t === undefined || t === '') return true
+          return String(t) !== uid
+        })
+        console.log("【NOTICE_DEBUG】USER类型数量 =", userTypeItems.length)
+        console.log("【NOTICE_DEBUG】USER类型 target_user 不匹配数量 =", mismatchUserTargets.length)
+        console.log("【NOTICE_DEBUG】USER类型不匹配样本 =", mismatchUserTargets.slice(0, 5).map(item => ({
+          id: item?.id,
+          title: item?.title,
+          targetType: item?.targetType ?? item?.target_type,
+          targetUserId: getTargetUserId(item)
+        })))
+
+        const feeLike = records.filter(item => {
+          const text = `${item?.title || ''}${item?.content || ''}${item?.type || ''}${item?.category || ''}`
+          return /缴费|账单|物业费|水费|电费|燃气费|停车费/i.test(text)
+        })
+        console.log("【NOTICE_DEBUG】疑似缴费提醒数量 =", feeLike.length)
+        console.log("【NOTICE_DEBUG】疑似缴费提醒样本 =", feeLike.slice(0, 5).map(item => ({
+          id: item?.id,
+          title: item?.title,
+          targetType: item?.targetType ?? item?.target_type,
+          targetUserId: getTargetUserId(item)
+        })))
+
+        this.notices = records.map(item => {
+          const id = item?.id
+          const readFlag = readCacheSet.has(String(id))
+            ? 1
+            : Number(item?.readFlag ?? item?.read_flag ?? 0)
+          return {
+            id,
+            title: item.title,
+            content: item.content,
+            publishTime: item.publishTime,
+            readFlag,
+            time: this.formatTime(item.publishTime),
+            tag: this.getTag(item.targetType)
+          }
+        })
 
         console.log("【DEBUG】全部公告 =", this.notices)
 
@@ -81,10 +136,20 @@ export default {
     async openNoticeDetail(item) {
       if (item.readFlag === 0) {
         try {
+          const user = uni.getStorageSync('userInfo')
+          const userId = user?.id || user?.userId
           await request({
             url: `/api/notice/${item.id}/read`,
-            method: "PUT"
+            method: 'POST',
+            params: userId ? { userId } : {}
           })
+          const raw = uni.getStorageSync('noticeReadIds')
+          const arr = Array.isArray(raw) ? raw.map(v => String(v)) : []
+          const sid = String(item.id)
+          if (!arr.includes(sid)) {
+            arr.push(sid)
+            uni.setStorageSync('noticeReadIds', arr)
+          }
           item.readFlag = 1
           this.notices = [...this.notices]
         } catch (err) {
@@ -93,7 +158,7 @@ export default {
       }
 
       uni.navigateTo({
-        url: `/pages/notice/detail?notice=${encodeURIComponent(
+        url: `/owner/pages/notice/detail?notice=${encodeURIComponent(
           JSON.stringify(item)
         )}`
       })

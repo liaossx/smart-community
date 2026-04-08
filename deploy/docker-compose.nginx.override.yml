@@ -1,0 +1,20 @@
+services:
+  smart-nginx:
+    image: nginx:latest
+    container_name: smart-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - /opt/smart-community/frontend:/usr/share/nginx/html:ro
+      - /opt/smart-community/nginx/conf.d:/etc/nginx/conf.d:ro
+    restart: unless-stopped
+    # 【非常重要】确保 Nginx 和你的网关在同一个 Docker 网络下
+    # 你需要把 smart-community_default 替换成你后端实际的 network 名字
+    # 可以用 docker network ls 查看。
+    networks:
+      - smart-community_default
+
+# 这里声明外部网络，表示使用已经存在的后端网络
+networks:
+  smart-community_default:
+    external: true

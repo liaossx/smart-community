@@ -342,6 +342,8 @@ input, textarea {
   font-size: 32rpx;
   color: #333;
 }
+
+.submit-btn {
   background: #2D81FF;
   color: white;
   border-radius: 50rpx;

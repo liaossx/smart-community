@@ -115,8 +115,11 @@ export default {
          setTimeout(() => {
            // 根据角色跳转到对应首页
           if (userInfo.role === 'admin' || userInfo.role === 'super_admin') {
-            // 管理员跳转到仪表盘页面（管理员首页）
+            // 管理员跳转到仪表盘页面
             uni.redirectTo({ url: '/admin/pages/admin/dashboard/index' })
+          } else if (userInfo.role === 'worker') {
+            // 维修员跳转到任务中心
+            uni.redirectTo({ url: '/admin/pages/admin/worker-tasks' })
           } else {
             // 业主跳转到用户首页
             uni.switchTab({ url: '/owner/pages/index/index' })

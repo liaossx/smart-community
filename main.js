@@ -46,7 +46,7 @@ uni.addInterceptor('switchTab', {
     
     if (!token) {
       console.log('未登录，跳转到登录页')
-      uni.redirectTo({ url: '/pages/login/login' })
+      uni.redirectTo({ url: '/owner/pages/login/login' })
       return false
     }
     

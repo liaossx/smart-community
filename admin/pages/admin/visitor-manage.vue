@@ -22,6 +22,15 @@
         </view>
       </view>
 
+      <view class="stats-filter">
+        <picker mode="selector" :range="monthOptions" range-key="label" @change="handleMonthChange">
+          <view class="stats-filter-btn">
+            <text class="stats-filter-text">{{ currentMonthLabel }}</text>
+            <text class="stats-filter-arrow">▼</text>
+          </view>
+        </picker>
+      </view>
+
       <!-- 搜索和筛选栏 -->
       <view class="search-filter-bar">
         <view class="search-box">
@@ -169,25 +178,61 @@ export default {
         total: 0,
         pending: 0,
         approved: 0
-      }
+      },
+      monthOptions: [],
+      monthIndex: 0,
+      monthValue: ''
     }
   },
   computed: {
     totalPages() {
       return Math.ceil(this.total / this.pageSize) || 1
+    },
+    currentMonthLabel() {
+      const opt = this.monthOptions && this.monthOptions[this.monthIndex]
+      return (opt && opt.label) || this.monthValue || '选择月份'
     }
   },
   onLoad() {
+    this.initMonthOptions()
     this.loadData()
     this.loadStats()
   },
   methods: {
+    initMonthOptions() {
+      const now = new Date()
+      const y = now.getFullYear()
+      const m = now.getMonth() + 1
+      const current = `${y}-${String(m).padStart(2, '0')}`
+      const opts = []
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(y, m - 1 - i, 1)
+        const yy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const value = `${yy}-${mm}`
+        opts.push({ label: value, value })
+      }
+      this.monthOptions = opts
+      this.monthValue = current
+      this.monthIndex = Math.max(0, opts.findIndex(o => o.value === current))
+    },
+    handleMonthChange(e) {
+      const idx = Number(e && e.detail ? e.detail.value : 0)
+      const option = this.monthOptions && this.monthOptions[idx]
+      if (!option) return
+      this.monthIndex = idx
+      this.monthValue = option.value
+      this.currentPage = 1
+      this.loadData()
+      this.loadStats()
+    },
     async loadData() {
       this.loading = true
       try {
         const params = {
           keyword: this.searchQuery || undefined,
           status: this.statusFilter || undefined,
+          month: this.monthValue || undefined,
           pageNum: this.currentPage,
           pageSize: this.pageSize
         }
@@ -222,9 +267,10 @@ export default {
     // 加载统计数据
     async loadStats() {
       try {
-        const totalReq = request('/api/visitor/list', { params: { pageSize: 1 } }, 'GET')
-        const pendingReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'PENDING' } }, 'GET')
-        const approvedReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'APPROVED' } }, 'GET')
+        const month = this.monthValue || undefined
+        const totalReq = request('/api/visitor/list', { params: { pageSize: 1, month } }, 'GET')
+        const pendingReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'PENDING', month } }, 'GET')
+        const approvedReq = request('/api/visitor/list', { params: { pageSize: 1, status: 'APPROVED', month } }, 'GET')
         
         const [totalRes, pendingRes, approvedRes] = await Promise.all([totalReq, pendingReq, approvedReq])
         
@@ -362,6 +408,32 @@ export default {
   grid-template-columns: repeat(3, 1fr);
   gap: 20rpx;
   margin-bottom: 20rpx;
+}
+
+.stats-filter {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20rpx;
+}
+
+.stats-filter-btn {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  padding: 12rpx 18rpx;
+  border-radius: 999rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
+}
+
+.stats-filter-text {
+  font-size: 24rpx;
+  color: #333;
+}
+
+.stats-filter-arrow {
+  margin-left: 10rpx;
+  font-size: 22rpx;
+  color: #999;
 }
 
 .stats-card {

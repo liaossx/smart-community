@@ -106,7 +106,22 @@ export default {
         console.log('【DEBUG】车位列表数据:', JSON.stringify(res))
         
         // 兼容处理：可能返回数组或分页对象
-        this.mySpaces = Array.isArray(res) ? res : (res.records || [])
+        const list = Array.isArray(res) ? res : (res.records || [])
+        
+        // 1. 去重逻辑：使用 Map 按 id 或 slot 去重
+        const uniqueMap = new Map()
+        list.forEach(item => {
+          if (item.id && !uniqueMap.has(item.id)) {
+            uniqueMap.set(item.id, item)
+          }
+        })
+        const uniqueList = Array.from(uniqueMap.values())
+
+        // 2. 状态过滤：只允许选择 AVAILABLE 或 FREE 状态的车位
+        this.mySpaces = uniqueList.filter(space => {
+          const status = (space.status || '').toString().toUpperCase()
+          return status === 'AVAILABLE' || status === 'FREE'
+        })
       } catch (e) {
         console.error('获取车位失败', e)
         uni.showToast({ title: '无法获取车位列表', icon: 'none' })

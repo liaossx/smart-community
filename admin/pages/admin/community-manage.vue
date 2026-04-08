@@ -123,13 +123,13 @@ export default {
       try {
         // 尝试调用列表接口，如果不存在则使用模拟数据
         try {
-           const data = await request('/api/community/list', {}, 'GET')
+           const data = await request('/api/house/community/list', {}, 'GET')
            if (data && Array.isArray(data)) {
              this.communityList = data
              return
            }
         } catch (e) {
-          console.log('API /api/community/list 可能不存在，使用模拟数据')
+          console.log('API /api/house/community/list 可能不存在，使用模拟数据')
         }
 
         // 模拟数据

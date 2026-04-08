@@ -67,3 +67,7 @@
 }
 .btn.default { background-color: #909399;
 }
+.btn.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}

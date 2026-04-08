@@ -22,6 +22,15 @@
         </view>
       </view>
 
+      <view class="stats-filter">
+        <picker mode="selector" :range="monthOptions" range-key="label" @change="handleMonthChange">
+          <view class="stats-filter-btn">
+            <text class="stats-filter-text">{{ currentMonthLabel }}</text>
+            <text class="stats-filter-arrow">▼</text>
+          </view>
+        </picker>
+      </view>
+
       <view class="search-section">
         <view class="search-left">
           <input 
@@ -213,7 +222,10 @@ export default {
         total: 0,
         admin: 0,
         owner: 0
-      }
+      },
+      monthOptions: [],
+      monthIndex: 0,
+      monthValue: ''
     }
   },
   computed: {
@@ -222,13 +234,45 @@ export default {
     },
     totalPages() {
       return Math.ceil(this.total / this.pageSize) || 1
+    },
+    currentMonthLabel() {
+      const opt = this.monthOptions && this.monthOptions[this.monthIndex]
+      return (opt && opt.label) || this.monthValue || '选择月份'
     }
   },
   onLoad() {
+    this.initMonthOptions()
     this.loadUserList()
     this.loadStats()
   },
   methods: {
+    initMonthOptions() {
+      const now = new Date()
+      const y = now.getFullYear()
+      const m = now.getMonth() + 1
+      const current = `${y}-${String(m).padStart(2, '0')}`
+      const opts = []
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(y, m - 1 - i, 1)
+        const yy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const value = `${yy}-${mm}`
+        opts.push({ label: value, value })
+      }
+      this.monthOptions = opts
+      this.monthValue = current
+      this.monthIndex = Math.max(0, opts.findIndex(o => o.value === current))
+    },
+    handleMonthChange(e) {
+      const idx = Number(e && e.detail ? e.detail.value : 0)
+      const option = this.monthOptions && this.monthOptions[idx]
+      if (!option) return
+      this.monthIndex = idx
+      this.monthValue = option.value
+      this.currentPage = 1
+      this.loadUserList()
+      this.loadStats()
+    },
     getRoleLabel(role) {
       const val = role == null ? '' : String(role).toLowerCase()
       if (val === 'admin') {
@@ -262,7 +306,8 @@ export default {
         const params = { 
           pageNum: this.currentPage, 
           pageSize: this.pageSize, 
-          keyword: this.searchKey 
+          keyword: this.searchKey,
+          month: this.monthValue || undefined
         }
         if (this.roleFilterValue) {
           params.role = this.roleFilterValue
@@ -288,9 +333,10 @@ export default {
     // 加载统计数据
     async loadStats() {
       try {
-        const totalReq = request('/api/admin/user/list', { params: { pageSize: 1 } }, 'GET')
-        const adminReq = request('/api/admin/user/list', { params: { pageSize: 1, role: 'admin' } }, 'GET')
-        const ownerReq = request('/api/admin/user/list', { params: { pageSize: 1, role: 'owner' } }, 'GET')
+        const month = this.monthValue || undefined
+        const totalReq = request('/api/admin/user/list', { params: { pageSize: 1, month } }, 'GET')
+        const adminReq = request('/api/admin/user/list', { params: { pageSize: 1, role: 'admin', month } }, 'GET')
+        const ownerReq = request('/api/admin/user/list', { params: { pageSize: 1, role: 'owner', month } }, 'GET')
         
         const [totalRes, adminRes, ownerRes] = await Promise.all([totalReq, adminReq, ownerReq])
         
@@ -435,6 +481,32 @@ export default {
   grid-template-columns: repeat(3, 1fr);
   gap: 20rpx;
   margin-bottom: 20rpx;
+}
+
+.stats-filter {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20rpx;
+}
+
+.stats-filter-btn {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  padding: 12rpx 18rpx;
+  border-radius: 999rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
+}
+
+.stats-filter-text {
+  font-size: 24rpx;
+  color: #333;
+}
+
+.stats-filter-arrow {
+  margin-left: 10rpx;
+  font-size: 22rpx;
+  color: #999;
 }
 
 .stats-card {

@@ -83,6 +83,11 @@ uni-input[data-v-62de0cb9], uni-textarea[data-v-62de0cb9] {
   font-size: 1.5rem;
   color: #999;
 }
+.picker-view[data-v-62de0cb9] {
+  flex: 1;
+  font-size: 1rem;
+  color: #333;
+}
 .submit-btn[data-v-62de0cb9] {
   background: #2D81FF;
   color: white;

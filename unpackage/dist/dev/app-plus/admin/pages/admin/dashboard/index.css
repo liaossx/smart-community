@@ -14,6 +14,28 @@
   margin-bottom: 0.9375rem;
   box-shadow: 0 0.125rem 0.625rem rgba(0,0,0,0.05);
 }
+.stats-filter[data-v-21c44072] {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+.stats-filter-btn[data-v-21c44072] {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  padding: 0.375rem 0.5625rem;
+  border-radius: 31.21875rem;
+  box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.06);
+}
+.stats-filter-text[data-v-21c44072] {
+  font-size: 0.75rem;
+  color: #333;
+}
+.stats-filter-arrow[data-v-21c44072] {
+  margin-left: 0.3125rem;
+  font-size: 0.6875rem;
+  color: #999;
+}
 .welcome-text[data-v-21c44072] {
   display: flex;
   flex-direction: column;
@@ -105,6 +127,17 @@
   margin-bottom: 0.5rem;
   color: white;
   box-shadow: 0 0.125rem 0.3125rem rgba(0,0,0,0.1);
+  position: relative;
+}
+.badge-dot[data-v-21c44072] {
+  position: absolute;
+  top: 0.1875rem;
+  right: 0.1875rem;
+  width: 0.5625rem;
+  height: 0.5625rem;
+  background: #ff3b30;
+  border-radius: 50%;
+  border: 0.09375rem solid #fff;
 }
 .menu-name[data-v-21c44072] {
   font-size: 0.8125rem;
@@ -125,6 +158,11 @@
   padding: 0.9375rem;
   border-radius: 0.625rem;
   box-shadow: 0 0.125rem 0.3125rem rgba(0,0,0,0.05);
+}
+.chart-box.full-width[data-v-21c44072] {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
 }
 .chart-title[data-v-21c44072] {
   font-size: 0.875rem;

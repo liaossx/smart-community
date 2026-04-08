@@ -149,11 +149,10 @@ export default {
     async loadCommunityList() {
       try {
         console.log('加载社区列表')
-        const data = await request('/api/community/list', {}, 'GET')
-        console.log('社区列表返回', data && data.length ? data.length : 0)
-        if (Array.isArray(data)) {
-          this.communityList = data
-        }
+        const data = await request('/api/house/community/all', {}, 'GET')
+        const list = Array.isArray(data) ? data : (data && Array.isArray(data.records) ? data.records : [])
+        console.log('社区列表返回', list.length)
+        this.communityList = list
       } catch (e) {
         console.error('社区列表加载失败', e && e.message ? e.message : e)
         this.communityList = []
@@ -173,7 +172,7 @@ export default {
         uni.showLoading({ title: '加载中...' })
         // 使用修正后的 RESTful 接口
         const res = await request(
-          `/api/notice/detail/${this.noticeId}`,
+          `/api/notice/${this.noticeId}`,
           {},
           'GET'
         )
@@ -244,6 +243,10 @@ export default {
       if (!this.form.content.trim()) {
         return uni.showToast({ title: '请输入内容', icon: 'none' })
       }
+
+      if (this.isSuperAdmin && !this.selectedCommunityId) {
+        return uni.showToast({ title: '请选择发布社区', icon: 'none' })
+      }
     
       const userInfo = uni.getStorageSync('userInfo')
       uni.showLoading({ title: '提交中...', mask: true })
@@ -253,10 +256,12 @@ export default {
           title: this.form.title,
           content: this.form.content,
           topFlag: this.form.topFlag,
+          targetType: 'COMMUNITY',
+          communityId: this.isSuperAdmin ? Number(this.selectedCommunityId) : undefined,
           publishStatus: status,
           expireTime: this.form.expireDate ? `${this.form.expireDate}T${this.form.expireTimeVal}:00` : null
         }
-        console.log('提交参数', { dto, status, userId: userInfo && userInfo.id })
+        console.log('提交参数', { dto, status, userId: userInfo && (userInfo.id || userInfo.userId) })
     
         let targetId = this.noticeId
     
@@ -265,7 +270,7 @@ export default {
           try {
             await request(
               `/api/notice/${this.noticeId}`,
-              { data: dto, params: { adminId: userInfo.id } },
+              { data: dto, params: { userId: userInfo.id || userInfo.userId } },
               'PUT'
             )
             console.log('更新公告成功', { id: this.noticeId })
@@ -277,52 +282,32 @@ export default {
           try {
             const res = await request(
               '/api/notice',
-              { data: dto, params: { adminId: userInfo.id } },
+              { data: dto, params: { userId: userInfo.id || userInfo.userId } },
               'POST'
             )
             // 假设创建接口直接返回 ID (Long)
-            targetId = res
+            targetId = (res && typeof res === 'object' && (res.id || res.noticeId)) ? (res.id || res.noticeId) : res
             console.log('创建公告成功', { id: targetId })
           } catch (createErr) {
             console.error('创建公告失败', createErr && createErr.message ? createErr.message : createErr)
             // 这里不抛出错误，即使创建失败，也继续执行后续逻辑
           }
         }
-    
-        // 1.5 发布：调用发布接口（后端在发布时强制社区化）
-        if (status === 'PUBLISHED' && targetId) {
-          const publishParams = { adminId: userInfo.id }
-          if (this.isSuperAdmin && this.selectedCommunityId) {
-            publishParams.communityId = this.selectedCommunityId
-          }
-          console.log('调用发布接口', { id: targetId, params: publishParams })
-          await request(
-            `/api/notice/${targetId}/publish`,
-            { params: publishParams },
-            'PUT'
-          )
-          console.log('发布接口完成', { id: targetId })
-        }
 
         // 2. 仅在编辑模式且发布时，设置过期时间
         if (status === 'PUBLISHED' && this.isEdit && this.form.expireDate && targetId) {
           try {
-            // 构造符合后端NoticeExpireDTO的数据结构
             const expireDto = {
-              noticeId: Number(targetId),  // 转换为Long类型
-              expireType: 'CUSTOM',        // 必须指定类型为CUSTOM
+              noticeIds: [Number(targetId)],
+              expireType: 'CUSTOM',
               customExpireTime: `${this.form.expireDate}T${this.form.expireTimeVal}:00`,
-              days: null                   // CUSTOM类型时days可以为null
+              days: null
             }
-    
-            console.log('设置过期时间参数', expireDto)
-    
-            // 调用 /expire/set 接口
             await request(
-              '/api/notice/expire/set',
+              '/api/notice/expire/batch',
               { 
-                data: expireDto,  // 使用正确的DTO结构
-                params: { adminId: userInfo.id } 
+                data: expireDto,
+                params: { userId: userInfo.id || userInfo.userId } 
               },
               'POST'
             )
@@ -340,17 +325,17 @@ export default {
           // 如果是编辑且清空了过期时间，可以设置为永不过期
           try {
             const expireDto = {
-              noticeId: Number(targetId),
-              expireType: 'NEVER',  // 设置为永不过期
+              noticeIds: [Number(targetId)],
+              expireType: 'NEVER',
               customExpireTime: null,
               days: null
             }
     
             await request(
-              '/api/notice/expire/set',
+              '/api/notice/expire/batch',
               { 
                 data: expireDto,
-                params: { adminId: userInfo.id } 
+                params: { userId: userInfo.id || userInfo.userId } 
               },
               'POST'
             )
