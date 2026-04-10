@@ -445,6 +445,11 @@ export default {
         await request('/api/fee/remind/batch', { ids: unpaidIds }, 'POST')
         
         uni.hideLoading()
+        this.feeList = this.feeList.map(i => {
+          if (i.status !== 'unpaid') return i
+          const nextCount = (Number(i.remindCount) || 0) + 1
+          return { ...i, remindCount: nextCount }
+        })
         uni.showToast({ title: '催缴发送成功', icon: 'success' })
       } catch (e) {
         uni.hideLoading()
@@ -461,6 +466,12 @@ export default {
               // 这里的 id 是 path variable，且后端没有 @RequestBody，所以 data 传 null 或空对象均可
               // 修改为 null 明确表示没有 Body
               await request(`/api/fee/remind/${item.id}`, null, 'POST')
+              const index = this.feeList.findIndex(v => v.id === item.id)
+              if (index !== -1) {
+                const current = this.feeList[index]
+                const nextCount = (Number(current.remindCount) || 0) + 1
+                this.feeList.splice(index, 1, { ...current, remindCount: nextCount })
+              }
               uni.showToast({ title: '发送成功', icon: 'success' })
             } catch (e) {
               console.error('催缴失败', e)

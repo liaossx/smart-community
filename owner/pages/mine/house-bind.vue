@@ -116,16 +116,42 @@ export default {
       if (!this.form.type) return uni.showToast({ title: '请选择身份类型', icon: 'none' })
 
       try {
-        uni.showLoading({ title: '提交中...' })
+        uni.showLoading({ title: '查询房屋...' })
         const userInfo = uni.getStorageSync('userInfo')
-        
-        await request('/api/house/bind', {
-          userId: userInfo?.id || userInfo?.userId,
-          communityId: this.form.communityId,
-          buildingNo: this.form.buildingNo,
-          houseNo: this.form.houseNo,
-          type: this.form.type
-        }, 'POST')
+
+        const userId = userInfo?.id || userInfo?.userId
+        if (!userId) {
+          uni.hideLoading()
+          return uni.showToast({ title: '未获取到用户信息，请重新登录', icon: 'none' })
+        }
+
+        const buildingNo = String(this.form.buildingNo || '').trim()
+        const houseNo = String(this.form.houseNo || '')
+          .trim()
+          .replace(/[室号]$/u, '')
+
+        const houseInfo = await request({
+          url: '/api/house/info',
+          method: 'GET',
+          params: { buildingNo, houseNo }
+        })
+        const houseId = houseInfo?.id ?? houseInfo?.houseId ?? houseInfo?.data?.id ?? houseInfo?.data?.houseId
+
+        if (!houseId) {
+          uni.hideLoading()
+          return uni.showToast({ title: '未找到对应房屋，请检查楼栋号和房屋号', icon: 'none' })
+        }
+
+        uni.showLoading({ title: '提交中...' })
+        await request({
+          url: '/api/house/bind',
+          method: 'POST',
+          params: {
+            userId,
+            houseId,
+            type: this.form.type
+          }
+        })
 
         uni.hideLoading()
         uni.showModal({

@@ -97,6 +97,16 @@ export function checkPagePermission(pagePath, role) {
   if (pagePath === '/owner/pages/login/login' || pagePath === '/pages/login/login') {
     return true
   }
+
+  if (role === 'admin') {
+    const denyPages = [
+      '/admin/pages/admin/register-review',
+      '/admin/pages/admin/system-config'
+    ]
+    if (denyPages.includes(pagePath)) {
+      return false
+    }
+  }
   
   // 简化权限检查逻辑：如果是管理员，只要是 admin/ 开头的页面都放行
   if ((role === 'admin' || role === 'super_admin')) {

@@ -1,88 +1,98 @@
 <template>
-  <view class="dashboard">
-    <!-- 顶部欢迎区 -->
-    <view class="welcome-card">
-      <view class="welcome-text">
-        <text class="greeting">你好，{{ userInfo.name || userInfo.username || '管理员' }}</text>
-        <text class="role-badge">系统管理员</text>
-      </view>
-      <view class="logout-btn" @click="handleLogout">
-        <text>退出登录</text>
-      </view>
-    </view>
-
-    <view class="stats-filter">
-      <picker mode="selector" :range="monthOptions" range-key="label" @change="handleMonthChange">
-        <view class="stats-filter-btn">
-          <text class="stats-filter-text">{{ currentMonthLabel }}</text>
-          <text class="stats-filter-arrow">▼</text>
+  <admin-sidebar
+    :showSidebar="showSidebar"
+    @update:showSidebar="showSidebar = $event"
+    pageTitle="仪表盘"
+    currentPage="/admin/pages/admin/dashboard/index"
+  >
+    <view class="dashboard">
+      <!-- 顶部欢迎区 -->
+      <view class="welcome-card">
+        <view class="welcome-text">
+          <text class="greeting">你好，{{ userInfo.name || userInfo.username || '管理员' }}</text>
+          <text class="role-badge">系统管理员</text>
         </view>
-      </picker>
-    </view>
-
-    <!-- 数据概览 -->
-    <view class="stats-grid">
-      <view class="stat-card" v-for="(item, index) in stats" :key="index" :style="{ background: item.bg }">
-        <view class="stat-icon">{{ item.icon }}</view>
-        <view class="stat-info">
-          <text class="stat-value">{{ item.value }}</text>
-          <text class="stat-label">{{ item.label }}</text>
+        <view class="logout-btn" @click="handleLogout">
+          <text>退出登录</text>
         </view>
       </view>
-    </view>
 
-    <!-- 图表区域 -->
-    <view class="charts-section">
-      <text class="section-title">数据分析</text>
-      <view class="charts-container">
-        <!-- 报修趋势图 -->
-        <view class="chart-box">
-          <view class="chart-title">近七日报修趋势</view>
-          <view id="repairChart" class="echart-container" :prop="repairTrend" :change:prop="echarts.updateRepairChart"></view>
-        </view>
-        
-        <!-- 投诉分布图 -->
-        <view class="chart-box">
-          <view class="chart-title">投诉类型分布</view>
-          <view id="complaintChart" class="echart-container" :prop="complaintType" :change:prop="echarts.updateComplaintChart"></view>
-        </view>
-
-        <!-- 新增：工单状态占比 -->
-        <view class="chart-box full-width">
-          <view class="chart-title">工单处理状态</view>
-          <view id="workOrderChart" class="echart-container" :prop="workOrderStats" :change:prop="echarts.updateWorkOrderChart"></view>
-        </view>
-
-        <!-- 新增：报修与工单对比 -->
-        <view class="chart-box full-width">
-          <view class="chart-title">报修转工单对比</view>
-          <view id="compareChart" class="echart-container" :prop="compareStats" :change:prop="echarts.updateCompareChart"></view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 功能菜单 -->
-    <view class="menu-section">
-      <text class="section-title">常用功能</text>
-      <view class="menu-grid">
-        <view class="menu-item" v-for="(menu, index) in menus" :key="index" @click="navigateTo(menu.path)">
-          <view class="menu-icon" :style="{ background: menu.color }">
-            {{ menu.icon }}
-            <view v-if="getMenuBadge(menu) > 0" class="badge-dot"></view>
+      <view class="stats-filter">
+        <picker mode="selector" :range="monthOptions" range-key="label" @change="handleMonthChange">
+          <view class="stats-filter-btn">
+            <text class="stats-filter-text">{{ currentMonthLabel }}</text>
+            <text class="stats-filter-arrow">▼</text>
           </view>
-          <text class="menu-name">{{ menu.name }}</text>
+        </picker>
+      </view>
+
+      <!-- 数据概览 -->
+      <view class="stats-grid">
+        <view class="stat-card" v-for="(item, index) in stats" :key="index" :style="{ background: item.bg }">
+          <view class="stat-icon">{{ item.icon }}</view>
+          <view class="stat-info">
+            <text class="stat-value">{{ item.value }}</text>
+            <text class="stat-label">{{ item.label }}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 图表区域 -->
+      <view class="charts-section">
+        <text class="section-title">数据分析</text>
+        <view class="charts-container">
+          <!-- 报修趋势图 -->
+          <view class="chart-box">
+            <view class="chart-title">近七日报修趋势</view>
+            <view id="repairChart" class="echart-container" :prop="repairTrend" :change:prop="echarts.updateRepairChart"></view>
+          </view>
+          
+          <!-- 投诉分布图 -->
+          <view class="chart-box">
+            <view class="chart-title">投诉类型分布</view>
+            <view id="complaintChart" class="echart-container" :prop="complaintType" :change:prop="echarts.updateComplaintChart"></view>
+          </view>
+
+          <!-- 新增：工单状态占比 -->
+          <view class="chart-box full-width">
+            <view class="chart-title">工单处理状态</view>
+            <view id="workOrderChart" class="echart-container" :prop="workOrderStats" :change:prop="echarts.updateWorkOrderChart"></view>
+          </view>
+
+          <!-- 新增：报修与工单对比 -->
+          <view class="chart-box full-width">
+            <view class="chart-title">报修转工单对比</view>
+            <view id="compareChart" class="echart-container" :prop="compareStats" :change:prop="echarts.updateCompareChart"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 功能菜单 -->
+      <view class="menu-section">
+        <text class="section-title">常用功能</text>
+        <view class="menu-grid">
+          <view class="menu-item" v-for="(menu, index) in menus" :key="index" @click="navigateTo(menu.path)">
+            <view class="menu-icon" :style="{ background: menu.color }">
+              {{ menu.icon }}
+              <view v-if="getMenuBadge(menu) > 0" class="badge-dot"></view>
+            </view>
+            <text class="menu-name">{{ menu.name }}</text>
+          </view>
         </view>
       </view>
     </view>
-  </view>
+  </admin-sidebar>
 </template>
 
 <script>
 import request from '@/utils/request'
+import adminSidebar from '@/admin/components/admin-sidebar/admin-sidebar'
 
 export default {
+  components: { adminSidebar },
   data() {
     return {
+      showSidebar: false,
       userInfo: {},
       stats: [
         { label: '小区总数', value: '-', icon: '🏢', bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
@@ -449,6 +459,7 @@ export default {
   min-height: 100vh;
   background-color: #f5f7fa;
   padding: 30rpx;
+  padding-top: 100rpx;
 }
 
 .welcome-card {

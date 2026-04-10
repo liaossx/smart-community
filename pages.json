@@ -151,6 +151,20 @@
         }
       },
       {
+        "path": "admin/pages/admin/register-review",
+        "style": {
+          "navigationBarTitleText": "注册审核",
+          "navigationStyle": "custom"
+        }
+      },
+      {
+        "path": "admin/pages/admin/house-bind-review",
+        "style": {
+          "navigationBarTitleText": "房屋绑定审核",
+          "navigationStyle": "custom"
+        }
+      },
+      {
         "path": "admin/pages/admin/activity-manage",
         "style": {
           "navigationBarTitleText": "社区活动",

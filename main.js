@@ -33,6 +33,33 @@ uni.addInterceptor('navigateTo', {
         goToHomeByRole()
         return false
       }
+
+      // 业主未绑定小区时的功能限权：引导去绑定房屋
+      const needBindPrefixes = ['/owner/pages/topic', '/owner/pages/communityService', '/owner/pages/parking']
+      const allowWithoutBind = [
+        '/owner/pages/login/login',
+        '/owner/pages/register/register',
+        '/owner/pages/index/index',
+        '/owner/pages/mine/index',
+        '/owner/pages/mine/profile',
+        '/owner/pages/mine/house-bind',
+        '/owner/pages/notice/list',
+        '/owner/pages/notice/detail'
+      ]
+      const noCommunity = !userInfo?.communityId
+      const isNeedBind = needBindPrefixes.some(p => pagePath.startsWith(p))
+      const isAllow = allowWithoutBind.includes(pagePath)
+      if (userInfo?.role === 'owner' && noCommunity && isNeedBind && !isAllow) {
+        uni.showModal({
+          title: '提示',
+          content: '请先绑定房屋以开启社区相关功能',
+          showCancel: false,
+          success: () => {
+            uni.navigateTo({ url: '/owner/pages/mine/house-bind' })
+          }
+        })
+        return false
+      }
     }
     return true
   }
@@ -57,7 +84,20 @@ uni.addInterceptor('switchTab', {
       goToHomeByRole()
       return false
     }
-    
+    // 业主未绑定小区时限制进入部分 tab（例如话题/停车等）
+    const target = e.url.split('?')[0]
+    const needBindTabs = ['/owner/pages/topic/index', '/owner/pages/parking/index']
+    if (userInfo?.role === 'owner' && !userInfo?.communityId && needBindTabs.includes(target)) {
+      uni.showModal({
+        title: '提示',
+        content: '请先绑定房屋以访问该功能',
+        showCancel: false,
+        success: () => {
+          uni.navigateTo({ url: '/owner/pages/mine/house-bind' })
+        }
+      })
+      return false
+    }
     return true
   }
 })

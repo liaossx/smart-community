@@ -105,10 +105,22 @@ export default {
   methods: {
     async loadTopics() {
       try {
+        const user = uni.getStorageSync('userInfo') || {}
+        if (!user?.communityId) {
+          uni.showModal({
+            title: '提示',
+            content: '请先绑定房屋以查看本小区话题',
+            showCancel: false,
+            success: () => {
+              uni.navigateTo({ url: '/owner/pages/mine/house-bind' })
+            }
+          })
+          return
+        }
         const data = await request({
           url: '/api/topic/list',
           method: 'GET',
-          params: { pageNum: 1, pageSize: 10, status: 'APPROVED' }
+          params: { pageNum: 1, pageSize: 10, status: 'APPROVED', communityId: user.communityId }
         })
         if (data?.records) {
           this.topics = data.records.map(t => ({

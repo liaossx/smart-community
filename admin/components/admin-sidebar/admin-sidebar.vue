@@ -81,6 +81,8 @@ export default {
         { text: '费用管理', icon: '💰', path: '/admin/pages/admin/fee-manage', roles: ['admin', 'super_admin'] },
         { text: '投诉处理', icon: '🗣️', path: '/admin/pages/admin/complaint-manage', roles: ['admin', 'super_admin'] },
         { text: '访客审核', icon: '👁️', path: '/admin/pages/admin/visitor-manage', roles: ['admin', 'super_admin'] },
+        { text: '注册审核', icon: '✅', path: '/admin/pages/admin/register-review', roles: ['super_admin'] },
+        { text: '房屋绑定审核', icon: '🏠', path: '/admin/pages/admin/house-bind-review', roles: ['admin', 'super_admin'] },
         { text: '社区活动', icon: '🎉', path: '/admin/pages/admin/activity-manage', roles: ['admin', 'super_admin'] },
         { text: '停车管理', icon: '🚗', path: '/admin/pages/admin/parking-manage', roles: ['admin', 'super_admin'] },
         { text: '用户管理', icon: '👥', path: '/admin/pages/admin/user-manage', roles: ['admin', 'super_admin'] },

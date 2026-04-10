@@ -1,6 +1,6 @@
 <template>
   <view class="register-container">
-    <view class="register-title">用户注册</view>
+    <view class="register-title" @tap="handleTitleTap">用户注册</view>
 
     <!-- 用户名 -->
     <view class="input-item">
@@ -56,6 +56,20 @@
       />
     </view>
 
+    <view v-if="showRolePicker" class="input-item">
+      <text class="input-icon">🎭</text>
+      <picker
+        :range="roleOptions"
+        range-key="label"
+        :value="roleIndex"
+        @change="handleRoleChange"
+      >
+        <view class="picker-value">
+          <text class="picker-text">{{ currentRoleLabel }}</text>
+        </view>
+      </picker>
+    </view>
+
     <!-- 注册按钮 -->
     <button 
       class="register-btn" 
@@ -83,9 +97,24 @@ export default {
         password: '',
         confirmPassword: '',
         phone: '',
-        realName: ''
+        realName: '',
+        role: 'owner'
       },
+      showRolePicker: false,
+      tapCount: 0,
+      roleOptions: [
+        { label: '业主(owner)', value: 'owner' },
+        { label: '工作人员(worker)', value: 'worker' },
+        { label: '管理员(admin)', value: 'admin' }
+      ],
+      roleIndex: 0,
       loading: false
+    }
+  },
+  computed: {
+    currentRoleLabel() {
+      const found = this.roleOptions.find(v => v.value === this.form.role)
+      return found ? found.label : '业主(owner)'
     }
   },
   methods: {
@@ -122,12 +151,29 @@ export default {
       return true
     },
 
+    handleTitleTap() {
+      this.tapCount += 1
+      if (this.tapCount >= 7 && !this.showRolePicker) {
+        this.showRolePicker = true
+        this.form.role = 'owner'
+        this.roleIndex = 0
+        uni.showToast({ title: '已开启角色选择', icon: 'none' })
+      }
+    },
+
+    handleRoleChange(e) {
+      const idx = Number(e?.detail?.value ?? 0)
+      this.roleIndex = Number.isNaN(idx) ? 0 : idx
+      this.form.role = this.roleOptions[this.roleIndex]?.value || 'owner'
+    },
+
     // 提交注册
     async handleRegister() {
       if (!this.validateForm()) return
 
       this.loading = true
       try {
+        const role = this.showRolePicker ? (this.form.role || 'owner') : 'owner'
         await request({
           url: '/api/user/register',
           method: 'POST',
@@ -135,7 +181,8 @@ export default {
             username: this.form.username,
             password: this.form.password,
             phone: this.form.phone,
-            realName: this.form.realName
+            realName: this.form.realName,
+            role
           }
         })
 
@@ -209,6 +256,18 @@ export default {
 
 input {
   flex: 1;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.picker-value {
+  flex: 1;
+  height: 90rpx;
+  display: flex;
+  align-items: center;
+}
+
+.picker-text {
   font-size: 28rpx;
   color: #333;
 }

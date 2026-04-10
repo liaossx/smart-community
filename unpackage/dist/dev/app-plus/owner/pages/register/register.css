@@ -39,6 +39,16 @@ uni-input[data-v-e10ddd9f] {
   font-size: 0.875rem;
   color: #333;
 }
+.picker-value[data-v-e10ddd9f] {
+  flex: 1;
+  height: 2.8125rem;
+  display: flex;
+  align-items: center;
+}
+.picker-text[data-v-e10ddd9f] {
+  font-size: 0.875rem;
+  color: #333;
+}
 .register-btn[data-v-e10ddd9f] {
   background-color: #2D81FF;
   color: #fff;

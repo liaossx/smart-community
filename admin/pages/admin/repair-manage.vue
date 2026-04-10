@@ -82,9 +82,9 @@
       <!-- 批量操作栏 -->
       <view v-if="repairList.length > 0" class="batch-operation-bar">
         <view class="batch-select">
-          <view style="margin: 10px;">
-            <button @click="testSelectAll">全选</button>
-          </view>
+          <button class="select-all-btn" @click="testSelectAll">
+            {{ selectedIds.length === repairList.length ? '取消全选' : '全选' }}
+          </button>
           <text v-if="selectedIds.length > 0" class="selected-count">
             {{ selectedIds.length }}项已选择
           </text>
@@ -1104,16 +1104,15 @@ export default {
   padding: 30rpx;
   padding-top: 100rpx; /* 增加顶部内边距，防止被侧边栏遮挡 */
   min-height: 100vh;
-  background-color: #f5f5f5; /* 添加背景色 */
+  background-color: #f5f7fa; /* 添加背景色 */
 }
 
 /* 搜索和筛选栏 */
 .search-filter-bar {
   background-color: #fff;
-  border-radius: 10rpx;
+  border-radius: 15rpx;
   padding: 20rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+  margin-bottom: 30rpx;
   display: flex;
   flex-direction: column;
   gap: 20rpx;
@@ -1127,21 +1126,21 @@ export default {
 
 .search-input {
   flex: 1;
-  height: 60rpx;
-  border: 1rpx solid #e4e7ed;
-  border-radius: 30rpx;
-  padding: 0 20rpx;
+  height: 70rpx;
+  border-radius: 35rpx;
+  padding: 0 30rpx;
   font-size: 28rpx;
   background-color: #f5f7fa;
 }
 
 .search-btn {
-  height: 60rpx;
-  padding: 0 30rpx;
+  height: 70rpx;
+  line-height: 70rpx;
+  padding: 0 40rpx;
   background-color: #2D81FF;
   color: white;
   border: none;
-  border-radius: 30rpx;
+  border-radius: 35rpx;
   font-size: 28rpx;
 }
 
@@ -1157,10 +1156,9 @@ export default {
 
 .filter-picker {
   flex: 1;
-  height: 60rpx;
+  height: 70rpx;
   background-color: #f5f7fa;
-  border: 1rpx solid #e4e7ed;
-  border-radius: 30rpx;
+  border-radius: 35rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1168,13 +1166,13 @@ export default {
 
 .filter-picker-text {
   font-size: 28rpx;
-  color: #333;
+  color: #666;
 }
 
 /* 统计卡片样式 */
 .stats-card-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150rpx, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20rpx;
   margin-bottom: 20rpx;
 }
@@ -1211,14 +1209,7 @@ export default {
   border-radius: 15rpx;
   box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
   text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
   border-left: 6rpx solid #2D81FF;
-}
-
-.stats-card:hover {
-  transform: translateY(-5rpx);
-  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.1);
 }
 
 .stats-card.status-pending {
@@ -1239,7 +1230,7 @@ export default {
 
 .stats-number {
   display: block;
-  font-size: 48rpx;
+  font-size: 40rpx;
   font-weight: bold;
   color: #333;
   margin-bottom: 10rpx;
@@ -1258,9 +1249,9 @@ export default {
   justify-content: space-between;
   background-color: #fff;
   padding: 20rpx;
-  border-radius: 10rpx;
+  border-radius: 15rpx;
   box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-  margin-bottom: 20rpx;
+  margin-bottom: 30rpx;
 }
 
 .batch-select {
@@ -1269,22 +1260,39 @@ export default {
   gap: 10rpx;
 }
 
-.batch-select text {
+.select-all-btn {
+  height: 60rpx;
+  line-height: 60rpx;
+  padding: 0 30rpx;
+  border-radius: 30rpx;
+  background: #f5f7fa;
+  color: #333;
+  font-size: 26rpx;
+  border: 1rpx solid #e4e7ed;
+  margin: 0;
+}
+
+.selected-count {
   font-size: 24rpx;
   color: #666;
 }
 
 .batch-buttons {
   display: flex;
-  gap: 10rpx;
+  gap: 16rpx;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .batch-btn {
-  padding: 10rpx 20rpx;
+  padding: 0 24rpx;
   border: none;
-  border-radius: 6rpx;
+  border-radius: 30rpx;
   font-size: 26rpx;
+  height: 60rpx;
+  line-height: 60rpx;
   min-width: 120rpx;
+  margin: 0;
 }
 
 .batch-btn.primary {
@@ -1316,10 +1324,10 @@ export default {
 
 .repair-item {
   background: white;
-  border-radius: 20rpx;
+  border-radius: 15rpx;
   padding: 30rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.1);
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
   display: flex;
   align-items: flex-start;
   gap: 20rpx;
@@ -1348,30 +1356,26 @@ export default {
 
 /* 操作按钮样式 */
 .action-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-}
-
-.repair-info {
-  flex: 1;
   width: 100%;
-  margin-bottom: 20rpx; /* 增加底部间距 */
+  display: flex;
+  gap: 20rpx;
+  margin-top: 20rpx;
+  justify-content: flex-end; /* 让按钮靠右对齐 */
 }
 
 .building-info {
   display: block;
-  font-size: 36rpx;
+  font-size: 32rpx;
   font-weight: bold;
   color: #333;
-  margin-bottom: 15rpx;
+  margin-bottom: 10rpx;
 }
 
 .fault-type {
   display: block;
-  font-size: 32rpx;
+  font-size: 28rpx;
   color: #666;
-  margin-bottom: 10rpx;
+  margin-bottom: 8rpx;
 }
 
 .fault-desc {
@@ -1417,20 +1421,17 @@ export default {
   margin-top: 10rpx;
 }
 
-.action-buttons {
-  width: 100%;
-  display: flex;
-  gap: 10rpx;
-  margin-top: 20rpx;
-}
-
 .handle-btn {
-  flex: 1;
+  /* 取消 flex: 1，改为按内容自适应宽度 */
   border: none;
-  border-radius: 10rpx;
-  padding: 16rpx 32rpx;
-  font-size: 28rpx;
+  border-radius: 30rpx;
+  padding: 0 30rpx;
+  height: 60rpx;
+  line-height: 60rpx;
+  font-size: 26rpx;
   text-align: center;
+  margin: 0;
+  min-width: 140rpx; /* 保证最小宽度，避免文字太少时按钮过小 */
 }
 
 .handle-btn.primary {
@@ -1439,8 +1440,9 @@ export default {
 }
 
 .handle-btn.secondary {
-  background: #f0f2f5;
-  color: #333;
+  background: #e6f7ff;
+  color: #1890ff;
+  border: 1rpx solid #91d5ff;
 }
 
 .processed-text {

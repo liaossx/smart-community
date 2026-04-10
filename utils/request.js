@@ -100,7 +100,16 @@ function request(options) {
         const responseData = res.data || {};
         const { code, msg, data } = responseData;
         const bizCode = typeof code === 'string' ? parseInt(code, 10) : code;
-        console.log('响应状态:', res.statusCode, '业务code:', code, 'msg:', msg, 'url:', requestUrl)
+        const rawMsg = msg == null ? '' : String(msg)
+        let normalizedMsg = rawMsg
+        if (normalizedMsg.includes('Duplicate entry') || normalizedMsg.includes('SQLIntegrityConstraintViolationException')) {
+          if (normalizedMsg.includes('sys_user_register_request') && normalizedMsg.toLowerCase().includes('username')) {
+            normalizedMsg = '用户名已存在或已提交注册申请，请更换用户名'
+          } else {
+            normalizedMsg = '数据已存在，请勿重复提交'
+          }
+        }
+        console.log('响应状态:', res.statusCode, '业务code:', code, 'msg:', rawMsg, 'url:', requestUrl)
         
         // 检查状态码
         if (res.statusCode === 200) {
@@ -119,30 +128,30 @@ function request(options) {
               console.warn('401未登录拦截:', requestUrl)
               uni.showModal({
                 title: '登录提示',
-                content: msg || '请先登录',
+                content: normalizedMsg || '请先登录',
                 showCancel: false,
                 success: () => {
                   uni.redirectTo({ url: '/owner/pages/login/login' })
                 }
               })
-              reject(new Error(msg || '未登录'));
+              reject(new Error(normalizedMsg || '未登录'));
             } else if (code === 403) {
               // 403无权限，显示详细提示
               console.warn('403无权限拦截:', requestUrl)
               uni.showModal({
                 title: '权限提示',
-                content: msg || '您没有权限执行此操作',
+                content: normalizedMsg || '您没有权限执行此操作',
                 showCancel: false
               })
-              reject(new Error(msg || '无权限操作'));
+              reject(new Error(normalizedMsg || '无权限操作'));
             } else {
               // 其他业务错误，显示详细提示
               uni.showModal({
                 title: '操作失败',
-                content: msg || '操作失败，请重试',
+                content: normalizedMsg || '操作失败，请重试',
                 showCancel: false
               })
-              reject(new Error(msg || '操作失败'));
+              reject(new Error(normalizedMsg || '操作失败'));
             }
           }
         } else {
@@ -154,16 +163,16 @@ function request(options) {
             console.warn('HTTP 401 未登录:', requestUrl)
             uni.showModal({
               title: '登录提示',
-              content: msg || '请先登录',
+              content: normalizedMsg || '请先登录',
               showCancel: false,
               success: () => {
                 uni.redirectTo({ url: '/owner/pages/login/login' })
               }
             })
-            reject(new Error(msg || '未登录'));
+            reject(new Error(normalizedMsg || '未登录'));
           } else {
             // 其他状态码错误，显示详细提示
-            const errMsg = msg || `请求失败，状态码: ${res.statusCode}`;
+            const errMsg = normalizedMsg || `请求失败，状态码: ${res.statusCode}`;
             console.warn('HTTP错误:', res.statusCode, 'url:', requestUrl)
             console.warn('错误详情(Body):', JSON.stringify(res.data)) // 新增：打印后端返回的具体错误信息
             uni.showModal({
