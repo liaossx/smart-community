@@ -1,6 +1,6 @@
 <template>
   <view class="register-container">
-    <view class="register-title" @tap="handleTitleTap">用户注册</view>
+    <view class="register-title">用户注册</view>
 
     <!-- 用户名 -->
     <view class="input-item">
@@ -56,9 +56,10 @@
       />
     </view>
 
-    <view v-if="showRolePicker" class="input-item">
+    <view class="input-item">
       <text class="input-icon">🎭</text>
       <picker
+        class="role-picker"
         :range="roleOptions"
         range-key="label"
         :value="roleIndex"
@@ -66,8 +67,13 @@
       >
         <view class="picker-value">
           <text class="picker-text">{{ currentRoleLabel }}</text>
+          <text class="picker-arrow">▼</text>
         </view>
       </picker>
+    </view>
+
+    <view class="role-tip">
+      业主账号可直接登录，工作人员和管理员账号提交后需要后台审核。
     </view>
 
     <!-- 注册按钮 -->
@@ -100,8 +106,6 @@ export default {
         realName: '',
         role: 'owner'
       },
-      showRolePicker: false,
-      tapCount: 0,
       roleOptions: [
         { label: '业主(owner)', value: 'owner' },
         { label: '工作人员(worker)', value: 'worker' },
@@ -151,16 +155,6 @@ export default {
       return true
     },
 
-    handleTitleTap() {
-      this.tapCount += 1
-      if (this.tapCount >= 7 && !this.showRolePicker) {
-        this.showRolePicker = true
-        this.form.role = 'owner'
-        this.roleIndex = 0
-        uni.showToast({ title: '已开启角色选择', icon: 'none' })
-      }
-    },
-
     handleRoleChange(e) {
       const idx = Number(e?.detail?.value ?? 0)
       this.roleIndex = Number.isNaN(idx) ? 0 : idx
@@ -173,7 +167,7 @@ export default {
 
       this.loading = true
       try {
-        const role = this.showRolePicker ? (this.form.role || 'owner') : 'owner'
+        const role = this.form.role || 'owner'
         await request({
           url: '/api/user/register',
           method: 'POST',
@@ -186,7 +180,8 @@ export default {
           }
         })
 
-        uni.showToast({ title: '注册成功', icon: 'success' })
+        const successText = role === 'owner' ? '注册成功' : '已提交审核'
+        uni.showToast({ title: successText, icon: 'success' })
         
         // 延迟跳转回登录页
         setTimeout(() => {
@@ -260,16 +255,33 @@ input {
   color: #333;
 }
 
+.role-picker {
+  flex: 1;
+}
+
 .picker-value {
   flex: 1;
   height: 90rpx;
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
 .picker-text {
   font-size: 28rpx;
   color: #333;
+}
+
+.picker-arrow {
+  color: #999;
+  font-size: 24rpx;
+}
+
+.role-tip {
+  margin: -4rpx 8rpx 24rpx;
+  color: #999;
+  font-size: 24rpx;
+  line-height: 1.6;
 }
 
 .register-btn {

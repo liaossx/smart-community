@@ -41,7 +41,23 @@ if (uni.restoreGlobal) {
   function resolveEasycom(component, easycom) {
     return typeof component === "string" ? easycom : component;
   }
-  const baseUrl = "http://192.168.1.65:80";
+  const DEFAULT_BASE_URL = "http://192.168.1.65:80";
+  function normalizeBaseUrl(url) {
+    return String(url || "").replace(/\/+$/, "");
+  }
+  function getBaseUrl() {
+    const customBaseUrl = normalizeBaseUrl(uni.getStorageSync("apiBaseUrl"));
+    if (customBaseUrl) {
+      return customBaseUrl;
+    }
+    return DEFAULT_BASE_URL;
+  }
+  function getRequestHint(requestUrl) {
+    const hints = [];
+    hints.push("如果你现在是真机预览，请确认手机和服务器在同一局域网，并且手机浏览器能打开该地址。");
+    hints.push(`请确认接口基地址可访问：${requestUrl}`);
+    return hints.join("");
+  }
   function request(options) {
     let finalOptions = {};
     if (typeof options === "string") {
@@ -78,7 +94,7 @@ if (uni.restoreGlobal) {
     const token = uni.getStorageSync("token");
     const hasToken = !!token;
     try {
-      formatAppLog("log", "at utils/request.js:51", "Token存在:", hasToken, hasToken ? `len=${String(token).length}` : "");
+      formatAppLog("log", "at utils/request.js:90", "Token存在:", hasToken, hasToken ? `len=${String(token).length}` : "");
     } catch (e) {
     }
     const headers = {
@@ -89,12 +105,13 @@ if (uni.restoreGlobal) {
     if (token) {
       headers["Authorization"] = "Bearer " + token;
     } else {
-      formatAppLog("warn", "at utils/request.js:63", "未注入Authorization头(无token)");
+      formatAppLog("warn", "at utils/request.js:102", "未注入Authorization头(无token)");
     }
     finalOptions.header = headers;
+    const baseUrl = getBaseUrl();
     let requestUrl = baseUrl + finalOptions.url;
     if (finalOptions.params && Object.keys(finalOptions.params).length > 0) {
-      formatAppLog("log", "at utils/request.js:71", "请求参数:", finalOptions.params);
+      formatAppLog("log", "at utils/request.js:111", "请求参数:", finalOptions.params);
       const paramStr = Object.entries(finalOptions.params).filter(([key, value]) => value !== null && value !== void 0 && value !== "").map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
       if (paramStr) {
         requestUrl += (requestUrl.includes("?") ? "&" : "?") + paramStr;
@@ -102,8 +119,9 @@ if (uni.restoreGlobal) {
     }
     uni.showLoading({ title: "加载中...", mask: true });
     return new Promise((resolve, reject) => {
-      formatAppLog("log", "at utils/request.js:86", "发送请求:", requestUrl, finalOptions.method, finalOptions.data);
-      formatAppLog("log", "at utils/request.js:87", "请求头已带授权:", Boolean(finalOptions.header && finalOptions.header.Authorization));
+      formatAppLog("log", "at utils/request.js:126", "当前API基地址:", baseUrl);
+      formatAppLog("log", "at utils/request.js:127", "发送请求:", requestUrl, finalOptions.method, finalOptions.data);
+      formatAppLog("log", "at utils/request.js:128", "请求头已带授权:", Boolean(finalOptions.header && finalOptions.header.Authorization));
       const requestTask = uni.request({
         url: requestUrl,
         data: finalOptions.data,
@@ -124,15 +142,15 @@ if (uni.restoreGlobal) {
               normalizedMsg = "数据已存在，请勿重复提交";
             }
           }
-          formatAppLog("log", "at utils/request.js:112", "响应状态:", res.statusCode, "业务code:", code, "msg:", rawMsg, "url:", requestUrl);
+          formatAppLog("log", "at utils/request.js:153", "响应状态:", res.statusCode, "业务code:", code, "msg:", rawMsg, "url:", requestUrl);
           if (res.statusCode === 200) {
             if (bizCode === 200 || bizCode === 0 || bizCode === void 0 || Number.isNaN(bizCode)) {
               const resolvedData = data != null ? data : responseData;
-              formatAppLog("log", "at utils/request.js:120", "Request resolved with:", JSON.stringify(resolvedData).substring(0, 200) + "...");
+              formatAppLog("log", "at utils/request.js:161", "Request resolved with:", JSON.stringify(resolvedData).substring(0, 200) + "...");
               resolve(resolvedData);
             } else {
               if (code === 401) {
-                formatAppLog("warn", "at utils/request.js:128", "401未登录拦截:", requestUrl);
+                formatAppLog("warn", "at utils/request.js:169", "401未登录拦截:", requestUrl);
                 uni.showModal({
                   title: "登录提示",
                   content: normalizedMsg || "请先登录",
@@ -143,7 +161,7 @@ if (uni.restoreGlobal) {
                 });
                 reject(new Error(normalizedMsg || "未登录"));
               } else if (code === 403) {
-                formatAppLog("warn", "at utils/request.js:140", "403无权限拦截:", requestUrl);
+                formatAppLog("warn", "at utils/request.js:181", "403无权限拦截:", requestUrl);
                 uni.showModal({
                   title: "权限提示",
                   content: normalizedMsg || "您没有权限执行此操作",
@@ -161,7 +179,7 @@ if (uni.restoreGlobal) {
             }
           } else {
             if (res.statusCode === 401) {
-              formatAppLog("warn", "at utils/request.js:163", "HTTP 401 未登录:", requestUrl);
+              formatAppLog("warn", "at utils/request.js:204", "HTTP 401 未登录:", requestUrl);
               uni.showModal({
                 title: "登录提示",
                 content: normalizedMsg || "请先登录",
@@ -173,8 +191,8 @@ if (uni.restoreGlobal) {
               reject(new Error(normalizedMsg || "未登录"));
             } else {
               const errMsg = normalizedMsg || `请求失败，状态码: ${res.statusCode}`;
-              formatAppLog("warn", "at utils/request.js:176", "HTTP错误:", res.statusCode, "url:", requestUrl);
-              formatAppLog("warn", "at utils/request.js:177", "错误详情(Body):", JSON.stringify(res.data));
+              formatAppLog("warn", "at utils/request.js:217", "HTTP错误:", res.statusCode, "url:", requestUrl);
+              formatAppLog("warn", "at utils/request.js:218", "错误详情(Body):", JSON.stringify(res.data));
               uni.showModal({
                 title: "网络错误",
                 content: errMsg,
@@ -194,11 +212,11 @@ if (uni.restoreGlobal) {
           } else if (err.errMsg.includes("abort")) {
             errMsg = "请求被中止，请检查网络设置";
           } else if (err.errMsg.includes("fail")) {
-            errMsg = "请求失败，请重试";
+            errMsg = getRequestHint(requestUrl);
           } else {
             errMsg = err.errMsg || errMsg;
           }
-          formatAppLog("error", "at utils/request.js:206", "请求失败:", err && err.errMsg, "url:", requestUrl);
+          formatAppLog("error", "at utils/request.js:247", "请求失败:", err && err.errMsg, "url:", requestUrl);
           uni.showModal({
             title: "网络错误",
             content: errMsg,
@@ -207,7 +225,7 @@ if (uni.restoreGlobal) {
           reject(new Error(errMsg));
         },
         complete: () => {
-          formatAppLog("log", "at utils/request.js:216", "请求完成:", requestUrl);
+          formatAppLog("log", "at utils/request.js:257", "请求完成:", requestUrl);
         }
       });
       if (finalOptions.returnTask) {
@@ -227,7 +245,7 @@ if (uni.restoreGlobal) {
   request.delete = (url, options = {}) => {
     return request({ url, method: "DELETE", ...options });
   };
-  formatAppLog("log", "at utils/request.js:243", "request.js loaded. Methods attached:", {
+  formatAppLog("log", "at utils/request.js:284", "request.js loaded. Methods attached:", {
     get: typeof request.get,
     post: typeof request.post,
     put: typeof request.put,
@@ -541,28 +559,45 @@ if (uni.restoreGlobal) {
       currentPage: {
         type: String,
         default: ""
+      },
+      pageBreadcrumb: {
+        type: String,
+        default: "Home > Dashboard"
+      },
+      showPageBanner: {
+        type: Boolean,
+        default: false
       }
     },
     data() {
       return {
-        adminName: "管理员",
-        roleName: "管理员",
+        appName: "智慧社区",
+        version: "物业运营后台",
+        userName: "管理员",
+        userInitial: "A",
+        userRoleLabel: "管理员",
+        currentDate: "",
+        currentTime: "",
+        weather: "多云 26°C 12km/h",
+        lastSignIn: "昨天 16:54",
         menuList: [
-          { text: "仪表盘", icon: "📊", path: "/admin/pages/admin/dashboard/index", roles: ["admin", "super_admin"] },
-          { text: "任务中心", icon: "🛠️", path: "/admin/pages/admin/worker-tasks", roles: ["worker"] },
-          { text: "报修管理", icon: "🛠️", path: "/admin/pages/admin/repair-manage", roles: ["admin", "super_admin"] },
-          { text: "工单管理", icon: "📋", path: "/admin/pages/admin/work-order-manage", roles: ["admin", "super_admin"] },
-          { text: "公告管理", icon: "📢", path: "/admin/pages/admin/notice-manage", roles: ["admin", "super_admin"] },
-          { text: "费用管理", icon: "💰", path: "/admin/pages/admin/fee-manage", roles: ["admin", "super_admin"] },
-          { text: "投诉处理", icon: "🗣️", path: "/admin/pages/admin/complaint-manage", roles: ["admin", "super_admin"] },
-          { text: "访客审核", icon: "👁️", path: "/admin/pages/admin/visitor-manage", roles: ["admin", "super_admin"] },
-          { text: "注册审核", icon: "✅", path: "/admin/pages/admin/register-review", roles: ["super_admin"] },
-          { text: "房屋绑定审核", icon: "🏠", path: "/admin/pages/admin/house-bind-review", roles: ["admin", "super_admin"] },
-          { text: "社区活动", icon: "🎉", path: "/admin/pages/admin/activity-manage", roles: ["admin", "super_admin"] },
-          { text: "停车管理", icon: "🚗", path: "/admin/pages/admin/parking-manage", roles: ["admin", "super_admin"] },
-          { text: "用户管理", icon: "👥", path: "/admin/pages/admin/user-manage", roles: ["admin", "super_admin"] },
-          { text: "系统配置", icon: "⚙️", path: "/admin/pages/admin/system-config", roles: ["super_admin"] }
-        ]
+          { text: "仪表盘", icon: "◫", path: "/admin/pages/admin/dashboard/index", roles: ["admin", "super_admin"] },
+          { text: "任务中心", icon: "⌘", path: "/admin/pages/admin/worker-tasks", roles: ["worker"] },
+          { text: "报修管理", icon: "⌂", path: "/admin/pages/admin/repair-manage", roles: ["admin", "super_admin"], badge: 0 },
+          { text: "工单管理", icon: "▣", path: "/admin/pages/admin/work-order-manage", roles: ["admin", "super_admin"], badge: 0 },
+          { text: "公告管理", icon: "✉", path: "/admin/pages/admin/notice-manage", roles: ["admin", "super_admin"] },
+          { text: "费用管理", icon: "¥", path: "/admin/pages/admin/fee-manage", roles: ["admin", "super_admin"] },
+          { text: "投诉处理", icon: "☏", path: "/admin/pages/admin/complaint-manage", roles: ["admin", "super_admin"], badge: 0 },
+          { text: "访客审核", icon: "◉", path: "/admin/pages/admin/visitor-manage", roles: ["admin", "super_admin"], badge: 0 },
+          { text: "注册审核", icon: "✓", path: "/admin/pages/admin/register-review", roles: ["super_admin"] },
+          { text: "房屋绑定审核", icon: "⌂", path: "/admin/pages/admin/house-bind-review", roles: ["admin", "super_admin"] },
+          { text: "社区活动", icon: "✦", path: "/admin/pages/admin/activity-manage", roles: ["admin", "super_admin"] },
+          { text: "停车管理", icon: "▤", path: "/admin/pages/admin/parking-manage", roles: ["admin", "super_admin"] },
+          { text: "用户管理", icon: "☺", path: "/admin/pages/admin/user-manage", roles: ["admin", "super_admin"] },
+          { text: "操作日志", icon: "≣", path: "/admin/pages/admin/oper-log", roles: ["super_admin"] },
+          { text: "系统配置", icon: "⚙", path: "/admin/pages/admin/system-config", roles: ["super_admin"] }
+        ],
+        timer: null
       };
     },
     computed: {
@@ -577,30 +612,69 @@ if (uni.restoreGlobal) {
       }
     },
     mounted() {
-      const userInfo = uni.getStorageSync("userInfo");
-      if (userInfo && userInfo.username) {
-        this.adminName = userInfo.username;
-      }
-      if (userInfo && userInfo.role === "super_admin") {
-        this.roleName = "超级管理员";
-      } else if (userInfo && userInfo.role === "worker") {
-        this.roleName = "维修员";
-      } else {
-        this.roleName = "普通管理员";
+      this.initUserInfo();
+      this.updateDateTime();
+      this.timer = setInterval(() => {
+        this.updateDateTime();
+      }, 1e3);
+    },
+    beforeDestroy() {
+      if (this.timer) {
+        clearInterval(this.timer);
       }
     },
     methods: {
-      toggleSidebar() {
-        this.$emit("update:showSidebar", !this.showSidebar);
+      initUserInfo() {
+        const userInfo = uni.getStorageSync("userInfo");
+        if (userInfo && userInfo.username) {
+          this.userName = userInfo.username;
+          this.userInitial = userInfo.username.charAt(0).toUpperCase();
+        }
+        if (userInfo && userInfo.role) {
+          const roleMap = {
+            super_admin: "超级管理员",
+            admin: "管理员",
+            worker: "维修人员"
+          };
+          this.userRoleLabel = roleMap[userInfo.role] || "管理员";
+        }
       },
-      closeSidebar() {
-        this.$emit("update:showSidebar", false);
+      updateDateTime() {
+        const now = /* @__PURE__ */ new Date();
+        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const day = days[now.getDay()];
+        const date = now.getDate();
+        const month = months[now.getMonth()];
+        const year = now.getFullYear();
+        this.currentDate = `${day}, ${date} ${month} ${year}`;
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        const seconds = String(now.getSeconds()).padStart(2, "0");
+        this.currentTime = `${hours}:${minutes}:${seconds}`;
       },
       handleMenuClick(menu) {
+        if (this.currentPage === menu.path)
+          return;
         uni.navigateTo({
           url: menu.path,
-          success: () => {
-            this.closeSidebar();
+          fail: () => {
+            uni.switchTab({
+              url: menu.path
+            });
+          }
+        });
+      },
+      showSearch() {
+        uni.showToast({ title: "搜索功能开发中", icon: "none" });
+      },
+      showUserMenu() {
+        uni.showActionSheet({
+          itemList: ["个人信息", "修改密码", "退出登录"],
+          success: (res) => {
+            if (res.tapIndex === 2) {
+              this.handleLogout();
+            }
           }
         });
       },
@@ -612,7 +686,7 @@ if (uni.restoreGlobal) {
             if (res.confirm) {
               uni.removeStorageSync("token");
               uni.removeStorageSync("userInfo");
-              uni.redirectTo({ url: "/owner/pages/login/login" });
+              uni.reLaunch({ url: "/owner/pages/login/login" });
             }
           }
         });
@@ -620,48 +694,60 @@ if (uni.restoreGlobal) {
     }
   };
   function _sfc_render$C(_ctx, _cache, $props, $setup, $data, $options) {
-    return vue.openBlock(), vue.createElementBlock("view", { class: "sidebar-container" }, [
-      vue.createCommentVNode(" 侧边栏遮罩 "),
-      $props.showSidebar ? (vue.openBlock(), vue.createElementBlock("view", {
-        key: 0,
-        class: "sidebar-mask",
-        onClick: _cache[0] || (_cache[0] = (...args) => $options.closeSidebar && $options.closeSidebar(...args))
-      })) : vue.createCommentVNode("v-if", true),
-      vue.createCommentVNode(" 侧边栏主体 "),
-      vue.createElementVNode(
-        "view",
-        {
-          class: vue.normalizeClass(["sidebar", { "sidebar-open": $props.showSidebar }])
-        },
-        [
-          vue.createCommentVNode(" 管理员信息 "),
-          vue.createElementVNode("view", { class: "admin-info" }, [
-            vue.createElementVNode("view", { class: "avatar" }, [
-              vue.createElementVNode(
-                "text",
-                { class: "avatar-text" },
-                vue.toDisplayString($data.adminName),
-                1
-                /* TEXT */
-              )
-            ]),
+    return vue.openBlock(), vue.createElementBlock("view", { class: "admin-layout" }, [
+      vue.createElementVNode("view", { class: "sidebar-fixed" }, [
+        vue.createElementVNode("view", { class: "sidebar-header" }, [
+          vue.createElementVNode("view", { class: "brand-row" }, [
             vue.createElementVNode(
               "text",
-              { class: "admin-role" },
-              vue.toDisplayString($data.roleName),
+              { class: "brand-name" },
+              vue.toDisplayString($data.appName),
+              1
+              /* TEXT */
+            ),
+            vue.createElementVNode(
+              "text",
+              { class: "brand-version" },
+              vue.toDisplayString($data.version),
               1
               /* TEXT */
             )
           ]),
-          vue.createCommentVNode(" 导航菜单 "),
-          vue.createElementVNode("view", { class: "menu-list" }, [
+          vue.createElementVNode("view", { class: "header-tools" }, [
+            vue.createElementVNode("view", { class: "tool-chip" }, "☰"),
+            vue.createElementVNode("view", { class: "tool-chip tool-chip-badge" }, [
+              vue.createElementVNode("text", null, "✉"),
+              vue.createElementVNode("text", { class: "chip-badge" }, "23")
+            ]),
+            vue.createElementVNode("view", { class: "tool-chip tool-chip-badge" }, [
+              vue.createElementVNode("text", null, "⚠"),
+              vue.createElementVNode("text", { class: "chip-badge success" }, "5")
+            ])
+          ])
+        ]),
+        vue.createElementVNode("view", {
+          class: "menu-search",
+          onClick: _cache[0] || (_cache[0] = (...args) => $options.showSearch && $options.showSearch(...args))
+        }, [
+          vue.createElementVNode("text", { class: "menu-search-icon" }, "⌕"),
+          vue.createElementVNode("text", { class: "menu-search-text" }, "搜索内容")
+        ]),
+        vue.createElementVNode("scroll-view", {
+          class: "menu-scroll",
+          "scroll-y": ""
+        }, [
+          vue.createElementVNode("view", { class: "menu-section" }, [
+            vue.createElementVNode("view", { class: "menu-section-head" }, [
+              vue.createElementVNode("text", { class: "menu-section-title" }, "工作台"),
+              vue.createElementVNode("text", { class: "menu-section-gear" }, "⚙")
+            ]),
             (vue.openBlock(true), vue.createElementBlock(
               vue.Fragment,
               null,
               vue.renderList($options.filteredMenuList, (menu, index) => {
                 return vue.openBlock(), vue.createElementBlock("view", {
                   key: index,
-                  class: vue.normalizeClass(["menu-item", { "active": $props.currentPage === menu.path }]),
+                  class: vue.normalizeClass(["menu-item", { "menu-item-active": $props.currentPage === menu.path }]),
                   onClick: ($event) => $options.handleMenuClick(menu)
                 }, [
                   vue.createElementVNode(
@@ -677,46 +763,172 @@ if (uni.restoreGlobal) {
                     vue.toDisplayString(menu.text),
                     1
                     /* TEXT */
-                  )
+                  ),
+                  menu.badge && menu.badge > 0 ? (vue.openBlock(), vue.createElementBlock(
+                    "view",
+                    {
+                      key: 0,
+                      class: "menu-badge"
+                    },
+                    vue.toDisplayString(menu.badge > 99 ? "99+" : menu.badge),
+                    1
+                    /* TEXT */
+                  )) : (vue.openBlock(), vue.createElementBlock("text", {
+                    key: 1,
+                    class: "menu-dot"
+                  }, "•"))
                 ], 10, ["onClick"]);
               }),
               128
               /* KEYED_FRAGMENT */
             ))
-          ]),
-          vue.createCommentVNode(" 退出登录 "),
-          vue.createElementVNode("view", { class: "logout-section" }, [
-            vue.createElementVNode("button", {
-              class: "logout-btn",
-              onClick: _cache[1] || (_cache[1] = (...args) => $options.handleLogout && $options.handleLogout(...args))
-            }, "退出登录")
           ])
-        ],
-        2
-        /* CLASS */
-      ),
-      vue.createCommentVNode(" 顶部导航栏 "),
-      vue.createElementVNode("view", { class: "top-nav" }, [
-        vue.createElementVNode(
-          "text",
-          { class: "nav-title" },
-          vue.toDisplayString($props.pageTitle),
-          1
-          /* TEXT */
-        ),
-        vue.createElementVNode("button", {
-          class: "menu-btn",
-          onClick: _cache[2] || (_cache[2] = (...args) => $options.toggleSidebar && $options.toggleSidebar(...args))
-        }, " ☰ ")
+        ])
       ]),
-      vue.createCommentVNode(" 页面内容区域 "),
-      vue.createElementVNode("view", { class: "slot-container" }, [
-        vue.renderSlot(_ctx.$slots, "default", {}, void 0, true)
+      vue.createElementVNode("view", { class: "main-content" }, [
+        vue.createElementVNode("view", { class: "top-navbar" }, [
+          vue.createElementVNode("view", { class: "nav-left" }, [
+            vue.createElementVNode("view", { class: "nav-chip" }, [
+              vue.createElementVNode("text", { class: "nav-chip-icon" }, "📅"),
+              vue.createElementVNode(
+                "text",
+                { class: "nav-chip-text" },
+                vue.toDisplayString($data.currentDate),
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "nav-chip" }, [
+              vue.createElementVNode("text", { class: "nav-chip-icon" }, "🕒"),
+              vue.createElementVNode(
+                "text",
+                { class: "nav-chip-text" },
+                vue.toDisplayString($data.currentTime),
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "nav-chip nav-chip-wide" }, [
+              vue.createElementVNode("text", { class: "nav-chip-icon" }, "☼"),
+              vue.createElementVNode(
+                "text",
+                { class: "nav-chip-text" },
+                vue.toDisplayString($data.weather),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "nav-right" }, [
+            vue.createElementVNode("view", {
+              class: "user-avatar",
+              onClick: _cache[1] || (_cache[1] = (...args) => $options.showUserMenu && $options.showUserMenu(...args))
+            }, [
+              vue.createElementVNode(
+                "text",
+                { class: "avatar-text" },
+                vue.toDisplayString($data.userInitial),
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", {
+              class: "user-block",
+              onClick: _cache[2] || (_cache[2] = (...args) => $options.showUserMenu && $options.showUserMenu(...args))
+            }, [
+              vue.createElementVNode(
+                "text",
+                { class: "user-greet" },
+                "Hi, " + vue.toDisplayString($data.userName),
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "user-role" },
+                vue.toDisplayString($data.userRoleLabel),
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", {
+              class: "nav-action",
+              onClick: _cache[3] || (_cache[3] = (...args) => $options.showUserMenu && $options.showUserMenu(...args))
+            }, [
+              vue.createElementVNode("text", { class: "nav-action-text" }, "设置")
+            ]),
+            vue.createElementVNode("view", {
+              class: "nav-action nav-action-square",
+              onClick: _cache[4] || (_cache[4] = (...args) => $options.handleLogout && $options.handleLogout(...args))
+            }, [
+              vue.createElementVNode("text", { class: "nav-action-text" }, "⎋")
+            ])
+          ])
+        ]),
+        $props.showPageBanner ? (vue.openBlock(), vue.createElementBlock("view", {
+          key: 0,
+          class: "page-banner"
+        }, [
+          vue.createElementVNode("view", { class: "page-banner-left" }, [
+            vue.createElementVNode("view", { class: "banner-fold" }),
+            vue.createElementVNode("view", null, [
+              vue.createElementVNode(
+                "text",
+                { class: "banner-title" },
+                vue.toDisplayString($props.pageTitle),
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "banner-breadcrumb" },
+                vue.toDisplayString($props.pageBreadcrumb),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "page-banner-right" }, [
+            vue.createElementVNode("text", { class: "welcome-icon" }, "ℹ"),
+            vue.createElementVNode(
+              "text",
+              { class: "welcome-text" },
+              "欢迎回来，" + vue.toDisplayString($data.userName) + "。上次登录时间 " + vue.toDisplayString($data.lastSignIn),
+              1
+              /* TEXT */
+            )
+          ])
+        ])) : vue.createCommentVNode("v-if", true),
+        vue.createElementVNode("view", { class: "page-toolbar" }, [
+          vue.createElementVNode("view", { class: "toolbar-left" }, [
+            vue.createElementVNode("text", { class: "toolbar-home" }, "⌂"),
+            vue.createElementVNode(
+              "text",
+              { class: "toolbar-breadcrumb" },
+              vue.toDisplayString($props.pageBreadcrumb),
+              1
+              /* TEXT */
+            )
+          ]),
+          vue.createElementVNode("view", {
+            class: "toolbar-search",
+            onClick: _cache[5] || (_cache[5] = (...args) => $options.showSearch && $options.showSearch(...args))
+          }, [
+            vue.createElementVNode("text", { class: "toolbar-search-text" }, "搜索记录...")
+          ])
+        ]),
+        vue.createElementVNode("scroll-view", {
+          class: "page-content-scroll",
+          "scroll-y": ""
+        }, [
+          vue.createElementVNode("view", { class: "page-content" }, [
+            vue.renderSlot(_ctx.$slots, "default", {}, void 0, true)
+          ])
+        ])
       ])
     ]);
   }
   const adminSidebar = /* @__PURE__ */ _export_sfc(_sfc_main$D, [["render", _sfc_render$C], ["__scopeId", "data-v-f8592f70"], ["__file", "D:/HBuilderProjects/smart-community/admin/components/admin-sidebar/admin-sidebar.vue"]]);
-  const _imports_0$1 = "/static/logo.png";
   const _sfc_main$C = {
     components: {
       adminSidebar
@@ -724,13 +936,14 @@ if (uni.restoreGlobal) {
     data() {
       return {
         showSidebar: false,
+        loading: false,
         currentTab: "ASSIGNED",
         submitting: false,
         taskList: [],
         tabs: [
-          { label: "待处理", value: "ASSIGNED" },
-          { label: "进行中", value: "PROCESSING" },
-          { label: "已完成", value: "COMPLETED" }
+          { label: "待处理", value: "ASSIGNED", statusClass: "tab-assigned" },
+          { label: "进行中", value: "PROCESSING", statusClass: "tab-processing" },
+          { label: "已完成", value: "COMPLETED", statusClass: "tab-completed" }
         ],
         showCompleteForm: false,
         currentTask: null,
@@ -742,7 +955,7 @@ if (uni.restoreGlobal) {
     },
     computed: {
       currentTabLabel() {
-        const tab = this.tabs.find((t) => t.value === this.currentTab);
+        const tab = this.tabs.find((item) => item.value === this.currentTab);
         return tab ? tab.label : "";
       }
     },
@@ -754,80 +967,74 @@ if (uni.restoreGlobal) {
     },
     methods: {
       async loadTasks() {
-        formatAppLog("log", "at admin/pages/admin/worker-tasks.vue:158", "--- 开始加载任务 ---");
-        formatAppLog("log", "at admin/pages/admin/worker-tasks.vue:159", "当前标签:", this.currentTab);
-        const userInfo = uni.getStorageSync("userInfo");
-        formatAppLog("log", "at admin/pages/admin/worker-tasks.vue:161", "当前登录用户信息:", userInfo);
+        this.loading = true;
         try {
           const res = await request("/api/workorder/list", {
             params: {
               status: this.currentTab
             }
           }, "GET");
-          formatAppLog("log", "at admin/pages/admin/worker-tasks.vue:170", "API 请求 URL: /api/workorder/list");
-          formatAppLog("log", "at admin/pages/admin/worker-tasks.vue:171", "API 响应原始数据:", res);
           const data = res.data || res;
-          formatAppLog("log", "at admin/pages/admin/worker-tasks.vue:174", "解析后的数据对象:", data);
           const list = data.records || data || [];
-          this.taskList = list.slice().sort((a, b) => {
+          this.taskList = Array.isArray(list) ? list.slice().sort((a, b) => {
             const diff = this.getPriorityRank(b.priority) - this.getPriorityRank(a.priority);
             if (diff !== 0)
               return diff;
             return new Date(b.createTime || 0).getTime() - new Date(a.createTime || 0).getTime();
-          });
-          formatAppLog("log", "at admin/pages/admin/worker-tasks.vue:182", "最终渲染的列表长度:", this.taskList.length);
-          formatAppLog("log", "at admin/pages/admin/worker-tasks.vue:183", "--- 加载任务结束 ---");
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/worker-tasks.vue:185", "加载任务失败", e);
+          }) : [];
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/worker-tasks.vue:236", "加载任务失败", error);
           uni.showToast({ title: "加载失败", icon: "none" });
+        } finally {
+          this.loading = false;
         }
       },
       switchTab(tab) {
+        if (this.currentTab === tab)
+          return;
         this.currentTab = tab;
         this.loadTasks();
       },
-      getPriorityText(p) {
+      getPriorityText(priority) {
         const map = {
-          "LOW": "低",
-          "MEDIUM": "中",
-          "HIGH": "高",
-          "URGENT": "紧急",
+          LOW: "低",
+          MEDIUM: "中",
+          HIGH: "高",
+          URGENT: "紧急",
           "1": "低",
           "2": "中",
           "3": "高",
           "4": "紧急"
         };
-        return map[String(p)] || p || "低";
+        return map[String(priority).toUpperCase()] || priority || "低";
       },
-      getPriorityClass(p) {
-        if (!p)
+      getPriorityClass(priority) {
+        if (!priority)
           return "priority-low";
-        const pStr = String(p).toUpperCase();
-        const classMap = {
-          "LOW": "priority-low",
+        const map = {
+          LOW: "priority-low",
           "1": "priority-low",
-          "MEDIUM": "priority-medium",
+          MEDIUM: "priority-medium",
           "2": "priority-medium",
-          "HIGH": "priority-high",
+          HIGH: "priority-high",
           "3": "priority-high",
-          "URGENT": "priority-urgent",
+          URGENT: "priority-urgent",
           "4": "priority-urgent"
         };
-        return classMap[pStr] || "priority-" + pStr.toLowerCase();
+        return map[String(priority).toUpperCase()] || "priority-low";
       },
-      getPriorityRank(p) {
-        const pStr = String(p).toUpperCase();
+      getPriorityRank(priority) {
         const map = {
-          "LOW": 1,
+          LOW: 1,
           "1": 1,
-          "MEDIUM": 2,
+          MEDIUM: 2,
           "2": 2,
-          "HIGH": 3,
+          HIGH: 3,
           "3": 3,
-          "URGENT": 4,
+          URGENT: 4,
           "4": 4
         };
-        return map[pStr] || 1;
+        return map[String(priority).toUpperCase()] || 1;
       },
       getRepairDesc(item) {
         if (!item)
@@ -842,47 +1049,47 @@ if (uni.restoreGlobal) {
       getRepairType(item) {
         if (!item)
           return "未知";
-        const type = item.repairInfo && item.repairInfo.faultType || item.faultType || item.repairFaultType || item.repairType || item.repair && item.repair.faultType;
-        if (type)
-          return type;
-        return "未知";
+        return item.repairInfo && item.repairInfo.faultType || item.faultType || item.repairFaultType || item.repairType || item.repair && item.repair.faultType || "未知";
       },
       getOwnerPhone(item) {
         if (!item)
           return "未知";
-        const phone = item.repairInfo && item.repairInfo.ownerPhone || item.ownerPhone || item.userPhone || item.phone || item.repairUserPhone || item.repair && (item.repair.ownerPhone || item.repair.userPhone || item.repair.phone);
-        if (phone)
-          return phone;
-        return "未知";
+        return item.repairInfo && item.repairInfo.ownerPhone || item.ownerPhone || item.userPhone || item.phone || item.repairUserPhone || item.repair && (item.repair.ownerPhone || item.repair.userPhone || item.repair.phone) || "未知";
       },
       getRepairAddress(item) {
         if (!item)
           return "地点未知";
-        const address = item.repairInfo && item.repairInfo.address || item.address || item.repairAddress || item.repair && item.repair.address || item.location;
-        if (address)
-          return address;
-        return "社区内";
+        return item.repairInfo && item.repairInfo.address || item.address || item.repairAddress || item.repair && item.repair.address || item.location || "社区内";
       },
-      formatTime(t) {
-        if (!t)
+      formatTime(time) {
+        if (!time)
           return "-";
-        const date = new Date(t);
-        return `${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:${date.getMinutes()}`;
+        const date = new Date(time);
+        if (Number.isNaN(date.getTime()))
+          return time;
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hour = String(date.getHours()).padStart(2, "0");
+        const minute = String(date.getMinutes()).padStart(2, "0");
+        return `${year}-${month}-${day} ${hour}:${minute}`;
       },
       async handleStart(orderId) {
         try {
           await request(`/api/workorder/worker/start?orderId=${orderId}`, {}, "POST");
           uni.showToast({ title: "已开始处理", icon: "success" });
           this.loadTasks();
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/worker-tasks.vue:292", "操作失败", e);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/worker-tasks.vue:343", "开始处理失败", error);
           uni.showToast({ title: "操作失败", icon: "none" });
         }
       },
       openCompleteForm(task) {
         this.currentTask = task;
-        this.completeForm.result = "";
-        this.completeForm.images = [];
+        this.completeForm = {
+          result: "",
+          images: []
+        };
         this.showCompleteForm = true;
       },
       closeCompleteForm() {
@@ -893,7 +1100,7 @@ if (uni.restoreGlobal) {
         uni.chooseImage({
           count: 3 - this.completeForm.images.length,
           success: (res) => {
-            this.completeForm.images = [...this.completeForm.images, ...res.tempFilePaths];
+            this.completeForm.images = this.completeForm.images.concat(res.tempFilePaths || []).slice(0, 3);
           }
         });
       },
@@ -901,8 +1108,12 @@ if (uni.restoreGlobal) {
         this.completeForm.images.splice(index, 1);
       },
       async handleCompleteSubmit() {
-        if (!this.completeForm.result) {
+        if (!this.completeForm.result.trim()) {
           uni.showToast({ title: "请输入处理结果", icon: "none" });
+          return;
+        }
+        if (!this.currentTask || !this.currentTask.id) {
+          uni.showToast({ title: "未找到任务信息", icon: "none" });
           return;
         }
         this.submitting = true;
@@ -917,8 +1128,8 @@ if (uni.restoreGlobal) {
           uni.showToast({ title: "提交成功", icon: "success" });
           this.closeCompleteForm();
           this.loadTasks();
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/worker-tasks.vue:337", "提交失败", e);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/worker-tasks.vue:392", "提交失败", error);
           uni.showToast({ title: "提交失败", icon: "none" });
         } finally {
           this.submitting = false;
@@ -930,156 +1141,208 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[6] || (_cache[6] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[8] || (_cache[8] = ($event) => $data.showSidebar = $event),
       pageTitle: "任务中心",
-      currentPage: "/admin/pages/admin/worker-tasks"
+      currentPage: "/admin/pages/admin/worker-tasks",
+      pageBreadcrumb: "管理后台 / 任务中心",
+      showPageBanner: false
     }, {
       default: vue.withCtx(() => [
-        vue.createElementVNode("view", { class: "worker-container" }, [
-          vue.createCommentVNode(" 顶部状态切换 "),
-          vue.createElementVNode("view", { class: "tab-bar" }, [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "维修任务中心"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一按后台任务表格页呈现待处理、处理中和已完成工单，并保留处理结果提交流程。")
+            ]),
+            vue.createElementVNode("view", { class: "overview-chip" }, [
+              vue.createElementVNode("text", { class: "overview-chip-label" }, "当前阶段"),
+              vue.createElementVNode(
+                "text",
+                { class: "overview-chip-value" },
+                vue.toDisplayString($options.currentTabLabel),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar worker-status-bar" }, [
             (vue.openBlock(true), vue.createElementBlock(
               vue.Fragment,
               null,
               vue.renderList($data.tabs, (tab) => {
                 return vue.openBlock(), vue.createElementBlock("view", {
                   key: tab.value,
-                  class: vue.normalizeClass(["tab-item", { active: $data.currentTab === tab.value }]),
+                  class: vue.normalizeClass(["status-summary-card", [tab.statusClass, { active: $data.currentTab === tab.value }]]),
                   onClick: ($event) => $options.switchTab(tab.value)
                 }, [
                   vue.createElementVNode(
                     "text",
-                    { class: "tab-text" },
+                    { class: "summary-label" },
                     vue.toDisplayString(tab.label),
                     1
                     /* TEXT */
                   ),
-                  $data.currentTab === tab.value ? (vue.openBlock(), vue.createElementBlock("view", {
-                    key: 0,
-                    class: "tab-line"
-                  })) : vue.createCommentVNode("v-if", true)
+                  vue.createElementVNode(
+                    "text",
+                    { class: "summary-value" },
+                    vue.toDisplayString($data.currentTab === tab.value ? $data.taskList.length : "-"),
+                    1
+                    /* TEXT */
+                  )
                 ], 10, ["onClick"]);
               }),
               128
               /* KEYED_FRAGMENT */
             ))
           ]),
-          vue.createCommentVNode(" 任务列表 "),
-          vue.createElementVNode("scroll-view", {
-            "scroll-y": "",
-            class: "list-container"
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "当前阶段：" + vue.toDisplayString($options.currentTabLabel),
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                "任务数 " + vue.toDisplayString($data.taskList.length) + " 条",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode("button", {
+                class: "row-btn ghost",
+                onClick: _cache[0] || (_cache[0] = (...args) => $options.loadTasks && $options.loadTasks(...args))
+              }, "刷新列表")
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
           }, [
-            (vue.openBlock(true), vue.createElementBlock(
-              vue.Fragment,
-              null,
-              vue.renderList($data.taskList, (item) => {
-                return vue.openBlock(), vue.createElementBlock("view", {
-                  key: item.id,
-                  class: "task-card"
-                }, [
-                  vue.createElementVNode("view", { class: "task-header" }, [
-                    vue.createElementVNode(
-                      "text",
-                      { class: "task-id" },
-                      "工单号: " + vue.toDisplayString(item.orderNo || item.id),
-                      1
-                      /* TEXT */
-                    ),
-                    vue.createElementVNode(
-                      "text",
-                      {
-                        class: vue.normalizeClass(["priority-badge", $options.getPriorityClass(item.priority)])
-                      },
-                      vue.toDisplayString($options.getPriorityText(item.priority)),
-                      3
-                      /* TEXT, CLASS */
-                    )
-                  ]),
-                  vue.createElementVNode("view", { class: "task-body" }, [
-                    vue.createElementVNode("view", { class: "info-item" }, [
-                      vue.createElementVNode("text", { class: "label" }, "报修类型:"),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "value" },
-                        vue.toDisplayString($options.getRepairType(item)),
-                        1
-                        /* TEXT */
-                      )
-                    ]),
-                    $options.getRepairDesc(item) ? (vue.openBlock(), vue.createElementBlock("view", {
-                      key: 0,
-                      class: "info-item"
-                    }, [
-                      vue.createElementVNode("text", { class: "label" }, "报修内容:"),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "value" },
-                        vue.toDisplayString($options.getRepairDesc(item)),
-                        1
-                        /* TEXT */
-                      )
-                    ])) : vue.createCommentVNode("v-if", true),
-                    vue.createElementVNode("view", { class: "info-item" }, [
-                      vue.createElementVNode("text", { class: "label" }, "用户手机:"),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "value" },
-                        vue.toDisplayString($options.getOwnerPhone(item)),
-                        1
-                        /* TEXT */
-                      )
-                    ]),
-                    vue.createElementVNode("view", { class: "info-item" }, [
-                      vue.createElementVNode("text", { class: "label" }, "报修地点:"),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "value" },
-                        vue.toDisplayString($options.getRepairAddress(item)),
-                        1
-                        /* TEXT */
-                      )
-                    ]),
-                    vue.createElementVNode("view", { class: "info-item" }, [
-                      vue.createElementVNode("text", { class: "label" }, "创建时间:"),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "value" },
-                        vue.toDisplayString($options.formatTime(item.createTime)),
-                        1
-                        /* TEXT */
-                      )
-                    ])
-                  ]),
-                  vue.createCommentVNode(" 操作按钮 "),
-                  vue.createElementVNode("view", { class: "task-footer" }, [
-                    item.status === "ASSIGNED" ? (vue.openBlock(), vue.createElementBlock("button", {
-                      key: 0,
-                      class: "btn-start",
-                      onClick: ($event) => $options.handleStart(item.id)
-                    }, "开始处理", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
-                    item.status === "PROCESSING" ? (vue.openBlock(), vue.createElementBlock("button", {
-                      key: 1,
-                      class: "btn-complete",
-                      onClick: ($event) => $options.openCompleteForm(item)
-                    }, "提交完成", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
-                    item.status === "COMPLETED" ? (vue.openBlock(), vue.createElementBlock("text", {
-                      key: 2,
-                      class: "completed-text"
-                    }, "已完成")) : vue.createCommentVNode("v-if", true)
-                  ])
-                ]);
-              }),
-              128
-              /* KEYED_FRAGMENT */
-            )),
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "scroll-table" }, [
+              vue.createElementVNode("view", { class: "table-head worker-table" }, [
+                vue.createElementVNode("text", { class: "table-col col-order" }, "工单号"),
+                vue.createElementVNode("text", { class: "table-col col-type" }, "报修类型"),
+                vue.createElementVNode("text", { class: "table-col col-desc" }, "报修内容"),
+                vue.createElementVNode("text", { class: "table-col col-phone" }, "手机号"),
+                vue.createElementVNode("text", { class: "table-col col-address" }, "报修地点"),
+                vue.createElementVNode("text", { class: "table-col col-priority" }, "优先级"),
+                vue.createElementVNode("text", { class: "table-col col-time" }, "创建时间"),
+                vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+              ]),
+              (vue.openBlock(true), vue.createElementBlock(
+                vue.Fragment,
+                null,
+                vue.renderList($data.taskList, (item, index) => {
+                  return vue.openBlock(), vue.createElementBlock(
+                    "view",
+                    {
+                      key: item.id || index,
+                      class: "table-row worker-table",
+                      style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                    },
+                    [
+                      vue.createElementVNode("view", { class: "table-col col-order" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "primary-text" },
+                          vue.toDisplayString(item.orderNo || item.id || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-type" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString($options.getRepairType(item)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-desc" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "desc-text" },
+                          vue.toDisplayString($options.getRepairDesc(item) || "暂无描述"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-phone" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString($options.getOwnerPhone(item)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-address" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "desc-text" },
+                          vue.toDisplayString($options.getRepairAddress(item)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-priority" }, [
+                        vue.createElementVNode(
+                          "text",
+                          {
+                            class: vue.normalizeClass(["status-pill", $options.getPriorityClass(item.priority)])
+                          },
+                          vue.toDisplayString($options.getPriorityText(item.priority)),
+                          3
+                          /* TEXT, CLASS */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-time" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString($options.formatTime(item.createTime)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                        item.status === "ASSIGNED" ? (vue.openBlock(), vue.createElementBlock("button", {
+                          key: 0,
+                          class: "row-btn primary",
+                          onClick: ($event) => $options.handleStart(item.id)
+                        }, " 开始处理 ", 8, ["onClick"])) : item.status === "PROCESSING" ? (vue.openBlock(), vue.createElementBlock("button", {
+                          key: 1,
+                          class: "row-btn secondary-warn",
+                          onClick: ($event) => $options.openCompleteForm(item)
+                        }, " 提交完成 ", 8, ["onClick"])) : (vue.openBlock(), vue.createElementBlock("text", {
+                          key: 2,
+                          class: "minor-text"
+                        }, "已完成"))
+                      ])
+                    ],
+                    4
+                    /* STYLE */
+                  );
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ]),
             $data.taskList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
               key: 0,
               class: "empty-state"
             }, [
-              vue.createElementVNode("image", {
-                src: _imports_0$1,
-                class: "empty-img"
-              }),
               vue.createElementVNode(
                 "text",
                 null,
@@ -1088,34 +1351,44 @@ if (uni.restoreGlobal) {
                 /* TEXT */
               )
             ])) : vue.createCommentVNode("v-if", true)
-          ]),
-          vue.createCommentVNode(" 完成表单弹窗 "),
+          ])),
           $data.showCompleteForm ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 0,
-            class: "form-mask",
-            onClick: _cache[5] || (_cache[5] = (...args) => $options.closeCompleteForm && $options.closeCompleteForm(...args))
+            key: 2,
+            class: "detail-modal",
+            onClick: _cache[7] || (_cache[7] = (...args) => $options.closeCompleteForm && $options.closeCompleteForm(...args))
           }, [
             vue.createElementVNode("view", {
-              class: "form-container",
-              onClick: _cache[4] || (_cache[4] = vue.withModifiers(() => {
+              class: "detail-content worker-detail-content",
+              onClick: _cache[6] || (_cache[6] = vue.withModifiers(() => {
               }, ["stop"]))
             }, [
-              vue.createElementVNode("view", { class: "form-header" }, [
-                vue.createElementVNode("text", { class: "form-title" }, "提交处理结果"),
-                vue.createElementVNode("text", {
-                  class: "form-close",
-                  onClick: _cache[0] || (_cache[0] = (...args) => $options.closeCompleteForm && $options.closeCompleteForm(...args))
-                }, "×")
+              vue.createElementVNode("view", { class: "detail-header" }, [
+                vue.createElementVNode("text", { class: "detail-title" }, "提交处理结果"),
+                vue.createElementVNode("button", {
+                  class: "close-btn",
+                  onClick: _cache[1] || (_cache[1] = (...args) => $options.closeCompleteForm && $options.closeCompleteForm(...args))
+                }, "关闭")
               ]),
-              vue.createElementVNode("view", { class: "form-body" }, [
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "form-label" }, "处理结果描述"),
+              vue.createElementVNode("view", { class: "detail-body" }, [
+                vue.createElementVNode("view", { class: "detail-item" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "工单号:"),
+                  vue.createElementVNode(
+                    "text",
+                    { class: "detail-value" },
+                    vue.toDisplayString($data.currentTask ? $data.currentTask.orderNo || $data.currentTask.id : "-"),
+                    1
+                    /* TEXT */
+                  )
+                ]),
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "处理结果:"),
                   vue.withDirectives(vue.createElementVNode(
                     "textarea",
                     {
-                      "onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => $data.completeForm.result = $event),
-                      placeholder: "请输入处理过程及结果描述...",
-                      class: "form-textarea"
+                      "onUpdate:modelValue": _cache[2] || (_cache[2] = ($event) => $data.completeForm.result = $event),
+                      class: "modal-textarea",
+                      maxlength: "500",
+                      placeholder: "请输入处理过程及结果描述"
                     },
                     null,
                     512
@@ -1124,16 +1397,16 @@ if (uni.restoreGlobal) {
                     [vue.vModelText, $data.completeForm.result]
                   ])
                 ]),
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "form-label" }, "现场图片"),
-                  vue.createElementVNode("view", { class: "upload-container" }, [
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "现场图片:"),
+                  vue.createElementVNode("view", { class: "upload-grid" }, [
                     (vue.openBlock(true), vue.createElementBlock(
                       vue.Fragment,
                       null,
                       vue.renderList($data.completeForm.images, (img, index) => {
                         return vue.openBlock(), vue.createElementBlock("view", {
                           key: index,
-                          class: "upload-item"
+                          class: "upload-card"
                         }, [
                           vue.createElementVNode("image", {
                             src: img,
@@ -1141,7 +1414,7 @@ if (uni.restoreGlobal) {
                             mode: "aspectFill"
                           }, null, 8, ["src"]),
                           vue.createElementVNode("text", {
-                            class: "img-remove",
+                            class: "upload-remove",
                             onClick: ($event) => $options.removeImage(index)
                           }, "×", 8, ["onClick"])
                         ]);
@@ -1151,20 +1424,25 @@ if (uni.restoreGlobal) {
                     )),
                     $data.completeForm.images.length < 3 ? (vue.openBlock(), vue.createElementBlock("view", {
                       key: 0,
-                      class: "upload-btn",
-                      onClick: _cache[2] || (_cache[2] = (...args) => $options.chooseImage && $options.chooseImage(...args))
+                      class: "upload-card upload-card-add",
+                      onClick: _cache[3] || (_cache[3] = (...args) => $options.chooseImage && $options.chooseImage(...args))
                     }, [
-                      vue.createElementVNode("text", { class: "upload-icon" }, "+")
+                      vue.createElementVNode("text", { class: "upload-plus" }, "+"),
+                      vue.createElementVNode("text", { class: "upload-tip" }, "添加图片")
                     ])) : vue.createCommentVNode("v-if", true)
                   ])
+                ]),
+                vue.createElementVNode("view", { class: "detail-actions" }, [
+                  vue.createElementVNode("button", {
+                    class: "detail-btn secondary",
+                    onClick: _cache[4] || (_cache[4] = (...args) => $options.closeCompleteForm && $options.closeCompleteForm(...args))
+                  }, "取消"),
+                  vue.createElementVNode("button", {
+                    class: "detail-btn primary",
+                    disabled: $data.submitting,
+                    onClick: _cache[5] || (_cache[5] = (...args) => $options.handleCompleteSubmit && $options.handleCompleteSubmit(...args))
+                  }, "提交完成", 8, ["disabled"])
                 ])
-              ]),
-              vue.createElementVNode("view", { class: "form-footer" }, [
-                vue.createElementVNode("button", {
-                  class: "btn-submit",
-                  onClick: _cache[3] || (_cache[3] = (...args) => $options.handleCompleteSubmit && $options.handleCompleteSubmit(...args)),
-                  loading: $data.submitting
-                }, "提交完成", 8, ["loading"])
               ])
             ])
           ])) : vue.createCommentVNode("v-if", true)
@@ -3368,8 +3646,6 @@ if (uni.restoreGlobal) {
           realName: "",
           role: "owner"
         },
-        showRolePicker: false,
-        tapCount: 0,
         roleOptions: [
           { label: "业主(owner)", value: "owner" },
           { label: "工作人员(worker)", value: "worker" },
@@ -3418,15 +3694,6 @@ if (uni.restoreGlobal) {
         }
         return true;
       },
-      handleTitleTap() {
-        this.tapCount += 1;
-        if (this.tapCount >= 7 && !this.showRolePicker) {
-          this.showRolePicker = true;
-          this.form.role = "owner";
-          this.roleIndex = 0;
-          uni.showToast({ title: "已开启角色选择", icon: "none" });
-        }
-      },
       handleRoleChange(e) {
         var _a, _b;
         const idx = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) ?? 0);
@@ -3439,7 +3706,7 @@ if (uni.restoreGlobal) {
           return;
         this.loading = true;
         try {
-          const role = this.showRolePicker ? this.form.role || "owner" : "owner";
+          const role = this.form.role || "owner";
           await request({
             url: "/api/user/register",
             method: "POST",
@@ -3451,7 +3718,8 @@ if (uni.restoreGlobal) {
               role
             }
           });
-          uni.showToast({ title: "注册成功", icon: "success" });
+          const successText = role === "owner" ? "注册成功" : "已提交审核";
+          uni.showToast({ title: successText, icon: "success" });
           setTimeout(() => {
             this.goToLogin();
           }, 1500);
@@ -3474,17 +3742,14 @@ if (uni.restoreGlobal) {
   };
   function _sfc_render$r(_ctx, _cache, $props, $setup, $data, $options) {
     return vue.openBlock(), vue.createElementBlock("view", { class: "register-container" }, [
-      vue.createElementVNode("view", {
-        class: "register-title",
-        onClick: _cache[0] || (_cache[0] = (...args) => $options.handleTitleTap && $options.handleTitleTap(...args))
-      }, "用户注册"),
+      vue.createElementVNode("view", { class: "register-title" }, "用户注册"),
       vue.createCommentVNode(" 用户名 "),
       vue.createElementVNode("view", { class: "input-item" }, [
         vue.createElementVNode("text", { class: "input-icon" }, "👤"),
         vue.withDirectives(vue.createElementVNode(
           "input",
           {
-            "onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => $data.form.username = $event),
+            "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.form.username = $event),
             placeholder: "请输入用户名",
             "placeholder-class": "placeholder-style"
           },
@@ -3501,7 +3766,7 @@ if (uni.restoreGlobal) {
         vue.withDirectives(vue.createElementVNode(
           "input",
           {
-            "onUpdate:modelValue": _cache[2] || (_cache[2] = ($event) => $data.form.password = $event),
+            "onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => $data.form.password = $event),
             type: "password",
             placeholder: "请输入密码",
             "placeholder-class": "placeholder-style"
@@ -3519,7 +3784,7 @@ if (uni.restoreGlobal) {
         vue.withDirectives(vue.createElementVNode(
           "input",
           {
-            "onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => $data.form.confirmPassword = $event),
+            "onUpdate:modelValue": _cache[2] || (_cache[2] = ($event) => $data.form.confirmPassword = $event),
             type: "password",
             placeholder: "请再次输入密码",
             "placeholder-class": "placeholder-style"
@@ -3537,7 +3802,7 @@ if (uni.restoreGlobal) {
         vue.withDirectives(vue.createElementVNode(
           "input",
           {
-            "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.form.phone = $event),
+            "onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => $data.form.phone = $event),
             type: "number",
             maxlength: "11",
             placeholder: "请输入手机号",
@@ -3556,7 +3821,7 @@ if (uni.restoreGlobal) {
         vue.withDirectives(vue.createElementVNode(
           "input",
           {
-            "onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => $data.form.realName = $event),
+            "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.form.realName = $event),
             placeholder: "请输入真实姓名",
             "placeholder-class": "placeholder-style"
           },
@@ -3567,16 +3832,14 @@ if (uni.restoreGlobal) {
           [vue.vModelText, $data.form.realName]
         ])
       ]),
-      $data.showRolePicker ? (vue.openBlock(), vue.createElementBlock("view", {
-        key: 0,
-        class: "input-item"
-      }, [
+      vue.createElementVNode("view", { class: "input-item" }, [
         vue.createElementVNode("text", { class: "input-icon" }, "🎭"),
         vue.createElementVNode("picker", {
+          class: "role-picker",
           range: $data.roleOptions,
           "range-key": "label",
           value: $data.roleIndex,
-          onChange: _cache[6] || (_cache[6] = (...args) => $options.handleRoleChange && $options.handleRoleChange(...args))
+          onChange: _cache[5] || (_cache[5] = (...args) => $options.handleRoleChange && $options.handleRoleChange(...args))
         }, [
           vue.createElementVNode("view", { class: "picker-value" }, [
             vue.createElementVNode(
@@ -3585,20 +3848,22 @@ if (uni.restoreGlobal) {
               vue.toDisplayString($options.currentRoleLabel),
               1
               /* TEXT */
-            )
+            ),
+            vue.createElementVNode("text", { class: "picker-arrow" }, "▼")
           ])
         ], 40, ["range", "value"])
-      ])) : vue.createCommentVNode("v-if", true),
+      ]),
+      vue.createElementVNode("view", { class: "role-tip" }, " 业主账号可直接登录，工作人员和管理员账号提交后需要后台审核。 "),
       vue.createCommentVNode(" 注册按钮 "),
       vue.createElementVNode("button", {
         class: "register-btn",
-        onClick: _cache[7] || (_cache[7] = (...args) => $options.handleRegister && $options.handleRegister(...args)),
+        onClick: _cache[6] || (_cache[6] = (...args) => $options.handleRegister && $options.handleRegister(...args)),
         disabled: $data.loading
       }, vue.toDisplayString($data.loading ? "注册中..." : "立即注册"), 9, ["disabled"]),
       vue.createCommentVNode(" 返回登录 "),
       vue.createElementVNode("view", {
         class: "login-link",
-        onClick: _cache[8] || (_cache[8] = (...args) => $options.goToLogin && $options.goToLogin(...args))
+        onClick: _cache[7] || (_cache[7] = (...args) => $options.goToLogin && $options.goToLogin(...args))
       }, " 已有账号？去登录 ")
     ]);
   }
@@ -3889,48 +4154,26 @@ if (uni.restoreGlobal) {
       return {
         showSidebar: false,
         repairList: [],
-        // 搜索和筛选
         searchQuery: "",
         statusFilter: "",
         faultTypeFilter: "",
-        dateRange: [],
-        // 日期范围筛选
         monthOptions: [],
         monthIndex: 0,
         monthValue: "",
-        // 加载状态
         loading: false,
-        loadingStats: false,
-        // 分页
+        loadingDetail: false,
         currentPage: 1,
         pageSize: 10,
         total: 0,
-        // 状态选项
-        statusOptions: [
-          { value: "", label: "全部状态" },
-          { value: "pending", label: "待处理" },
-          { value: "processing", label: "处理中" },
-          { value: "completed", label: "已完成" },
-          { value: "cancelled", label: "已取消" }
-        ],
-        // 故障类型选项
-        faultTypeOptions: [
-          { value: "", label: "全部类型" },
-          { value: "水电维修", label: "水电维修" },
-          { value: "家电维修", label: "家电维修" },
-          { value: "门窗维修", label: "门窗维修" },
-          { value: "电器维修", label: "电器维修" }
-        ],
-        // 详情弹窗
         showDetail: false,
         currentRepair: null,
-        loadingDetail: false,
-        // 批量操作
         selectedIds: [],
-        // 选中的报修ID数组
         selectAll: false,
-        // 是否全选
-        // 统计数据
+        exporting: false,
+        autoRefresh: true,
+        autoRefreshInterval: 30,
+        timerId: null,
+        repairTimeout: 24,
         stats: {
           total: 0,
           pending: 0,
@@ -3939,20 +4182,20 @@ if (uni.restoreGlobal) {
           cancelled: 0,
           today: 0
         },
-        // 导出功能
-        exporting: false,
-        // 实时通知
-        notifications: [],
-        showNotifications: false,
-        // 自动刷新功能
-        autoRefresh: true,
-        // 是否开启自动刷新
-        autoRefreshInterval: 30,
-        // 自动刷新间隔（秒）
-        timerId: null,
-        // 定时器ID
-        repairTimeout: 24
-        // 默认超时时间（小时）
+        statusOptions: [
+          { value: "", label: "全部状态" },
+          { value: "pending", label: "待处理" },
+          { value: "processing", label: "处理中" },
+          { value: "completed", label: "已完成" },
+          { value: "cancelled", label: "已取消" }
+        ],
+        faultTypeOptions: [
+          { value: "", label: "全部类型" },
+          { value: "水电维修", label: "水电维修" },
+          { value: "家电维修", label: "家电维修" },
+          { value: "门窗维修", label: "门窗维修" },
+          { value: "电器维修", label: "电器维修" }
+        ]
       };
     },
     onLoad() {
@@ -3971,35 +4214,109 @@ if (uni.restoreGlobal) {
     onUnload() {
       this.stopAutoRefresh();
     },
+    computed: {
+      totalPages() {
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50, 100];
+        return Math.max(0, options.indexOf(this.pageSize));
+      },
+      currentMonthLabel() {
+        const option = this.monthOptions[this.monthIndex];
+        return option ? option.label : this.monthValue || "选择月份";
+      },
+      currentStatusLabel() {
+        const option = this.statusOptions.find((opt) => opt.value === this.statusFilter);
+        return option ? option.label : "全部状态";
+      },
+      currentFaultTypeLabel() {
+        const option = this.faultTypeOptions.find((opt) => opt.value === this.faultTypeFilter);
+        return option ? option.label : "全部类型";
+      }
+    },
     methods: {
       initMonthOptions() {
         const now = /* @__PURE__ */ new Date();
-        const y = now.getFullYear();
-        const m = now.getMonth() + 1;
-        const current = `${y}-${String(m).padStart(2, "0")}`;
-        const opts = [];
+        const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const options = [];
         for (let i = 0; i < 12; i++) {
-          const d = new Date(y, m - 1 - i, 1);
-          const yy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, "0");
-          const value = `${yy}-${mm}`;
-          opts.push({ label: value, value });
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          options.push({ label: value, value });
         }
-        this.monthOptions = opts;
+        this.monthOptions = options;
         this.monthValue = current;
-        this.monthIndex = Math.max(0, opts.findIndex((o) => o.value === current));
+        this.monthIndex = Math.max(0, options.findIndex((item) => item.value === current));
       },
       handleMonthChange(e) {
-        const idx = Number(e && e.detail ? e.detail.value : 0);
-        const option = this.monthOptions && this.monthOptions[idx];
-        if (!option)
+        var _a;
+        const nextIndex = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        const nextOption = this.monthOptions[nextIndex];
+        if (!nextOption)
           return;
-        this.monthIndex = idx;
-        this.monthValue = option.value;
+        this.monthIndex = nextIndex;
+        this.monthValue = nextOption.value;
         this.currentPage = 1;
         this.loadRepairs();
       },
-      // 加载报修超时配置
+      handleStatsClick(status) {
+        this.statusFilter = status === "all" ? "" : status;
+        this.currentPage = 1;
+        this.loadRepairs();
+      },
+      handleSearch() {
+        this.currentPage = 1;
+        this.loadRepairs();
+      },
+      handleResetFilters() {
+        this.searchQuery = "";
+        this.statusFilter = "";
+        this.faultTypeFilter = "";
+        this.currentPage = 1;
+        this.loadRepairs();
+      },
+      handleStatusChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.statusFilter = ((_b = this.statusOptions[index]) == null ? void 0 : _b.value) || "";
+        this.currentPage = 1;
+        this.loadRepairs();
+      },
+      handleFaultTypeChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.faultTypeFilter = ((_b = this.faultTypeOptions[index]) == null ? void 0 : _b.value) || "";
+        this.currentPage = 1;
+        this.loadRepairs();
+      },
+      handlePrevPage() {
+        if (this.currentPage <= 1)
+          return;
+        this.currentPage -= 1;
+        this.loadRepairs();
+      },
+      handleNextPage() {
+        if (this.currentPage >= this.totalPages)
+          return;
+        this.currentPage += 1;
+        this.loadRepairs();
+      },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50, 100];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 10;
+        this.currentPage = 1;
+        this.loadRepairs();
+      },
+      checkAdminRole() {
+        const userInfo = uni.getStorageSync("userInfo");
+        if (!userInfo || userInfo.role !== "admin" && userInfo.role !== "super_admin") {
+          uni.showToast({ title: "无权限访问", icon: "none" });
+          uni.redirectTo({ url: "/owner/pages/login/login" });
+        }
+      },
       async loadRepairConfig() {
         try {
           const res = await getConfigByKey("repair.timeout");
@@ -4010,66 +4327,11 @@ if (uni.restoreGlobal) {
           } else if (res.data && res.data.configValue) {
             configValue = res.data.configValue;
           }
-          if (configValue !== null) {
+          if (configValue !== null && configValue !== void 0) {
             this.repairTimeout = parseFloat(configValue) || 24;
-            formatAppLog("log", "at admin/pages/admin/repair-manage.vue:465", "获取到报修超时配置:", this.repairTimeout, "小时");
           }
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:468", "获取报修配置失败，使用默认值24小时", e);
-        }
-      },
-      // 判断是否超时
-      isTimeout(item) {
-        if (item.status !== "pending")
-          return false;
-        if (!item.createTime)
-          return false;
-        const createTime = new Date(item.createTime).getTime();
-        const now = (/* @__PURE__ */ new Date()).getTime();
-        const diffHours = (now - createTime) / (1e3 * 60 * 60);
-        return diffHours > this.repairTimeout;
-      },
-      getRepairUrgencyRank(item) {
-        if (!item)
-          return 1;
-        if (item.priority !== void 0 && item.priority !== null) {
-          const n = Number(item.priority);
-          if (Number.isFinite(n) && n > 0)
-            return n;
-        }
-        const urgentFlag = item.urgent ?? item.isUrgent ?? item.emergency ?? item.isEmergency;
-        if (urgentFlag === true || urgentFlag === 1 || urgentFlag === "1")
-          return 4;
-        if (this.isTimeout(item))
-          return 4;
-        return 1;
-      },
-      testSelectAll() {
-        formatAppLog("log", "at admin/pages/admin/repair-manage.vue:497", "=== 全选/取消功能 ===");
-        if (!this.repairList || this.repairList.length === 0) {
-          formatAppLog("log", "at admin/pages/admin/repair-manage.vue:501", "列表为空，无法操作");
-          return;
-        }
-        const isAllSelected = this.selectedIds.length === this.repairList.length;
-        if (isAllSelected) {
-          this.selectAll = false;
-          this.selectedIds = [];
-          formatAppLog("log", "at admin/pages/admin/repair-manage.vue:512", "取消全选成功");
-        } else {
-          this.selectAll = true;
-          this.selectedIds = this.repairList.map((item) => String(item.id));
-          formatAppLog("log", "at admin/pages/admin/repair-manage.vue:517", "全选成功，选中", this.selectedIds.length, "项");
-        }
-      },
-      checkAdminRole() {
-        const userInfo = uni.getStorageSync("userInfo");
-        const token = uni.getStorageSync("token");
-        formatAppLog("log", "at admin/pages/admin/repair-manage.vue:523", "检查管理员角色 - userInfo:", userInfo);
-        formatAppLog("log", "at admin/pages/admin/repair-manage.vue:524", "检查管理员角色 - token:", token ? "存在" : "不存在");
-        if (!userInfo || userInfo.role !== "admin" && userInfo.role !== "super_admin") {
-          uni.showToast({ title: "无权限访问", icon: "none" });
-          uni.redirectTo({ url: "/owner/pages/login/login" });
-          return;
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:462", "获取报修超时配置失败:", error);
         }
       },
       async loadRepairs() {
@@ -4080,119 +4342,91 @@ if (uni.restoreGlobal) {
             pageNum: this.currentPage,
             pageSize: this.pageSize,
             status: this.statusFilter || void 0,
-            // 传递状态筛选
             faultType: this.faultTypeFilter || void 0,
-            // 添加故障类型筛选
             keyword: this.searchQuery || void 0,
-            // 传递关键词参数
             month: this.monthValue || void 0
           };
-          formatAppLog("log", "at admin/pages/admin/repair-manage.vue:544", "搜索参数:", params);
           const data = await request("/api/repair/admin/all", { params }, "GET");
-          formatAppLog("log", "at admin/pages/admin/repair-manage.vue:549", "真实接口返回的搜索结果:", data);
           const list = ((_a = data.data) == null ? void 0 : _a.records) || data.records || [];
           this.repairList = list.slice().sort((a, b) => {
-            const diff = this.getRepairUrgencyRank(b) - this.getRepairUrgencyRank(a);
-            if (diff !== 0)
-              return diff;
+            const urgencyDiff = this.getRepairUrgencyRank(b) - this.getRepairUrgencyRank(a);
+            if (urgencyDiff !== 0)
+              return urgencyDiff;
             return new Date(b.createTime || 0).getTime() - new Date(a.createTime || 0).getTime();
           });
-          this.total = ((_b = data.data) == null ? void 0 : _b.total) || data.total || 0;
-          this.loadStats();
-          this.calculateStats();
+          this.total = Number(((_b = data.data) == null ? void 0 : _b.total) || data.total || this.repairList.length || 0);
           this.selectAll = false;
           this.selectedIds = [];
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:569", "搜索失败:", err);
+          this.calculateStats();
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:490", "加载报修列表失败:", error);
           this.repairList = [];
           this.total = 0;
           this.selectAll = false;
           this.selectedIds = [];
+          this.calculateStats();
           uni.showToast({ title: "加载失败，请重试", icon: "none" });
         } finally {
           this.loading = false;
         }
       },
-      // 统计数据方法 - 尝试调用真实接口获取统计，如果失败则使用本地计算作为保底
-      async loadStats() {
-        var _a, _b, _c;
-        try {
-          const month = this.monthValue || void 0;
-          const totalReq = request("/api/repair/admin/all", { params: { pageSize: 1, month } }, "GET");
-          const pendingReq = request("/api/repair/admin/all", { params: { pageSize: 1, status: "pending", month } }, "GET");
-          const processingReq = request("/api/repair/admin/all", { params: { pageSize: 1, status: "processing", month } }, "GET");
-          const [totalRes, pendingRes, processingRes] = await Promise.all([totalReq, pendingReq, processingReq]);
-          this.stats.total = ((_a = totalRes.data) == null ? void 0 : _a.total) || totalRes.total || 0;
-          this.stats.pending = ((_b = pendingRes.data) == null ? void 0 : _b.total) || pendingRes.total || 0;
-          this.stats.processing = ((_c = processingRes.data) == null ? void 0 : _c.total) || processingRes.total || 0;
-          this.stats.today = 0;
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:607", "加载统计数据失败，切换回本地计算", e);
-          this.calculateStats();
-        }
-      },
-      // 本地计算统计数据（降级方案）
       calculateStats() {
-        this.stats.today = this.repairList.filter((item) => {
-          if (!item.createTime)
-            return false;
-          const date = new Date(item.createTime);
-          const today = /* @__PURE__ */ new Date();
-          return date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
-        }).length;
+        const counters = {
+          total: this.total || this.repairList.length,
+          pending: 0,
+          processing: 0,
+          completed: 0,
+          cancelled: 0,
+          today: 0
+        };
+        const today = /* @__PURE__ */ new Date();
+        const y = today.getFullYear();
+        const m = today.getMonth();
+        const d = today.getDate();
+        this.repairList.forEach((item) => {
+          if (item.status && counters[item.status] !== void 0) {
+            counters[item.status] += 1;
+          }
+          if (item.createTime) {
+            const createdAt = new Date(item.createTime);
+            if (createdAt.getFullYear() === y && createdAt.getMonth() === m && createdAt.getDate() === d) {
+              counters.today += 1;
+            }
+          }
+        });
+        this.stats = counters;
       },
-      // 统计卡片点击事件
-      handleStatsClick(status) {
-        if (status === "all") {
-          this.statusFilter = "";
-        } else {
-          this.statusFilter = status;
-        }
-        this.currentPage = 1;
-        this.loadRepairs();
+      isTimeout(item) {
+        if (!item || item.status !== "pending" || !item.createTime)
+          return false;
+        const createTime = new Date(item.createTime).getTime();
+        const now = Date.now();
+        return (now - createTime) / (1e3 * 60 * 60) > this.repairTimeout;
       },
-      // 搜索相关方法
-      onSearchInput(e) {
-        this.searchQuery = e.detail.value;
+      getRepairUrgencyRank(item) {
+        if (!item)
+          return 1;
+        const urgentFlag = item.urgent ?? item.isUrgent ?? item.emergency ?? item.isEmergency;
+        if (urgentFlag === true || urgentFlag === 1 || urgentFlag === "1")
+          return 4;
+        if (this.isTimeout(item))
+          return 4;
+        const priority = Number(item.priority);
+        if (Number.isFinite(priority) && priority > 0)
+          return priority;
+        return 1;
       },
-      handleSearch() {
-        this.currentPage = 1;
-        this.loadRepairs();
+      formatHouse(item) {
+        if (!item)
+          return "-";
+        return `${item.buildingNo || ""}${item.houseNo || ""}` || "-";
       },
-      handleStatusChange(e) {
-        const index = e.detail.value;
-        this.statusFilter = this.statusOptions[index].value;
-        this.currentPage = 1;
-        this.loadRepairs();
+      getTimeoutText(item) {
+        return this.isTimeout(item) ? "超时待处理" : "正常";
       },
-      handleFaultTypeChange(e) {
-        const index = e.detail.value;
-        this.faultTypeFilter = this.faultTypeOptions[index].value;
-        this.currentPage = 1;
-        this.loadRepairs();
-      },
-      // 分页相关方法
-      handlePrevPage() {
-        if (this.currentPage > 1) {
-          this.currentPage--;
-          this.loadRepairs();
-        }
-      },
-      handleNextPage() {
-        if (this.currentPage < this.totalPages) {
-          this.currentPage++;
-          this.loadRepairs();
-        }
-      },
-      handlePageSizeChange(e) {
-        const pageSizeOptions = [10, 20, 50, 100];
-        this.pageSize = pageSizeOptions[e.detail.value];
-        this.currentPage = 1;
-        this.loadRepairs();
-      },
-      // 详情相关方法
       openDetail(item) {
         this.currentRepair = item;
+        this.loadingDetail = false;
         this.showDetail = true;
       },
       closeDetail() {
@@ -4200,42 +4434,31 @@ if (uni.restoreGlobal) {
         this.currentRepair = null;
         this.loadingDetail = false;
       },
-      // 批量操作相关方法
       handleCheckboxGroupChange(event) {
-        this.selectedIds = event.detail.value;
+        this.selectedIds = event.detail.value || [];
         this.selectAll = this.selectedIds.length === this.repairList.length;
-        this.safeLog("复选框组变化:", {
-          selectedIds: this.selectedIds,
-          selectAll: this.selectAll,
-          listLength: this.repairList.length
-        });
       },
-      safeLog(...args) {
-        if (console && typeof console.log === "function") {
-          formatAppLog("log", "at admin/pages/admin/repair-manage.vue:716", ...args);
-        }
-      },
-      handleSelectAll(event) {
-        formatAppLog("log", "at admin/pages/admin/repair-manage.vue:721", "全选按钮点击");
-        const shouldSelectAll = !this.selectAll;
-        this.selectAll = shouldSelectAll;
-        if (shouldSelectAll) {
-          this.selectedIds = [...this.repairList.map((item) => String(item.id))];
-        } else {
-          this.selectedIds = [];
-        }
-        formatAppLog("log", "at admin/pages/admin/repair-manage.vue:734", "更新完成:", this.selectedIds);
+      testSelectAll() {
+        if (!this.repairList.length)
+          return;
+        const isAllSelected = this.selectedIds.length === this.repairList.length;
+        this.selectAll = !isAllSelected;
+        this.selectedIds = isAllSelected ? [] : this.repairList.map((item) => String(item.id));
         this.$forceUpdate();
-        setTimeout(() => {
-          this.selectedIds = [...this.selectedIds];
-        }, 10);
       },
-      // 模板中如果需要调试，调用这个方法
-      handleCheckboxClick() {
-        this.safeLog("checkbox被点击");
+      async batchUpdateFallback(ids, status, remark = "") {
+        for (const id of ids) {
+          await request("/api/repair/admin/updateStatus", {
+            params: {
+              repairId: id,
+              status,
+              remark
+            }
+          }, "POST");
+        }
       },
       async handleBatchProcess() {
-        if (this.selectedIds.length === 0) {
+        if (!this.selectedIds.length) {
           uni.showToast({ title: "请选择要处理的报修", icon: "none" });
           return;
         }
@@ -4249,13 +4472,13 @@ if (uni.restoreGlobal) {
           }, "POST");
           uni.showToast({ title: "批量处理成功", icon: "success" });
           this.loadRepairs();
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:771", "批量处理失败:", err);
+        } catch (error) {
           try {
             await this.batchUpdateFallback(this.selectedIds, "processing");
             uni.showToast({ title: "批量处理成功", icon: "success" });
             this.loadRepairs();
-          } catch (fallbackErr) {
+          } catch (fallbackError) {
+            formatAppLog("error", "at admin/pages/admin/repair-manage.vue:611", "批量处理失败:", fallbackError);
             uni.showToast({ title: "批量处理失败", icon: "none" });
           }
         } finally {
@@ -4263,7 +4486,7 @@ if (uni.restoreGlobal) {
         }
       },
       async handleBatchComplete() {
-        if (this.selectedIds.length === 0) {
+        if (!this.selectedIds.length) {
           uni.showToast({ title: "请选择要完成的报修", icon: "none" });
           return;
         }
@@ -4271,36 +4494,36 @@ if (uni.restoreGlobal) {
           title: "确认批量完成",
           content: `确定要将选中的${this.selectedIds.length}个报修设为已完成吗？`,
           success: async (res) => {
-            if (res.confirm) {
+            if (!res.confirm)
+              return;
+            try {
+              uni.showLoading({ title: "批量完成中..." });
+              await request("/api/repair/admin/batchUpdateStatus", {
+                data: {
+                  repairIds: this.selectedIds,
+                  status: "completed",
+                  remark: "批量完成"
+                }
+              }, "POST");
+              uni.showToast({ title: "批量完成成功", icon: "success" });
+              this.loadRepairs();
+            } catch (error) {
               try {
-                uni.showLoading({ title: "批量完成中..." });
-                await request("/api/repair/admin/batchUpdateStatus", {
-                  data: {
-                    repairIds: this.selectedIds,
-                    status: "completed",
-                    remark: "批量完成"
-                  }
-                }, "POST");
+                await this.batchUpdateFallback(this.selectedIds, "completed", "批量完成");
                 uni.showToast({ title: "批量完成成功", icon: "success" });
                 this.loadRepairs();
-              } catch (err) {
-                formatAppLog("error", "at admin/pages/admin/repair-manage.vue:813", "批量完成失败:", err);
-                try {
-                  await this.batchUpdateFallback(this.selectedIds, "completed", "批量完成");
-                  uni.showToast({ title: "批量完成成功", icon: "success" });
-                  this.loadRepairs();
-                } catch (fallbackErr) {
-                  uni.showToast({ title: "批量完成失败", icon: "none" });
-                }
-              } finally {
-                uni.hideLoading();
+              } catch (fallbackError) {
+                formatAppLog("error", "at admin/pages/admin/repair-manage.vue:646", "批量完成失败:", fallbackError);
+                uni.showToast({ title: "批量完成失败", icon: "none" });
               }
+            } finally {
+              uni.hideLoading();
             }
           }
         });
       },
       async handleBatchCancel() {
-        if (this.selectedIds.length === 0) {
+        if (!this.selectedIds.length) {
           uni.showToast({ title: "请选择要取消的报修", icon: "none" });
           return;
         }
@@ -4308,80 +4531,53 @@ if (uni.restoreGlobal) {
           title: "确认批量取消",
           content: `确定要取消选中的${this.selectedIds.length}个报修吗？`,
           success: async (res) => {
-            if (res.confirm) {
+            if (!res.confirm)
+              return;
+            try {
+              uni.showLoading({ title: "批量取消中..." });
+              await request("/api/repair/admin/batchUpdateStatus", {
+                data: {
+                  repairIds: this.selectedIds,
+                  status: "cancelled",
+                  remark: "批量取消"
+                }
+              }, "POST");
+              uni.showToast({ title: "批量取消成功", icon: "success" });
+              this.loadRepairs();
+            } catch (error) {
               try {
-                uni.showLoading({ title: "批量取消中..." });
-                await request("/api/repair/admin/batchUpdateStatus", {
-                  data: {
-                    repairIds: this.selectedIds,
-                    status: "cancelled",
-                    remark: "批量取消"
-                  }
-                }, "POST");
+                await this.batchUpdateFallback(this.selectedIds, "cancelled", "批量取消");
                 uni.showToast({ title: "批量取消成功", icon: "success" });
                 this.loadRepairs();
-              } catch (err) {
-                formatAppLog("error", "at admin/pages/admin/repair-manage.vue:858", "批量取消失败:", err);
-                try {
-                  await this.batchUpdateFallback(this.selectedIds, "cancelled", "批量取消");
-                  uni.showToast({ title: "批量取消成功", icon: "success" });
-                  this.loadRepairs();
-                } catch (fallbackErr) {
-                  uni.showToast({ title: "批量取消失败", icon: "none" });
-                }
-              } finally {
-                uni.hideLoading();
+              } catch (fallbackError) {
+                formatAppLog("error", "at admin/pages/admin/repair-manage.vue:683", "批量取消失败:", fallbackError);
+                uni.showToast({ title: "批量取消失败", icon: "none" });
               }
+            } finally {
+              uni.hideLoading();
             }
           }
         });
       },
-      // 批量更新失败时的备选方案：逐个更新
-      async batchUpdateFallback(ids, status, remark = "") {
-        for (const id of ids) {
-          try {
-            await request("/api/repair/admin/updateStatus", {
-              params: {
-                repairId: id,
-                status,
-                remark
-              }
-            }, "POST");
-          } catch (e) {
-            formatAppLog("error", "at admin/pages/admin/repair-manage.vue:889", `更新ID为${id}的记录失败:`, e);
-          }
-        }
-      },
-      // 导出功能 - 使用真实导出接口
       async handleExport() {
         try {
           this.exporting = true;
           uni.showLoading({ title: "导出中..." });
-          const params = {
-            status: this.statusFilter || void 0,
-            faultType: this.faultTypeFilter || void 0,
-            keyword: this.searchQuery || void 0
-          };
-          formatAppLog("log", "at admin/pages/admin/repair-manage.vue:908", "导出参数:", params);
-          await request("/api/repair/admin/export", { params }, "GET");
+          await request("/api/repair/admin/export", {
+            params: {
+              status: this.statusFilter || void 0,
+              faultType: this.faultTypeFilter || void 0,
+              keyword: this.searchQuery || void 0
+            }
+          }, "GET");
           uni.showToast({ title: "导出成功", icon: "success" });
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:916", "导出失败:", err);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:705", "导出失败:", error);
           uni.showToast({ title: "导出失败，请重试", icon: "none" });
         } finally {
           this.exporting = false;
           uni.hideLoading();
         }
-      },
-      // 前端导出备选方案
-      exportLocal() {
-        let csvContent = "ID,房屋信息,故障类型,故障描述,状态,提交时间\n";
-        this.repairList.forEach((item) => {
-          csvContent += `${item.id},"${item.buildingNo}${item.houseNo}","${item.faultType}","${item.faultDesc}","${this.getStatusText(item.status)}","${this.formatTime(item.createTime)}"
-`;
-        });
-        uni.showToast({ title: "导出成功", icon: "success" });
-        formatAppLog("log", "at admin/pages/admin/repair-manage.vue:935", "导出的数据:", csvContent);
       },
       async handleSetProcessing(repairId) {
         const result = await this.updateRepairStatus(repairId, "processing", "受理");
@@ -4402,15 +4598,15 @@ if (uni.restoreGlobal) {
       async handleCancelRepair(repairId) {
         uni.showModal({
           title: "确认取消",
-          content: "确定要取消这个报修吗？",
+          content: "确定要取消这条报修吗？",
           success: async (res) => {
             if (res.confirm) {
-              await this.updateRepairStatus(repairId, "cancelled", "取消报修", "已取消");
+              await this.updateRepairStatus(repairId, "cancelled", "取消报修");
             }
           }
         });
       },
-      async updateRepairStatus(repairId, status, actionName, localStatusName) {
+      async updateRepairStatus(repairId, status, actionName) {
         try {
           uni.showLoading({ title: "处理中..." });
           await request("/api/repair/admin/updateStatus", {
@@ -4419,35 +4615,13 @@ if (uni.restoreGlobal) {
               status
             }
           }, "POST");
-          uni.showToast({ title: actionName + "成功", icon: "success" });
+          uni.showToast({ title: `${actionName}成功`, icon: "success" });
           this.loadRepairs();
           return { success: true };
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:985", actionName + "失败:", err);
-          const errorMsg = (err == null ? void 0 : err.message) || "";
-          if (errorMsg.includes("权限") || errorMsg.includes("网络") || errorMsg.includes("timeout")) {
-            const repair = this.repairList.find((item) => item.id === repairId);
-            if (repair) {
-              repair.status = status;
-              uni.showToast({
-                title: actionName + "成功（本地模拟）",
-                icon: "success"
-              });
-              return { success: true, local: true };
-            } else {
-              uni.showToast({
-                title: actionName + "失败，记录不存在",
-                icon: "none"
-              });
-              return { success: false };
-            }
-          } else {
-            uni.showToast({
-              title: errorMsg || actionName + "失败",
-              icon: "none"
-            });
-            return { success: false };
-          }
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/repair-manage.vue:751", `${actionName}失败:`, error);
+          uni.showToast({ title: `${actionName}失败`, icon: "none" });
+          return { success: false };
         } finally {
           uni.hideLoading();
         }
@@ -4457,7 +4631,7 @@ if (uni.restoreGlobal) {
           title: "受理成功",
           content: "已生成工单，是否前往工单管理进行指派？",
           confirmText: "去指派",
-          cancelText: "留在此页",
+          cancelText: "留在本页",
           success: (res) => {
             if (res.confirm) {
               this.goToWorkOrderManage("PENDING", repairId);
@@ -4483,51 +4657,32 @@ if (uni.restoreGlobal) {
         };
       },
       getStatusText(status) {
-        const statusMap = {
-          "pending": "待处理",
-          "processing": "处理中",
-          "completed": "已完成",
-          "cancelled": "已取消"
+        const map = {
+          pending: "待处理",
+          processing: "处理中",
+          completed: "已完成",
+          cancelled: "已取消"
         };
-        return statusMap[status] || status;
+        return map[status] || status || "-";
       },
       formatTime(time) {
         if (!time)
-          return "";
+          return "-";
         return new Date(time).toLocaleString();
       },
-      // 启动自动刷新
       startAutoRefresh() {
-        if (this.autoRefresh) {
-          this.stopAutoRefresh();
-          this.timerId = setInterval(() => {
-            this.loadRepairs();
-          }, this.autoRefreshInterval * 1e3);
-          formatAppLog("log", "at admin/pages/admin/repair-manage.vue:1072", "自动刷新已启动，间隔：" + this.autoRefreshInterval + "秒");
-        }
+        if (!this.autoRefresh)
+          return;
+        this.stopAutoRefresh();
+        this.timerId = setInterval(() => {
+          this.loadRepairs();
+        }, this.autoRefreshInterval * 1e3);
       },
-      // 停止自动刷新
       stopAutoRefresh() {
-        if (this.timerId) {
-          clearInterval(this.timerId);
-          this.timerId = null;
-          formatAppLog("log", "at admin/pages/admin/repair-manage.vue:1081", "自动刷新已停止");
-        }
-      }
-    },
-    computed: {
-      // 总页数
-      totalPages() {
-        return Math.ceil(this.total / this.pageSize);
-      },
-      currentMonthLabel() {
-        const opt = this.monthOptions && this.monthOptions[this.monthIndex];
-        return opt && opt.label || this.monthValue || "选择月份";
-      },
-      // 当前每页条数在选项中的索引
-      pageSizeIndex() {
-        const pageSizeOptions = [10, 20, 50, 100];
-        return pageSizeOptions.indexOf(this.pageSize);
+        if (!this.timerId)
+          return;
+        clearInterval(this.timerId);
+        this.timerId = null;
       }
     }
   };
@@ -4535,554 +4690,580 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[26] || (_cache[26] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[27] || (_cache[27] = ($event) => $data.showSidebar = $event),
       pageTitle: "报修管理",
-      currentPage: "/admin/pages/admin/repair-manage"
+      currentPage: "/admin/pages/admin/repair-manage",
+      showPageBanner: false
     }, {
-      default: vue.withCtx(() => {
-        var _a, _b;
-        return [
-          vue.createElementVNode("view", { class: "manage-container" }, [
-            vue.createCommentVNode(" 统计卡片 "),
-            vue.createElementVNode("view", { class: "stats-card-container" }, [
-              vue.createElementVNode("view", {
-                class: "stats-card",
-                onClick: _cache[0] || (_cache[0] = ($event) => $options.handleStatsClick("all"))
-              }, [
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "报修工单列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "采用标准后台数据页的筛选、表头、数据行与操作列结构。")
+            ]),
+            vue.createElementVNode("picker", {
+              mode: "selector",
+              range: $data.monthOptions,
+              "range-key": "label",
+              onChange: _cache[0] || (_cache[0] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
+            }, [
+              vue.createElementVNode("view", { class: "month-filter-chip" }, [
+                vue.createElementVNode("text", { class: "month-filter-label" }, "统计月份"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "month-filter-value" },
+                  vue.toDisplayString($options.currentMonthLabel),
+                  1
+                  /* TEXT */
+                )
+              ])
+            ], 40, ["range"])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.statusFilter === "" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick("all"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "全部"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.total),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "总报修数")
-              ]),
-              vue.createElementVNode("view", {
-                class: "stats-card status-pending",
-                onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick("pending"))
-              }, [
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card pending", { active: $data.statusFilter === "pending" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("pending"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "待处理"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.pending),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "待处理")
-              ]),
-              vue.createElementVNode("view", {
-                class: "stats-card status-processing",
-                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("processing"))
-              }, [
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card processing", { active: $data.statusFilter === "processing" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.handleStatsClick("processing"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "处理中"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.processing),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "处理中")
-              ]),
-              vue.createCommentVNode(" 新增今日数据统计 "),
-              vue.createElementVNode("view", { class: "stats-card status-today" }, [
-                vue.createElementVNode(
-                  "text",
-                  { class: "stats-number" },
-                  vue.toDisplayString($data.stats.today),
-                  1
-                  /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "今日新增")
-              ])
-            ]),
-            vue.createElementVNode("view", { class: "stats-filter" }, [
-              vue.createElementVNode("picker", {
-                mode: "selector",
-                range: $data.monthOptions,
-                "range-key": "label",
-                onChange: _cache[3] || (_cache[3] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
-              }, [
-                vue.createElementVNode("view", { class: "stats-filter-btn" }, [
-                  vue.createElementVNode(
-                    "text",
-                    { class: "stats-filter-text" },
-                    vue.toDisplayString($options.currentMonthLabel),
-                    1
-                    /* TEXT */
-                  ),
-                  vue.createElementVNode("text", { class: "stats-filter-arrow" }, "▼")
-                ])
-              ], 40, ["range"])
-            ]),
-            vue.createCommentVNode(" 搜索和筛选栏 "),
-            vue.createElementVNode("view", { class: "search-filter-bar" }, [
-              vue.createElementVNode("view", { class: "search-box" }, [
-                vue.createCommentVNode(" ✅ 修复：使用v-model简化 "),
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode("view", { class: "status-summary-card today" }, [
+              vue.createElementVNode("text", { class: "summary-label" }, "今日新增"),
+              vue.createElementVNode(
+                "text",
+                { class: "summary-value" },
+                vue.toDisplayString($data.stats.today),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
                 vue.withDirectives(vue.createElementVNode(
                   "input",
                   {
-                    type: "text",
-                    placeholder: "搜索房屋编号、故障类型",
                     "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchQuery = $event),
-                    onConfirm: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args)),
-                    class: "search-input"
+                    class: "query-input",
+                    type: "text",
+                    placeholder: "搜索房屋编号、故障类型、描述",
+                    onConfirm: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args))
                   },
                   null,
                   544
                   /* NEED_HYDRATION, NEED_PATCH */
                 ), [
                   [vue.vModelText, $data.searchQuery]
-                ]),
-                vue.createElementVNode("button", {
-                  class: "search-btn",
-                  onClick: _cache[6] || (_cache[6] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-                }, "搜索")
+                ])
               ]),
-              vue.createElementVNode("view", { class: "filter-row" }, [
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "状态"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: $data.statusOptions,
                   "range-key": "label",
                   value: $data.statusOptions.findIndex((opt) => opt.value === $data.statusFilter),
-                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args)),
-                  class: "filter-picker"
+                  onChange: _cache[6] || (_cache[6] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
                 }, [
-                  vue.createElementVNode(
-                    "view",
-                    { class: "filter-picker-text" },
-                    vue.toDisplayString(((_a = $data.statusOptions.find((opt) => opt.value === $data.statusFilter)) == null ? void 0 : _a.label) || "全部状态"),
-                    1
-                    /* TEXT */
-                  )
-                ], 40, ["range", "value"]),
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "类型"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: $data.faultTypeOptions,
                   "range-key": "label",
                   value: $data.faultTypeOptions.findIndex((opt) => opt.value === $data.faultTypeFilter),
-                  onChange: _cache[8] || (_cache[8] = (...args) => $options.handleFaultTypeChange && $options.handleFaultTypeChange(...args)),
-                  class: "filter-picker"
+                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleFaultTypeChange && $options.handleFaultTypeChange(...args))
                 }, [
-                  vue.createElementVNode(
-                    "view",
-                    { class: "filter-picker-text" },
-                    vue.toDisplayString(((_b = $data.faultTypeOptions.find((opt) => opt.value === $data.faultTypeFilter)) == null ? void 0 : _b.label) || "全部类型"),
-                    1
-                    /* TEXT */
-                  )
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentFaultTypeLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
                 ], 40, ["range", "value"])
               ])
             ]),
-            vue.createCommentVNode(" 批量操作栏 "),
-            $data.repairList.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 0,
-              class: "batch-operation-bar"
-            }, [
-              vue.createElementVNode("view", { class: "batch-select" }, [
-                vue.createElementVNode(
-                  "button",
-                  {
-                    class: "select-all-btn",
-                    onClick: _cache[9] || (_cache[9] = (...args) => $options.testSelectAll && $options.testSelectAll(...args))
-                  },
-                  vue.toDisplayString($data.selectedIds.length === $data.repairList.length ? "取消全选" : "全选"),
-                  1
-                  /* TEXT */
-                ),
-                $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock(
-                  "text",
-                  {
-                    key: 0,
-                    class: "selected-count"
-                  },
-                  vue.toDisplayString($data.selectedIds.length) + "项已选择 ",
-                  1
-                  /* TEXT */
-                )) : vue.createCommentVNode("v-if", true)
-              ]),
-              vue.createCommentVNode(" 批量操作按钮，只在选中项目时显示 "),
-              $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "button",
+                {
+                  class: "toolbar-chip",
+                  onClick: _cache[10] || (_cache[10] = (...args) => $options.testSelectAll && $options.testSelectAll(...args))
+                },
+                vue.toDisplayString($data.selectedIds.length === $data.repairList.length && $data.repairList.length ? "取消全选" : "全选当前页"),
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock(
+                "text",
+                {
+                  key: 0,
+                  class: "toolbar-meta active"
+                },
+                "已选 " + vue.toDisplayString($data.selectedIds.length) + " 条",
+                1
+                /* TEXT */
+              )) : vue.createCommentVNode("v-if", true)
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock("button", {
                 key: 0,
-                class: "batch-buttons"
-              }, [
-                vue.createElementVNode("button", {
-                  class: "batch-btn primary",
-                  onClick: _cache[10] || (_cache[10] = (...args) => $options.handleBatchProcess && $options.handleBatchProcess(...args))
-                }, " 批量处理 "),
-                vue.createElementVNode("button", {
-                  class: "batch-btn success",
-                  onClick: _cache[11] || (_cache[11] = (...args) => $options.handleBatchComplete && $options.handleBatchComplete(...args))
-                }, " 批量完成 "),
-                vue.createElementVNode("button", {
-                  class: "batch-btn danger",
-                  onClick: _cache[12] || (_cache[12] = (...args) => $options.handleBatchCancel && $options.handleBatchCancel(...args))
-                }, " 批量取消 "),
-                vue.createElementVNode("button", {
-                  class: "batch-btn export",
-                  onClick: _cache[13] || (_cache[13] = (...args) => $options.handleExport && $options.handleExport(...args)),
-                  disabled: $data.exporting
-                }, vue.toDisplayString($data.exporting ? "导出中..." : "导出数据"), 9, ["disabled"])
-              ])) : vue.createCommentVNode("v-if", true)
-            ])) : vue.createCommentVNode("v-if", true),
-            vue.createCommentVNode(" 加载状态 "),
-            $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 1,
-              class: "loading-state"
-            }, [
-              vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-            ])) : (vue.openBlock(), vue.createElementBlock(
-              vue.Fragment,
-              { key: 2 },
+                class: "toolbar-action primary",
+                onClick: _cache[11] || (_cache[11] = (...args) => $options.handleBatchProcess && $options.handleBatchProcess(...args))
+              }, "批量处理")) : vue.createCommentVNode("v-if", true),
+              $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock("button", {
+                key: 1,
+                class: "toolbar-action success",
+                onClick: _cache[12] || (_cache[12] = (...args) => $options.handleBatchComplete && $options.handleBatchComplete(...args))
+              }, "批量完成")) : vue.createCommentVNode("v-if", true),
+              $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock("button", {
+                key: 2,
+                class: "toolbar-action danger",
+                onClick: _cache[13] || (_cache[13] = (...args) => $options.handleBatchCancel && $options.handleBatchCancel(...args))
+              }, "批量取消")) : vue.createCommentVNode("v-if", true),
+              vue.createElementVNode("button", {
+                class: "toolbar-action ghost",
+                disabled: $data.exporting,
+                onClick: _cache[14] || (_cache[14] = (...args) => $options.handleExport && $options.handleExport(...args))
+              }, vue.toDisplayString($data.exporting ? "导出中..." : "导出数据"), 9, ["disabled"])
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "table-head" }, [
+              vue.createElementVNode("text", { class: "table-col col-check" }, "选择"),
+              vue.createElementVNode("text", { class: "table-col col-id" }, "编号"),
+              vue.createElementVNode("text", { class: "table-col col-house" }, "房屋信息"),
+              vue.createElementVNode("text", { class: "table-col col-type" }, "故障类型"),
+              vue.createElementVNode("text", { class: "table-col col-desc" }, "故障描述"),
+              vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+              vue.createElementVNode("text", { class: "table-col col-time" }, "提交时间"),
+              vue.createElementVNode("text", { class: "table-col col-timeout" }, "响应"),
+              vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+            ]),
+            $data.repairList.length > 0 ? (vue.openBlock(), vue.createElementBlock(
+              "checkbox-group",
+              {
+                key: 0,
+                onChange: _cache[17] || (_cache[17] = (...args) => $options.handleCheckboxGroupChange && $options.handleCheckboxGroupChange(...args))
+              },
               [
-                vue.createCommentVNode(" 报修列表 "),
-                vue.createElementVNode("view", { class: "repair-list" }, [
-                  vue.createElementVNode(
-                    "checkbox-group",
-                    {
-                      onChange: _cache[16] || (_cache[16] = (...args) => $options.handleCheckboxGroupChange && $options.handleCheckboxGroupChange(...args))
-                    },
-                    [
-                      (vue.openBlock(true), vue.createElementBlock(
-                        vue.Fragment,
-                        null,
-                        vue.renderList($data.repairList, (item) => {
-                          return vue.openBlock(), vue.createElementBlock("view", {
-                            key: item.id,
-                            class: "repair-item"
-                          }, [
-                            vue.createCommentVNode(" 复选框 "),
-                            vue.createElementVNode("view", {
-                              class: "checkbox-container",
-                              onClick: _cache[14] || (_cache[14] = vue.withModifiers(() => {
-                              }, ["stop"]))
-                            }, [
-                              vue.createElementVNode("checkbox", {
-                                value: String(item.id),
-                                checked: $data.selectedIds.includes(String(item.id))
-                              }, null, 8, ["value", "checked"])
-                            ]),
-                            vue.createCommentVNode(" 报修信息 "),
-                            vue.createElementVNode("view", {
-                              class: "repair-info",
-                              onClick: ($event) => $options.openDetail(item)
-                            }, [
-                              vue.createElementVNode("text", { class: "building-info" }, [
-                                vue.createTextVNode(
-                                  vue.toDisplayString(item.buildingNo) + vue.toDisplayString(item.houseNo) + " ",
-                                  1
-                                  /* TEXT */
-                                ),
-                                $options.isTimeout(item) ? (vue.openBlock(), vue.createElementBlock("text", {
-                                  key: 0,
-                                  class: "timeout-badge"
-                                }, "已超时")) : vue.createCommentVNode("v-if", true)
-                              ]),
-                              vue.createElementVNode(
-                                "text",
-                                { class: "fault-type" },
-                                vue.toDisplayString(item.faultType),
-                                1
-                                /* TEXT */
-                              ),
-                              vue.createElementVNode(
-                                "text",
-                                { class: "fault-desc" },
-                                vue.toDisplayString(item.faultDesc),
-                                1
-                                /* TEXT */
-                              ),
-                              vue.createElementVNode(
-                                "text",
-                                {
-                                  class: vue.normalizeClass(["status", $options.getStatusClass(item.status)])
-                                },
-                                vue.toDisplayString($options.getStatusText(item.status)),
-                                3
-                                /* TEXT, CLASS */
-                              ),
-                              vue.createElementVNode(
-                                "text",
-                                { class: "create-time" },
-                                vue.toDisplayString($options.formatTime(item.createTime)),
-                                1
-                                /* TEXT */
-                              )
-                            ], 8, ["onClick"]),
-                            vue.createElementVNode("view", {
-                              class: "action-buttons",
-                              onClick: _cache[15] || (_cache[15] = vue.withModifiers(() => {
-                              }, ["stop"]))
-                            }, [
-                              vue.createCommentVNode(" 待处理状态 "),
-                              item.status === "pending" ? (vue.openBlock(), vue.createElementBlock(
-                                vue.Fragment,
-                                { key: 0 },
-                                [
-                                  vue.createElementVNode("button", {
-                                    class: "handle-btn primary",
-                                    onClick: ($event) => $options.handleSetProcessing(item.id)
-                                  }, " 受理 ", 8, ["onClick"]),
-                                  vue.createElementVNode("button", {
-                                    class: "handle-btn secondary",
-                                    onClick: ($event) => $options.handleCancelRepair(item.id)
-                                  }, " 取消报修 ", 8, ["onClick"])
-                                ],
-                                64
-                                /* STABLE_FRAGMENT */
-                              )) : item.status === "processing" ? (vue.openBlock(), vue.createElementBlock(
-                                vue.Fragment,
-                                { key: 1 },
-                                [
-                                  vue.createCommentVNode(" 处理中状态 "),
-                                  vue.createElementVNode("button", {
-                                    class: "handle-btn primary",
-                                    onClick: ($event) => $options.goToWorkOrderManage("PENDING", item.id)
-                                  }, " 去指派 ", 8, ["onClick"]),
-                                  vue.createElementVNode("button", {
-                                    class: "handle-btn secondary",
-                                    onClick: ($event) => $options.goToWorkOrderManage("", item.id)
-                                  }, " 查看工单 ", 8, ["onClick"])
-                                ],
-                                64
-                                /* STABLE_FRAGMENT */
-                              )) : (vue.openBlock(), vue.createElementBlock(
-                                vue.Fragment,
-                                { key: 2 },
-                                [
-                                  vue.createCommentVNode(" 已完成或已取消状态 "),
-                                  vue.createElementVNode(
-                                    "text",
-                                    { class: "processed-text" },
-                                    vue.toDisplayString($options.getStatusText(item.status)),
-                                    1
-                                    /* TEXT */
-                                  )
-                                ],
-                                64
-                                /* STABLE_FRAGMENT */
-                              ))
-                            ])
-                          ]);
-                        }),
-                        128
-                        /* KEYED_FRAGMENT */
-                      ))
-                    ],
-                    32
-                    /* NEED_HYDRATION */
-                  )
-                ])
+                (vue.openBlock(true), vue.createElementBlock(
+                  vue.Fragment,
+                  null,
+                  vue.renderList($data.repairList, (item, index) => {
+                    return vue.openBlock(), vue.createElementBlock("view", {
+                      key: item.id,
+                      class: "table-row",
+                      style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` }),
+                      onClick: ($event) => $options.openDetail(item)
+                    }, [
+                      vue.createElementVNode("view", {
+                        class: "table-col col-check row-check",
+                        onClick: _cache[15] || (_cache[15] = vue.withModifiers(() => {
+                        }, ["stop"]))
+                      }, [
+                        vue.createElementVNode("checkbox", {
+                          value: String(item.id),
+                          checked: $data.selectedIds.includes(String(item.id))
+                        }, null, 8, ["value", "checked"])
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-id" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "primary-text" },
+                          "#" + vue.toDisplayString(item.id),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-house" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "primary-text" },
+                          vue.toDisplayString($options.formatHouse(item)),
+                          1
+                          /* TEXT */
+                        ),
+                        $options.isTimeout(item) ? (vue.openBlock(), vue.createElementBlock("text", {
+                          key: 0,
+                          class: "row-inline-tag warning"
+                        }, "已超时")) : vue.createCommentVNode("v-if", true)
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-type" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString(item.faultType || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-desc" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "desc-text" },
+                          vue.toDisplayString(item.faultDesc || "暂无描述"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-status" }, [
+                        vue.createElementVNode(
+                          "text",
+                          {
+                            class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
+                          },
+                          vue.toDisplayString($options.getStatusText(item.status)),
+                          3
+                          /* TEXT, CLASS */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-time" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString($options.formatTime(item.createTime)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-timeout" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString($options.getTimeoutText(item)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", {
+                        class: "table-col col-actions row-actions",
+                        onClick: _cache[16] || (_cache[16] = vue.withModifiers(() => {
+                        }, ["stop"]))
+                      }, [
+                        vue.createElementVNode("button", {
+                          class: "row-btn ghost",
+                          onClick: ($event) => $options.openDetail(item)
+                        }, "详情", 8, ["onClick"]),
+                        item.status === "pending" ? (vue.openBlock(), vue.createElementBlock("button", {
+                          key: 0,
+                          class: "row-btn primary",
+                          onClick: ($event) => $options.handleSetProcessing(item.id)
+                        }, "受理", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
+                        item.status === "pending" ? (vue.openBlock(), vue.createElementBlock("button", {
+                          key: 1,
+                          class: "row-btn danger",
+                          onClick: ($event) => $options.handleCancelRepair(item.id)
+                        }, "取消", 8, ["onClick"])) : item.status === "processing" ? (vue.openBlock(), vue.createElementBlock("button", {
+                          key: 2,
+                          class: "row-btn primary",
+                          onClick: ($event) => $options.goToWorkOrderManage("PENDING", item.id)
+                        }, "指派", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
+                        item.status === "processing" || item.status === "completed" ? (vue.openBlock(), vue.createElementBlock("button", {
+                          key: 3,
+                          class: "row-btn ghost",
+                          onClick: ($event) => $options.goToWorkOrderManage("", item.id)
+                        }, "工单", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
+                      ])
+                    ], 12, ["onClick"]);
+                  }),
+                  128
+                  /* KEYED_FRAGMENT */
+                ))
               ],
-              2112
-              /* STABLE_FRAGMENT, DEV_ROOT_FRAGMENT */
-            )),
-            vue.createCommentVNode(" 空状态 "),
-            $data.repairList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 3,
+              32
+              /* NEED_HYDRATION */
+            )) : (vue.openBlock(), vue.createElementBlock("view", {
+              key: 1,
               class: "empty-state"
             }, [
               vue.createElementVNode("text", null, "暂无报修记录")
-            ])) : vue.createCommentVNode("v-if", true),
-            vue.createCommentVNode(" 分页组件 "),
-            $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 4,
-              class: "pagination"
-            }, [
+            ]))
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === 1,
-                onClick: _cache[17] || (_cache[17] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
-              }, " 上一页 ", 8, ["disabled"]),
-              vue.createElementVNode("view", { class: "page-info" }, [
-                vue.createElementVNode(
-                  "text",
-                  null,
-                  vue.toDisplayString($data.currentPage),
-                  1
-                  /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "page-separator" }, "/"),
-                vue.createElementVNode(
-                  "text",
-                  null,
-                  vue.toDisplayString($options.totalPages),
-                  1
-                  /* TEXT */
-                )
-              ]),
+                onClick: _cache[18] || (_cache[18] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
+              }, "上一页", 8, ["disabled"]),
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === $options.totalPages,
-                onClick: _cache[18] || (_cache[18] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
-              }, " 下一页 ", 8, ["disabled"]),
+                onClick: _cache[19] || (_cache[19] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
+              }, "下一页", 8, ["disabled"]),
               vue.createElementVNode("view", { class: "page-size" }, [
                 vue.createElementVNode("text", null, "每页"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: [10, 20, 50, 100],
                   value: $options.pageSizeIndex,
-                  onChange: _cache[19] || (_cache[19] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                  onChange: _cache[20] || (_cache[20] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
                 }, [
                   vue.createElementVNode(
                     "text",
                     { class: "page-size-text" },
-                    vue.toDisplayString($data.pageSize) + "条",
+                    vue.toDisplayString($data.pageSize) + " 条",
                     1
                     /* TEXT */
                   )
                 ], 40, ["value"])
               ])
-            ])) : vue.createCommentVNode("v-if", true)
-          ]),
-          vue.createCommentVNode(" 详情弹窗 "),
-          $data.showDetail ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 0,
-            class: "detail-modal",
-            onClick: _cache[25] || (_cache[25] = (...args) => $options.closeDetail && $options.closeDetail(...args))
-          }, [
-            vue.createElementVNode("view", {
-              class: "detail-content",
-              onClick: _cache[24] || (_cache[24] = vue.withModifiers(() => {
-              }, ["stop"]))
-            }, [
-              vue.createElementVNode("view", { class: "detail-header" }, [
-                vue.createElementVNode("text", { class: "detail-title" }, "报修详情"),
-                vue.createElementVNode("button", {
-                  class: "close-btn",
-                  onClick: _cache[20] || (_cache[20] = (...args) => $options.closeDetail && $options.closeDetail(...args))
-                }, "关闭")
-              ]),
-              $data.loadingDetail ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 0,
-                class: "detail-loading"
-              }, [
-                vue.createElementVNode("text", null, "加载中...")
-              ])) : $data.currentRepair ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 1,
-                class: "detail-body"
-              }, [
-                vue.createElementVNode("view", { class: "detail-item" }, [
-                  vue.createElementVNode("text", { class: "detail-label" }, "报修编号:"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "detail-value" },
-                    vue.toDisplayString($data.currentRepair.id),
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                vue.createElementVNode("view", { class: "detail-item" }, [
-                  vue.createElementVNode("text", { class: "detail-label" }, "房屋信息:"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "detail-value" },
-                    vue.toDisplayString($data.currentRepair.buildingNo) + vue.toDisplayString($data.currentRepair.houseNo),
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                vue.createElementVNode("view", { class: "detail-item" }, [
-                  vue.createElementVNode("text", { class: "detail-label" }, "故障类型:"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "detail-value" },
-                    vue.toDisplayString($data.currentRepair.faultType),
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                vue.createElementVNode("view", { class: "detail-item" }, [
-                  vue.createElementVNode("text", { class: "detail-label" }, "故障描述:"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "detail-value detail-desc" },
-                    vue.toDisplayString($data.currentRepair.faultDesc),
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                vue.createElementVNode("view", { class: "detail-item" }, [
-                  vue.createElementVNode("text", { class: "detail-label" }, "当前状态:"),
-                  vue.createElementVNode(
-                    "text",
-                    {
-                      class: vue.normalizeClass(["detail-value", $options.getStatusClass($data.currentRepair.status)])
-                    },
-                    vue.toDisplayString($options.getStatusText($data.currentRepair.status)),
-                    3
-                    /* TEXT, CLASS */
-                  )
-                ]),
-                vue.createElementVNode("view", { class: "detail-item" }, [
-                  vue.createElementVNode("text", { class: "detail-label" }, "提交时间:"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "detail-value" },
-                    vue.toDisplayString($options.formatTime($data.currentRepair.createTime)),
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                $data.currentRepair.processTime ? (vue.openBlock(), vue.createElementBlock("view", {
-                  key: 0,
-                  class: "detail-item"
-                }, [
-                  vue.createElementVNode("text", { class: "detail-label" }, "处理时间:"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "detail-value" },
-                    vue.toDisplayString($options.formatTime($data.currentRepair.processTime)),
-                    1
-                    /* TEXT */
-                  )
-                ])) : vue.createCommentVNode("v-if", true),
-                $data.currentRepair.completeTime ? (vue.openBlock(), vue.createElementBlock("view", {
-                  key: 1,
-                  class: "detail-item"
-                }, [
-                  vue.createElementVNode("text", { class: "detail-label" }, "完成时间:"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "detail-value" },
-                    vue.toDisplayString($options.formatTime($data.currentRepair.completeTime)),
-                    1
-                    /* TEXT */
-                  )
-                ])) : vue.createCommentVNode("v-if", true),
-                $data.currentRepair.remark ? (vue.openBlock(), vue.createElementBlock("view", {
-                  key: 2,
-                  class: "detail-item"
-                }, [
-                  vue.createElementVNode("text", { class: "detail-label" }, "处理备注:"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "detail-value detail-desc" },
-                    vue.toDisplayString($data.currentRepair.remark),
-                    1
-                    /* TEXT */
-                  )
-                ])) : vue.createCommentVNode("v-if", true),
-                vue.createElementVNode("view", { class: "detail-actions" }, [
-                  $data.currentRepair.status === "pending" ? (vue.openBlock(), vue.createElementBlock("button", {
-                    key: 0,
-                    class: "detail-btn primary",
-                    onClick: _cache[21] || (_cache[21] = (...args) => $options.handleAcceptFromDetail && $options.handleAcceptFromDetail(...args))
-                  }, " 受理并生成工单 ")) : $data.currentRepair.status === "processing" ? (vue.openBlock(), vue.createElementBlock("button", {
-                    key: 1,
-                    class: "detail-btn primary",
-                    onClick: _cache[22] || (_cache[22] = ($event) => $options.goToWorkOrderManage("PENDING", $data.currentRepair.id))
-                  }, " 去工单指派 ")) : $data.currentRepair.status === "completed" ? (vue.openBlock(), vue.createElementBlock("button", {
-                    key: 2,
-                    class: "detail-btn secondary",
-                    onClick: _cache[23] || (_cache[23] = ($event) => $options.goToWorkOrderManage("", $data.currentRepair.id))
-                  }, " 查看工单 ")) : vue.createCommentVNode("v-if", true)
-                ])
-              ])) : vue.createCommentVNode("v-if", true)
             ])
           ])) : vue.createCommentVNode("v-if", true)
-        ];
-      }),
+        ]),
+        $data.showDetail ? (vue.openBlock(), vue.createElementBlock("view", {
+          key: 0,
+          class: "detail-modal",
+          onClick: _cache[26] || (_cache[26] = (...args) => $options.closeDetail && $options.closeDetail(...args))
+        }, [
+          vue.createElementVNode("view", {
+            class: "detail-content",
+            onClick: _cache[25] || (_cache[25] = vue.withModifiers(() => {
+            }, ["stop"]))
+          }, [
+            vue.createElementVNode("view", { class: "detail-header" }, [
+              vue.createElementVNode("text", { class: "detail-title" }, "报修详情"),
+              vue.createElementVNode("button", {
+                class: "close-btn",
+                onClick: _cache[21] || (_cache[21] = (...args) => $options.closeDetail && $options.closeDetail(...args))
+              }, "关闭")
+            ]),
+            $data.loadingDetail ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "detail-loading"
+            }, [
+              vue.createElementVNode("text", null, "加载中...")
+            ])) : $data.currentRepair ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 1,
+              class: "detail-body"
+            }, [
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "报修编号:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value" },
+                  vue.toDisplayString($data.currentRepair.id),
+                  1
+                  /* TEXT */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "房屋信息:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value" },
+                  vue.toDisplayString($options.formatHouse($data.currentRepair)),
+                  1
+                  /* TEXT */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "故障类型:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value" },
+                  vue.toDisplayString($data.currentRepair.faultType),
+                  1
+                  /* TEXT */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "故障描述:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value detail-desc" },
+                  vue.toDisplayString($data.currentRepair.faultDesc),
+                  1
+                  /* TEXT */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "当前状态:"),
+                vue.createElementVNode(
+                  "text",
+                  {
+                    class: vue.normalizeClass(["detail-value", $options.getStatusClass($data.currentRepair.status)])
+                  },
+                  vue.toDisplayString($options.getStatusText($data.currentRepair.status)),
+                  3
+                  /* TEXT, CLASS */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "提交时间:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value" },
+                  vue.toDisplayString($options.formatTime($data.currentRepair.createTime)),
+                  1
+                  /* TEXT */
+                )
+              ]),
+              $data.currentRepair.processTime ? (vue.openBlock(), vue.createElementBlock("view", {
+                key: 0,
+                class: "detail-item"
+              }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "处理时间:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value" },
+                  vue.toDisplayString($options.formatTime($data.currentRepair.processTime)),
+                  1
+                  /* TEXT */
+                )
+              ])) : vue.createCommentVNode("v-if", true),
+              $data.currentRepair.completeTime ? (vue.openBlock(), vue.createElementBlock("view", {
+                key: 1,
+                class: "detail-item"
+              }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "完成时间:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value" },
+                  vue.toDisplayString($options.formatTime($data.currentRepair.completeTime)),
+                  1
+                  /* TEXT */
+                )
+              ])) : vue.createCommentVNode("v-if", true),
+              $data.currentRepair.remark ? (vue.openBlock(), vue.createElementBlock("view", {
+                key: 2,
+                class: "detail-item"
+              }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "处理备注:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value detail-desc" },
+                  vue.toDisplayString($data.currentRepair.remark),
+                  1
+                  /* TEXT */
+                )
+              ])) : vue.createCommentVNode("v-if", true),
+              vue.createElementVNode("view", { class: "detail-actions" }, [
+                $data.currentRepair.status === "pending" ? (vue.openBlock(), vue.createElementBlock("button", {
+                  key: 0,
+                  class: "detail-btn primary",
+                  onClick: _cache[22] || (_cache[22] = (...args) => $options.handleAcceptFromDetail && $options.handleAcceptFromDetail(...args))
+                }, "受理并生成工单")) : $data.currentRepair.status === "processing" ? (vue.openBlock(), vue.createElementBlock("button", {
+                  key: 1,
+                  class: "detail-btn primary",
+                  onClick: _cache[23] || (_cache[23] = ($event) => $options.goToWorkOrderManage("PENDING", $data.currentRepair.id))
+                }, "去工单指派")) : $data.currentRepair.status === "completed" ? (vue.openBlock(), vue.createElementBlock("button", {
+                  key: 2,
+                  class: "detail-btn secondary",
+                  onClick: _cache[24] || (_cache[24] = ($event) => $options.goToWorkOrderManage("", $data.currentRepair.id))
+                }, "查看工单")) : vue.createCommentVNode("v-if", true)
+              ])
+            ])) : vue.createCommentVNode("v-if", true)
+          ])
+        ])) : vue.createCommentVNode("v-if", true)
+      ]),
       _: 1
       /* STABLE */
     }, 8, ["showSidebar"]);
@@ -5099,6 +5280,7 @@ if (uni.restoreGlobal) {
         assigning: false,
         workOrderList: [],
         workerList: [],
+        repairIdFilter: "",
         statusFilter: "",
         currentPage: 1,
         pageSize: 10,
@@ -5134,77 +5316,149 @@ if (uni.restoreGlobal) {
     },
     computed: {
       totalPages() {
-        return Math.ceil(this.total / this.pageSize) || 1;
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50, 100];
+        return Math.max(0, options.indexOf(this.pageSize));
       },
       currentMonthLabel() {
-        const opt = this.monthOptions && this.monthOptions[this.monthIndex];
-        return opt && opt.label || this.monthValue || "选择月份";
+        const option = this.monthOptions[this.monthIndex];
+        return option ? option.label : this.monthValue || "选择月份";
+      },
+      currentStatusLabel() {
+        const option = this.statusOptions.find((item) => item.value === this.statusFilter);
+        return option ? option.label : "全部状态";
+      },
+      statusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.statusFilter));
+      },
+      priorityPickerIndex() {
+        return Math.max(0, this.priorityOptions.findIndex((item) => item.value === this.assignPriority));
       }
     },
     onLoad(options) {
+      this.checkAdminRole();
       this.initMonthOptions();
-      if (options && options.status) {
-        const status = String(options.status).toUpperCase();
-        const exists = this.statusOptions.some((opt) => opt.value === status);
-        if (exists) {
-          this.statusFilter = status;
-        }
-      }
-      this.loadWorkOrders();
-      this.loadStats();
+      this.applyRouteFilters(options);
       this.loadWorkers();
+      this.refreshPage();
     },
     methods: {
+      checkAdminRole() {
+        const userInfo = uni.getStorageSync("userInfo");
+        if (!userInfo || userInfo.role !== "admin" && userInfo.role !== "super_admin") {
+          uni.showToast({ title: "无权限访问", icon: "none" });
+          uni.redirectTo({ url: "/owner/pages/login/login" });
+        }
+      },
+      applyRouteFilters(options) {
+        if (!options)
+          return;
+        if (options.status) {
+          const status = String(options.status).toUpperCase();
+          if (this.statusOptions.some((item) => item.value === status)) {
+            this.statusFilter = status;
+          }
+        }
+        if (options.repairId !== void 0 && options.repairId !== null) {
+          this.repairIdFilter = String(options.repairId);
+        }
+      },
       initMonthOptions() {
         const now = /* @__PURE__ */ new Date();
-        const y = now.getFullYear();
-        const m = now.getMonth() + 1;
-        const current = `${y}-${String(m).padStart(2, "0")}`;
-        const opts = [];
+        const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const options = [];
         for (let i = 0; i < 12; i++) {
-          const d = new Date(y, m - 1 - i, 1);
-          const yy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, "0");
-          const value = `${yy}-${mm}`;
-          opts.push({ label: value, value });
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          options.push({ label: value, value });
         }
-        this.monthOptions = opts;
+        this.monthOptions = options;
         this.monthValue = current;
-        this.monthIndex = Math.max(0, opts.findIndex((o) => o.value === current));
+        this.monthIndex = Math.max(0, options.findIndex((item) => item.value === current));
       },
-      handleMonthChange(e) {
-        const idx = Number(e && e.detail ? e.detail.value : 0);
-        const option = this.monthOptions && this.monthOptions[idx];
-        if (!option)
-          return;
-        this.monthIndex = idx;
-        this.monthValue = option.value;
-        this.currentPage = 1;
+      refreshPage() {
         this.loadWorkOrders();
         this.loadStats();
       },
+      handleMonthChange(e) {
+        var _a;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        const option = this.monthOptions[index];
+        if (!option)
+          return;
+        this.monthIndex = index;
+        this.monthValue = option.value;
+        this.currentPage = 1;
+        this.refreshPage();
+      },
+      handleSearch() {
+        this.currentPage = 1;
+        this.refreshPage();
+      },
+      handleResetFilters() {
+        this.repairIdFilter = "";
+        this.statusFilter = "";
+        this.currentPage = 1;
+        this.refreshPage();
+      },
+      handleStatusChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.statusFilter = ((_b = this.statusOptions[index]) == null ? void 0 : _b.value) || "";
+        this.currentPage = 1;
+        this.loadWorkOrders();
+      },
+      handleStatsClick(status) {
+        this.statusFilter = status;
+        this.currentPage = 1;
+        this.loadWorkOrders();
+      },
+      handlePageChange(delta) {
+        const nextPage = this.currentPage + delta;
+        if (nextPage < 1 || nextPage > this.totalPages)
+          return;
+        this.currentPage = nextPage;
+        this.loadWorkOrders();
+      },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50, 100];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 10;
+        this.currentPage = 1;
+        this.loadWorkOrders();
+      },
+      getListParams(extra = {}) {
+        return {
+          pageNum: extra.pageNum || this.currentPage,
+          pageSize: extra.pageSize || this.pageSize,
+          month: this.monthValue || void 0,
+          status: extra.status !== void 0 ? extra.status : this.statusFilter || void 0,
+          repairId: this.repairIdFilter || void 0
+        };
+      },
       async loadWorkOrders() {
+        var _a, _b;
         this.loading = true;
         try {
           const res = await request("/api/workorder/list", {
-            params: {
-              pageNum: this.currentPage,
-              pageSize: this.pageSize,
-              month: this.monthValue || void 0,
-              status: this.statusFilter || void 0
-            }
+            params: this.getListParams()
           }, "GET");
-          const data = res.data || res;
-          const list = data.records || [];
+          const data = (res == null ? void 0 : res.data) || res || {};
+          const list = data.records || ((_a = data.data) == null ? void 0 : _a.records) || [];
           this.workOrderList = list.slice().sort((a, b) => {
-            const diff = this.getPriorityRank(b.priority) - this.getPriorityRank(a.priority);
-            if (diff !== 0)
-              return diff;
+            const priorityDiff = this.getPriorityRank(b.priority) - this.getPriorityRank(a.priority);
+            if (priorityDiff !== 0)
+              return priorityDiff;
             return new Date(b.createTime || 0).getTime() - new Date(a.createTime || 0).getTime();
           });
-          this.total = data.total || 0;
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/work-order-manage.vue:288", "加载工单失败", e);
+          this.total = Number(data.total || ((_b = data.data) == null ? void 0 : _b.total) || this.workOrderList.length || 0);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/work-order-manage.vue:433", "加载工单失败", error);
+          this.workOrderList = [];
+          this.total = 0;
           uni.showToast({ title: "加载失败", icon: "none" });
         } finally {
           this.loading = false;
@@ -5215,121 +5469,127 @@ if (uni.restoreGlobal) {
           const res = await request("/api/user/inner/list/role", {
             params: { role: "worker" }
           }, "GET");
-          this.workerList = res.data || res || [];
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/work-order-manage.vue:301", "加载维修员失败", e);
+          const rawList = (res == null ? void 0 : res.data) || res || [];
+          const list = Array.isArray(rawList) ? rawList : rawList.records || rawList.data || [];
+          this.workerList = list.map((item) => ({
+            ...item,
+            displayName: `${item.name || item.username || "未命名"}${item.phone ? ` (${item.phone})` : ""}`
+          }));
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/work-order-manage.vue:454", "加载维修员失败", error);
+          this.workerList = [];
         }
       },
       async loadStats() {
-        const getTotalFromRes = (res) => {
+        const extractTotal = (res) => {
           var _a;
-          const d = res && (res.data || res);
-          return d && (d.total ?? ((_a = d.data) == null ? void 0 : _a.total)) || 0;
+          const data = (res == null ? void 0 : res.data) || res || {};
+          return Number(data.total || ((_a = data.data) == null ? void 0 : _a.total) || 0);
         };
+        const buildParams = (status) => ({
+          pageNum: 1,
+          pageSize: 1,
+          month: this.monthValue || void 0,
+          status: status || void 0,
+          repairId: this.repairIdFilter || void 0
+        });
         try {
-          const month = this.monthValue || void 0;
-          const totalReq = request("/api/workorder/list", { params: { pageNum: 1, pageSize: 1, month } }, "GET");
-          const pendingReq = request("/api/workorder/list", { params: { pageNum: 1, pageSize: 1, status: "PENDING", month } }, "GET");
-          const assignedReq = request("/api/workorder/list", { params: { pageNum: 1, pageSize: 1, status: "ASSIGNED", month } }, "GET");
-          const processingReq = request("/api/workorder/list", { params: { pageNum: 1, pageSize: 1, status: "PROCESSING", month } }, "GET");
-          const completedReq = request("/api/workorder/list", { params: { pageNum: 1, pageSize: 1, status: "COMPLETED", month } }, "GET");
           const [totalRes, pendingRes, assignedRes, processingRes, completedRes] = await Promise.all([
-            totalReq,
-            pendingReq,
-            assignedReq,
-            processingReq,
-            completedReq
+            request("/api/workorder/list", { params: buildParams("") }, "GET"),
+            request("/api/workorder/list", { params: buildParams("PENDING") }, "GET"),
+            request("/api/workorder/list", { params: buildParams("ASSIGNED") }, "GET"),
+            request("/api/workorder/list", { params: buildParams("PROCESSING") }, "GET"),
+            request("/api/workorder/list", { params: buildParams("COMPLETED") }, "GET")
           ]);
-          this.stats.total = getTotalFromRes(totalRes);
-          this.stats.pending = getTotalFromRes(pendingRes);
-          this.stats.assigned = getTotalFromRes(assignedRes);
-          this.stats.processing = getTotalFromRes(processingRes);
-          this.stats.completed = getTotalFromRes(completedRes);
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/work-order-manage.vue:331", "加载工单统计失败", e);
-          this.stats.total = this.total || this.stats.total || 0;
+          this.stats.total = extractTotal(totalRes);
+          this.stats.pending = extractTotal(pendingRes);
+          this.stats.assigned = extractTotal(assignedRes);
+          this.stats.processing = extractTotal(processingRes);
+          this.stats.completed = extractTotal(completedRes);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/work-order-manage.vue:487", "加载工单统计失败", error);
         }
-      },
-      handleStatusChange(e) {
-        this.statusFilter = this.statusOptions[e.detail.value].value;
-        this.currentPage = 1;
-        this.loadWorkOrders();
-      },
-      handleStatsClick(status) {
-        this.statusFilter = status;
-        this.currentPage = 1;
-        this.loadWorkOrders();
-      },
-      handlePageChange(delta) {
-        this.currentPage += delta;
-        this.loadWorkOrders();
       },
       getStatusText(status) {
         const map = {
-          "PENDING": "待指派",
-          "ASSIGNED": "已指派",
-          "PROCESSING": "处理中",
-          "COMPLETED": "已完成"
+          PENDING: "待指派",
+          ASSIGNED: "已指派",
+          PROCESSING: "处理中",
+          COMPLETED: "已完成"
         };
-        return map[status] || status;
+        return map[status] || status || "-";
       },
       getStatusClass(status) {
-        if (!status)
-          return "";
-        return "status-" + String(status).toLowerCase();
+        const map = {
+          PENDING: "status-pending",
+          ASSIGNED: "status-assigned",
+          PROCESSING: "status-processing",
+          COMPLETED: "status-completed"
+        };
+        return map[status] || "";
       },
       getPriorityText(priority) {
         const map = {
-          "LOW": "低",
-          "MEDIUM": "中",
-          "HIGH": "高",
-          "URGENT": "紧急",
-          "1": "低",
-          "2": "中",
-          "3": "高",
-          "4": "紧急"
+          LOW: "低",
+          MEDIUM: "中",
+          HIGH: "高",
+          URGENT: "紧急",
+          1: "低",
+          2: "中",
+          3: "高",
+          4: "紧急"
         };
-        return map[String(priority)] || priority;
+        return map[String(priority).toUpperCase()] || map[Number(priority)] || priority || "低";
       },
       getPriorityRank(priority) {
-        const str = String(priority).toUpperCase();
         const map = {
-          "LOW": 1,
-          "1": 1,
-          "MEDIUM": 2,
-          "2": 2,
-          "HIGH": 3,
-          "3": 3,
-          "URGENT": 4,
-          "4": 4
+          LOW: 1,
+          MEDIUM: 2,
+          HIGH: 3,
+          URGENT: 4,
+          1: 1,
+          2: 2,
+          3: 3,
+          4: 4
         };
-        return map[str] || 1;
+        return map[String(priority).toUpperCase()] || map[Number(priority)] || 1;
       },
       getPriorityClass(priority) {
-        if (!priority)
-          return "";
-        const priorityStr = String(priority).toUpperCase();
-        const classMap = {
-          "LOW": "priority-low",
-          "1": "priority-low",
-          "MEDIUM": "priority-medium",
-          "2": "priority-medium",
-          "HIGH": "priority-high",
-          "3": "priority-high",
-          "URGENT": "priority-urgent",
-          "4": "priority-urgent"
+        const map = {
+          LOW: "priority-low",
+          MEDIUM: "priority-medium",
+          HIGH: "priority-high",
+          URGENT: "priority-urgent",
+          1: "priority-low",
+          2: "priority-medium",
+          3: "priority-high",
+          4: "priority-urgent"
         };
-        return classMap[priorityStr] || "priority-" + priorityStr.toLowerCase();
+        return map[String(priority).toUpperCase()] || map[Number(priority)] || "priority-low";
+      },
+      getWorkerName(item) {
+        return item.workerName || item.assigneeName || "-";
+      },
+      getWorkerPhone(item) {
+        return item.workerPhone || item.assigneePhone || "-";
+      },
+      getLatestTime(item) {
+        return item.updateTime || item.completeTime || item.finishTime || item.processTime || item.assignTime || item.startTime || item.createTime || "";
       },
       formatTime(time) {
         if (!time)
           return "-";
         return new Date(time).toLocaleString();
       },
+      reuseRepairFilter(repairId) {
+        this.repairIdFilter = repairId ? String(repairId) : "";
+        this.currentPage = 1;
+        this.refreshPage();
+      },
       openAssignDialog(order) {
         this.currentOrder = order;
         this.selectedWorker = null;
-        this.assignPriority = Number(order && order.priority ? order.priority : 1);
+        this.assignPriority = Number((order == null ? void 0 : order.priority) || 1) || 1;
         this.showAssignDialog = true;
       },
       closeAssignDialog() {
@@ -5339,44 +5599,41 @@ if (uni.restoreGlobal) {
         this.assignPriority = 1;
       },
       handleWorkerSelect(e) {
-        this.selectedWorker = this.workerList[e.detail.value];
+        var _a;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.selectedWorker = this.workerList[index] || null;
       },
       handlePrioritySelect(e) {
-        const selected = this.priorityOptions[e.detail.value];
-        if (selected)
-          this.assignPriority = selected.value;
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.assignPriority = ((_b = this.priorityOptions[index]) == null ? void 0 : _b.value) || 1;
       },
       async handleAssignSubmit() {
+        if (!this.currentOrder)
+          return;
         if (!this.selectedWorker) {
           uni.showToast({ title: "请选择维修员", icon: "none" });
           return;
         }
         this.assigning = true;
-        const assignData = {
-          orderId: this.currentOrder.id,
-          workerId: this.selectedWorker.userId || this.selectedWorker.id,
-          // 优先取 userId
-          workerName: this.selectedWorker.name || this.selectedWorker.username,
-          workerPhone: this.selectedWorker.phone,
-          priority: this.assignPriority
-        };
-        formatAppLog("log", "at admin/pages/admin/work-order-manage.vue:441", "--- 开始指派工单 ---");
-        formatAppLog("log", "at admin/pages/admin/work-order-manage.vue:442", "指派参数:", assignData);
         try {
-          const res = await request("/api/workorder/admin/assign", {
-            data: assignData
+          await request("/api/workorder/admin/assign", {
+            data: {
+              orderId: this.currentOrder.id,
+              workerId: this.selectedWorker.userId || this.selectedWorker.id,
+              workerName: this.selectedWorker.name || this.selectedWorker.username,
+              workerPhone: this.selectedWorker.phone,
+              priority: this.assignPriority
+            }
           }, "POST");
-          formatAppLog("log", "at admin/pages/admin/work-order-manage.vue:449", "指派响应结果:", res);
           uni.showToast({ title: "指派成功", icon: "success" });
           this.closeAssignDialog();
-          this.loadWorkOrders();
-          this.loadStats();
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/work-order-manage.vue:455", "指派失败:", e);
+          this.refreshPage();
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/work-order-manage.vue:608", "指派失败:", error);
           uni.showToast({ title: "指派失败", icon: "none" });
         } finally {
           this.assigning = false;
-          formatAppLog("log", "at admin/pages/admin/work-order-manage.vue:459", "--- 指派操作结束 ---");
         }
       }
     }
@@ -5385,338 +5642,491 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[15] || (_cache[15] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[20] || (_cache[20] = ($event) => $data.showSidebar = $event),
       pageTitle: "工单管理",
-      currentPage: "/admin/pages/admin/work-order-manage"
+      currentPage: "/admin/pages/admin/work-order-manage",
+      pageBreadcrumb: "管理后台 / 工单管理",
+      showPageBanner: false
     }, {
-      default: vue.withCtx(() => {
-        var _a;
-        return [
-          vue.createElementVNode("view", { class: "manage-container" }, [
-            vue.createCommentVNode(" 统计卡片 "),
-            vue.createElementVNode("view", { class: "stats-card-container" }, [
-              vue.createElementVNode("view", {
-                class: "stats-card",
-                onClick: _cache[0] || (_cache[0] = ($event) => $options.handleStatsClick(""))
-              }, [
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "工单数据列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "延续统一后台表格页结构，聚焦指派、状态流转与维修人员信息。")
+            ]),
+            vue.createElementVNode("picker", {
+              mode: "selector",
+              range: $data.monthOptions,
+              "range-key": "label",
+              onChange: _cache[0] || (_cache[0] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
+            }, [
+              vue.createElementVNode("view", { class: "month-filter-chip" }, [
+                vue.createElementVNode("text", { class: "month-filter-label" }, "统计月份"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "month-filter-value" },
+                  vue.toDisplayString($options.currentMonthLabel),
+                  1
+                  /* TEXT */
+                )
+              ])
+            ], 40, ["range"])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.statusFilter === "" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick(""))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "全部工单"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.total),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "总工单数")
-              ]),
-              vue.createElementVNode("view", {
-                class: "stats-card status-pending",
-                onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick("PENDING"))
-              }, [
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card pending", { active: $data.statusFilter === "PENDING" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("PENDING"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "待指派"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.pending),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "待指派")
-              ]),
-              vue.createElementVNode("view", {
-                class: "stats-card status-assigned",
-                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("ASSIGNED"))
-              }, [
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card assigned", { active: $data.statusFilter === "ASSIGNED" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.handleStatsClick("ASSIGNED"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已指派"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.assigned),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "已指派")
-              ]),
-              vue.createElementVNode("view", {
-                class: "stats-card status-processing",
-                onClick: _cache[3] || (_cache[3] = ($event) => $options.handleStatsClick("PROCESSING"))
-              }, [
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card processing", { active: $data.statusFilter === "PROCESSING" }]),
+                onClick: _cache[4] || (_cache[4] = ($event) => $options.handleStatsClick("PROCESSING"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "处理中"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.processing),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "处理中")
-              ])
-            ]),
-            vue.createElementVNode("view", { class: "stats-filter" }, [
-              vue.createElementVNode("picker", {
-                mode: "selector",
-                range: $data.monthOptions,
-                "range-key": "label",
-                onChange: _cache[4] || (_cache[4] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
-              }, [
-                vue.createElementVNode("view", { class: "stats-filter-btn" }, [
-                  vue.createElementVNode(
-                    "text",
-                    { class: "stats-filter-text" },
-                    vue.toDisplayString($options.currentMonthLabel),
-                    1
-                    /* TEXT */
-                  ),
-                  vue.createElementVNode("text", { class: "stats-filter-arrow" }, "▼")
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关联报修ID"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => $data.repairIdFilter = $event),
+                    class: "query-input",
+                    type: "text",
+                    placeholder: "输入 repairId 进行筛选",
+                    onConfirm: _cache[6] || (_cache[6] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+                  },
+                  null,
+                  544
+                  /* NEED_HYDRATION, NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.repairIdFilter]
                 ])
-              ], 40, ["range"])
-            ]),
-            vue.createCommentVNode(" 筛选栏 "),
-            vue.createElementVNode("view", { class: "search-filter-bar" }, [
-              vue.createElementVNode("view", { class: "filter-row" }, [
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "工单状态"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: $data.statusOptions,
                   "range-key": "label",
-                  value: $data.statusOptions.findIndex((opt) => opt.value === $data.statusFilter),
-                  onChange: _cache[5] || (_cache[5] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args)),
-                  class: "filter-picker"
+                  value: $options.statusPickerIndex,
+                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
                 }, [
-                  vue.createElementVNode(
-                    "view",
-                    { class: "filter-picker-text" },
-                    vue.toDisplayString(((_a = $data.statusOptions.find((opt) => opt.value === $data.statusFilter)) == null ? void 0 : _a.label) || "全部状态"),
-                    1
-                    /* TEXT */
-                  )
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
                 ], 40, ["range", "value"])
               ])
             ]),
-            vue.createCommentVNode(" 工单列表 "),
-            $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 0,
-              class: "loading-state"
-            }, [
-              vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-            ])) : (vue.openBlock(), vue.createElementBlock("view", {
-              key: 1,
-              class: "list-container"
-            }, [
-              (vue.openBlock(true), vue.createElementBlock(
-                vue.Fragment,
-                null,
-                vue.renderList($data.workOrderList, (item) => {
-                  return vue.openBlock(), vue.createElementBlock("view", {
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              $data.repairIdFilter ? (vue.openBlock(), vue.createElementBlock(
+                "text",
+                {
+                  key: 0,
+                  class: "toolbar-meta active"
+                },
+                "当前报修ID: " + vue.toDisplayString($data.repairIdFilter),
+                1
+                /* TEXT */
+              )) : vue.createCommentVNode("v-if", true)
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "待指派 " + vue.toDisplayString($data.stats.pending) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "已完成 " + vue.toDisplayString($data.stats.completed) + " 条",
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "table-head" }, [
+              vue.createElementVNode("text", { class: "table-col col-order" }, "工单号"),
+              vue.createElementVNode("text", { class: "table-col col-repair" }, "关联报修"),
+              vue.createElementVNode("text", { class: "table-col col-priority" }, "优先级"),
+              vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+              vue.createElementVNode("text", { class: "table-col col-worker" }, "维修人员"),
+              vue.createElementVNode("text", { class: "table-col col-phone" }, "联系电话"),
+              vue.createElementVNode("text", { class: "table-col col-create" }, "创建时间"),
+              vue.createElementVNode("text", { class: "table-col col-update" }, "最近时间"),
+              vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+            ]),
+            (vue.openBlock(true), vue.createElementBlock(
+              vue.Fragment,
+              null,
+              vue.renderList($data.workOrderList, (item, index) => {
+                return vue.openBlock(), vue.createElementBlock(
+                  "view",
+                  {
                     key: item.id,
-                    class: "order-item"
-                  }, [
-                    vue.createElementVNode("view", { class: "order-header" }, [
+                    class: "table-row",
+                    style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                  },
+                  [
+                    vue.createElementVNode("view", { class: "table-col col-order" }, [
                       vue.createElementVNode(
                         "text",
-                        { class: "order-no" },
-                        "工单号: " + vue.toDisplayString(item.orderNo || item.id),
+                        { class: "primary-text" },
+                        vue.toDisplayString(item.orderNo || item.id || "-"),
                         1
                         /* TEXT */
-                      ),
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-repair" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        "#" + vue.toDisplayString(item.repairId || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-priority" }, [
                       vue.createElementVNode(
                         "text",
                         {
-                          class: vue.normalizeClass(["status-badge", $options.getStatusClass(item.status)])
+                          class: vue.normalizeClass(["priority-pill", $options.getPriorityClass(item.priority)])
+                        },
+                        vue.toDisplayString($options.getPriorityText(item.priority)),
+                        3
+                        /* TEXT, CLASS */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-status" }, [
+                      vue.createElementVNode(
+                        "text",
+                        {
+                          class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
                         },
                         vue.toDisplayString($options.getStatusText(item.status)),
                         3
                         /* TEXT, CLASS */
                       )
                     ]),
-                    vue.createElementVNode("view", { class: "order-body" }, [
-                      vue.createElementVNode("view", { class: "info-row" }, [
-                        vue.createElementVNode("text", { class: "label" }, "关联报修ID:"),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "value" },
-                          vue.toDisplayString(item.repairId),
-                          1
-                          /* TEXT */
-                        )
-                      ]),
-                      vue.createElementVNode("view", { class: "info-row" }, [
-                        vue.createElementVNode("text", { class: "label" }, "优先级:"),
-                        vue.createElementVNode(
-                          "text",
-                          {
-                            class: vue.normalizeClass(["value", $options.getPriorityClass(item.priority)])
-                          },
-                          vue.toDisplayString($options.getPriorityText(item.priority)),
-                          3
-                          /* TEXT, CLASS */
-                        )
-                      ]),
-                      item.workerName ? (vue.openBlock(), vue.createElementBlock("view", {
-                        key: 0,
-                        class: "info-row"
-                      }, [
-                        vue.createElementVNode("text", { class: "label" }, "维修员:"),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "value" },
-                          vue.toDisplayString(item.workerName) + " (" + vue.toDisplayString(item.workerPhone) + ")",
-                          1
-                          /* TEXT */
-                        )
-                      ])) : vue.createCommentVNode("v-if", true),
-                      vue.createElementVNode("view", { class: "info-row" }, [
-                        vue.createElementVNode("text", { class: "label" }, "创建时间:"),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "value" },
-                          vue.toDisplayString($options.formatTime(item.createTime)),
-                          1
-                          /* TEXT */
-                        )
-                      ])
+                    vue.createElementVNode("view", { class: "table-col col-worker" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString($options.getWorkerName(item)),
+                        1
+                        /* TEXT */
+                      )
                     ]),
-                    item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("view", {
-                      key: 0,
-                      class: "order-footer"
-                    }, [
-                      vue.createElementVNode("button", {
-                        class: "btn-assign",
+                    vue.createElementVNode("view", { class: "table-col col-phone" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString($options.getWorkerPhone(item)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-create" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString($options.formatTime(item.createTime)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-update" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString($options.formatTime($options.getLatestTime(item))),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                      item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 0,
+                        class: "row-btn primary",
                         onClick: ($event) => $options.openAssignDialog(item)
-                      }, "指派维修员", 8, ["onClick"])
-                    ])) : vue.createCommentVNode("v-if", true)
-                  ]);
-                }),
-                128
-                /* KEYED_FRAGMENT */
-              )),
-              $data.workOrderList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 0,
-                class: "empty-state"
-              }, [
-                vue.createElementVNode("text", null, "暂无工单数据")
-              ])) : vue.createCommentVNode("v-if", true)
-            ])),
-            vue.createCommentVNode(" 分页 "),
-            $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 2,
-              class: "pagination"
+                      }, "指派维修员", 8, ["onClick"])) : (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 1,
+                        class: "row-btn ghost",
+                        onClick: ($event) => $options.reuseRepairFilter(item.repairId)
+                      }, "查看同报修", 8, ["onClick"]))
+                    ])
+                  ],
+                  4
+                  /* STYLE */
+                );
+              }),
+              128
+              /* KEYED_FRAGMENT */
+            )),
+            $data.workOrderList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "empty-state"
             }, [
+              vue.createElementVNode("text", null, "暂无工单数据")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === 1,
-                onClick: _cache[6] || (_cache[6] = ($event) => $options.handlePageChange(-1))
+                onClick: _cache[10] || (_cache[10] = ($event) => $options.handlePageChange(-1))
               }, "上一页", 8, ["disabled"]),
-              vue.createElementVNode(
-                "text",
-                { class: "page-info" },
-                vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPages),
-                1
-                /* TEXT */
-              ),
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === $options.totalPages,
-                onClick: _cache[7] || (_cache[7] = ($event) => $options.handlePageChange(1))
-              }, "下一页", 8, ["disabled"])
-            ])) : vue.createCommentVNode("v-if", true)
-          ]),
-          vue.createCommentVNode(" 指派维修员弹窗 "),
-          $data.showAssignDialog ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 0,
-            class: "modal-mask",
-            onClick: _cache[14] || (_cache[14] = (...args) => $options.closeAssignDialog && $options.closeAssignDialog(...args))
-          }, [
-            vue.createElementVNode("view", {
-              class: "modal-content",
-              onClick: _cache[13] || (_cache[13] = vue.withModifiers(() => {
-              }, ["stop"]))
-            }, [
-              vue.createElementVNode("view", { class: "modal-header" }, [
-                vue.createElementVNode("text", { class: "modal-title" }, "指派维修任务"),
-                vue.createElementVNode("text", {
-                  class: "modal-close",
-                  onClick: _cache[8] || (_cache[8] = (...args) => $options.closeAssignDialog && $options.closeAssignDialog(...args))
-                }, "×")
-              ]),
-              vue.createElementVNode("view", { class: "modal-body" }, [
-                vue.createElementVNode("view", { class: "order-brief" }, [
-                  vue.createElementVNode("text", { class: "brief-label" }, "待指派工单："),
+                onClick: _cache[11] || (_cache[11] = ($event) => $options.handlePageChange(1))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: [10, 20, 50, 100],
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[12] || (_cache[12] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
                   vue.createElementVNode(
                     "text",
-                    { class: "brief-value" },
-                    vue.toDisplayString($data.currentOrder ? $data.currentOrder.orderNo || $data.currentOrder.id : "-"),
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.pageSize) + " 条",
                     1
                     /* TEXT */
                   )
-                ]),
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "form-label" }, "选择维修人员"),
+                ], 40, ["value"])
+              ])
+            ])
+          ])) : vue.createCommentVNode("v-if", true)
+        ]),
+        $data.showAssignDialog ? (vue.openBlock(), vue.createElementBlock("view", {
+          key: 0,
+          class: "detail-modal",
+          onClick: _cache[19] || (_cache[19] = (...args) => $options.closeAssignDialog && $options.closeAssignDialog(...args))
+        }, [
+          vue.createElementVNode("view", {
+            class: "detail-content",
+            onClick: _cache[18] || (_cache[18] = vue.withModifiers(() => {
+            }, ["stop"]))
+          }, [
+            vue.createElementVNode("view", { class: "detail-header" }, [
+              vue.createElementVNode("text", { class: "detail-title" }, "指派维修任务"),
+              vue.createElementVNode("button", {
+                class: "close-btn",
+                onClick: _cache[13] || (_cache[13] = (...args) => $options.closeAssignDialog && $options.closeAssignDialog(...args))
+              }, "关闭")
+            ]),
+            vue.createElementVNode("view", { class: "detail-body" }, [
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "工单号:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value" },
+                  vue.toDisplayString($data.currentOrder ? $data.currentOrder.orderNo || $data.currentOrder.id : "-"),
+                  1
+                  /* TEXT */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "关联报修:"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "detail-value" },
+                  "#" + vue.toDisplayString($data.currentOrder && $data.currentOrder.repairId ? $data.currentOrder.repairId : "-"),
+                  1
+                  /* TEXT */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "维修人员:"),
+                vue.createElementVNode("view", { class: "detail-picker-wrap" }, [
                   vue.createElementVNode("picker", {
                     mode: "selector",
                     range: $data.workerList,
-                    "range-key": "name",
-                    onChange: _cache[9] || (_cache[9] = (...args) => $options.handleWorkerSelect && $options.handleWorkerSelect(...args)),
-                    class: "form-picker"
+                    "range-key": "displayName",
+                    onChange: _cache[14] || (_cache[14] = (...args) => $options.handleWorkerSelect && $options.handleWorkerSelect(...args))
                   }, [
-                    vue.createElementVNode("view", { class: "picker-content" }, [
+                    vue.createElementVNode("view", { class: "detail-picker" }, [
                       $data.selectedWorker ? (vue.openBlock(), vue.createElementBlock(
                         "text",
                         {
                           key: 0,
-                          class: "picker-value"
+                          class: "detail-picker-text"
                         },
-                        vue.toDisplayString($data.selectedWorker.name) + " (" + vue.toDisplayString($data.selectedWorker.phone) + ") ",
+                        vue.toDisplayString($data.selectedWorker.displayName),
                         1
                         /* TEXT */
                       )) : (vue.openBlock(), vue.createElementBlock("text", {
                         key: 1,
-                        class: "picker-placeholder"
-                      }, "请点击选择维修员")),
-                      vue.createElementVNode("text", { class: "picker-arrow" }, "▼")
+                        class: "detail-picker-placeholder"
+                      }, "请选择维修员"))
                     ])
                   ], 40, ["range"])
-                ]),
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "form-label" }, "设置优先级"),
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "detail-item" }, [
+                vue.createElementVNode("text", { class: "detail-label" }, "优先级:"),
+                vue.createElementVNode("view", { class: "detail-picker-wrap" }, [
                   vue.createElementVNode("picker", {
                     mode: "selector",
                     range: $data.priorityOptions,
                     "range-key": "label",
-                    value: $data.priorityOptions.findIndex((opt) => opt.value === $data.assignPriority),
-                    onChange: _cache[10] || (_cache[10] = (...args) => $options.handlePrioritySelect && $options.handlePrioritySelect(...args)),
-                    class: "form-picker"
+                    value: $options.priorityPickerIndex,
+                    onChange: _cache[15] || (_cache[15] = (...args) => $options.handlePrioritySelect && $options.handlePrioritySelect(...args))
                   }, [
-                    vue.createElementVNode("view", { class: "picker-content" }, [
+                    vue.createElementVNode("view", { class: "detail-picker" }, [
                       vue.createElementVNode(
                         "text",
-                        { class: "picker-value" },
+                        { class: "detail-picker-text" },
                         vue.toDisplayString($options.getPriorityText($data.assignPriority)),
                         1
                         /* TEXT */
-                      ),
-                      vue.createElementVNode("text", { class: "picker-arrow" }, "▼")
+                      )
                     ])
                   ], 40, ["range", "value"])
-                ]),
-                !$data.workerList.length ? (vue.openBlock(), vue.createElementBlock("view", {
-                  key: 0,
-                  class: "form-tip"
-                }, [
-                  vue.createElementVNode("text", null, "暂无可用维修人员数据")
-                ])) : vue.createCommentVNode("v-if", true)
+                ])
               ]),
-              vue.createElementVNode("view", { class: "modal-footer" }, [
+              !$data.workerList.length ? (vue.openBlock(), vue.createElementBlock("view", {
+                key: 0,
+                class: "form-tip"
+              }, [
+                vue.createElementVNode("text", null, "暂无可用维修人员数据")
+              ])) : vue.createCommentVNode("v-if", true),
+              vue.createElementVNode("view", { class: "detail-actions" }, [
                 vue.createElementVNode("button", {
-                  class: "btn-cancel",
-                  onClick: _cache[11] || (_cache[11] = (...args) => $options.closeAssignDialog && $options.closeAssignDialog(...args))
+                  class: "detail-btn secondary",
+                  onClick: _cache[16] || (_cache[16] = (...args) => $options.closeAssignDialog && $options.closeAssignDialog(...args))
                 }, "取消"),
                 vue.createElementVNode("button", {
-                  class: "btn-confirm",
-                  onClick: _cache[12] || (_cache[12] = (...args) => $options.handleAssignSubmit && $options.handleAssignSubmit(...args)),
+                  class: "detail-btn primary",
+                  onClick: _cache[17] || (_cache[17] = (...args) => $options.handleAssignSubmit && $options.handleAssignSubmit(...args)),
                   loading: $data.assigning,
                   disabled: !$data.selectedWorker
                 }, " 确认指派 ", 8, ["loading", "disabled"])
               ])
             ])
-          ])) : vue.createCommentVNode("v-if", true)
-        ];
-      }),
+          ])
+        ])) : vue.createCommentVNode("v-if", true)
+      ]),
       _: 1
       /* STABLE */
     }, 8, ["showSidebar"]);
@@ -5730,29 +6140,27 @@ if (uni.restoreGlobal) {
     components: { adminSidebar },
     data() {
       return {
-        showSidebar: false,
         userInfo: {},
         stats: [
-          { label: "小区总数", value: "-", icon: "🏢", bg: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
-          { label: "住户总数", value: "-", icon: "👥", bg: "linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)" },
-          { label: "待办事项", value: "-", icon: "📝", bg: "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)" },
-          { label: "今日报修", value: "-", icon: "🔧", bg: "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)" }
+          { label: "小区总数", value: "-", icon: "▦", bg: "linear-gradient(135deg, #5e78a2 0%, #7991b2 100%)" },
+          { label: "住户总数", value: "-", icon: "☺", bg: "linear-gradient(135deg, #7da4b8 0%, #92bac8 100%)" },
+          { label: "待办事项", value: "-", icon: "≣", bg: "linear-gradient(135deg, #6a7fa3 0%, #88a0c0 100%)" },
+          { label: "今日报修", value: "-", icon: "⌘", bg: "linear-gradient(135deg, #7ab38a 0%, #9cc3a4 100%)" }
         ],
         menus: [
-          { name: "仪表盘", icon: "📊", color: "#4facfe", path: "/admin/pages/admin/dashboard/index" },
-          { name: "报修管理", icon: "🛠️", color: "#a18cd1", path: "/admin/pages/admin/repair-manage", badgeKey: "repair" },
-          { name: "工单管理", icon: "📋", color: "#667eea", path: "/admin/pages/admin/work-order-manage", badgeKey: "workorder" },
-          { name: "公告管理", icon: "📢", color: "#ff9a9e", path: "/admin/pages/admin/notice-manage" },
-          { name: "费用管理", icon: "�", color: "#f6d365", path: "/admin/pages/admin/fee-manage" },
-          { name: "投诉处理", icon: "�️", color: "#fda085", path: "/admin/pages/admin/complaint-manage", badgeKey: "complaint" },
-          { name: "访客审核", icon: "�️", color: "#84fab0", path: "/admin/pages/admin/visitor-manage", badgeKey: "visitor" },
-          { name: "社区活动", icon: "🎉", color: "#ffecd2", path: "/admin/pages/admin/activity-manage" },
-          { name: "停车管理", icon: "🚗", color: "#00f2fe", path: "/admin/pages/admin/parking-manage" },
-          { name: "用户管理", icon: "�", color: "#a8e6cf", path: "/admin/pages/admin/user-manage" },
-          { name: "系统配置", icon: "⚙️", color: "#b8c6ff", path: "/admin/pages/admin/system-config" }
+          { name: "仪表盘", icon: "◫", color: "linear-gradient(135deg, #617ca4 0%, #7f97b6 100%)", path: "/admin/pages/admin/dashboard/index" },
+          { name: "报修管理", icon: "⌂", color: "linear-gradient(135deg, #6f86a8 0%, #8fa1bf 100%)", path: "/admin/pages/admin/repair-manage", badgeKey: "repair" },
+          { name: "工单管理", icon: "▣", color: "linear-gradient(135deg, #607099 0%, #7c8db0 100%)", path: "/admin/pages/admin/work-order-manage", badgeKey: "workorder" },
+          { name: "公告管理", icon: "✉", color: "linear-gradient(135deg, #8ea0b7 0%, #a7b6c9 100%)", path: "/admin/pages/admin/notice-manage" },
+          { name: "费用管理", icon: "¥", color: "linear-gradient(135deg, #c0a57b 0%, #d6b98f 100%)", path: "/admin/pages/admin/fee-manage" },
+          { name: "投诉处理", icon: "☏", color: "linear-gradient(135deg, #a98578 0%, #c29e90 100%)", path: "/admin/pages/admin/complaint-manage", badgeKey: "complaint" },
+          { name: "访客审核", icon: "◉", color: "linear-gradient(135deg, #7fa494 0%, #95b7a9 100%)", path: "/admin/pages/admin/visitor-manage", badgeKey: "visitor" },
+          { name: "社区活动", icon: "✦", color: "linear-gradient(135deg, #8c96b5 0%, #adb4cb 100%)", path: "/admin/pages/admin/activity-manage" },
+          { name: "停车管理", icon: "▤", color: "linear-gradient(135deg, #7ea0ae 0%, #97b7c4 100%)", path: "/admin/pages/admin/parking-manage" },
+          { name: "用户管理", icon: "☺", color: "linear-gradient(135deg, #86a18e 0%, #a1b9aa 100%)", path: "/admin/pages/admin/user-manage" },
+          { name: "系统配置", icon: "⚙", color: "linear-gradient(135deg, #8d95a6 0%, #a5adbd 100%)", path: "/admin/pages/admin/system-config" }
         ],
         menuBadges: {},
-        // 图表数据
         repairTrend: [],
         complaintType: [],
         workOrderStats: [],
@@ -5833,7 +6241,7 @@ if (uni.restoreGlobal) {
             };
           }
         } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/dashboard/index.vue:202", "加载统计失败", e);
+          formatAppLog("error", "at admin/pages/admin/dashboard/index.vue:199", "加载统计失败", e);
         }
       },
       async loadDashboardData() {
@@ -5867,35 +6275,35 @@ if (uni.restoreGlobal) {
             for (let i = 6; i >= 0; i--) {
               const d = new Date(today);
               d.setDate(today.getDate() - i);
-              const m = (d.getMonth() + 1).toString().padStart(2, "0");
-              const day = d.getDate().toString().padStart(2, "0");
+              const m = String(d.getMonth() + 1).padStart(2, "0");
+              const day = String(d.getDate()).padStart(2, "0");
               dates.push(`${m}-${day}`);
             }
             this.repairTrend = dates.map((d) => ({ date: d, count: 0 }));
           }
           if (data.complaintType && data.complaintType.length > 0) {
             const typeMap = {
-              "noise": "噪音扰民",
-              "environment": "环境卫生",
-              "env": "环境卫生",
-              "sanitation": "环境卫生",
-              "facility": "设施损坏",
-              "repair": "设施损坏",
-              "security": "安保问题",
-              "safety": "安保问题",
-              "other": "其他"
+              noise: "噪音扰民",
+              environment: "环境卫生",
+              env: "环境卫生",
+              sanitation: "环境卫生",
+              facility: "设施损坏",
+              repair: "设施损坏",
+              security: "安保问题",
+              safety: "安保问题",
+              other: "其他"
             };
             this.complaintType = data.complaintType.map((item) => ({
               ...item,
-              name: typeMap[item.name.toLowerCase()] || item.name
+              name: typeMap[(item.name || "").toLowerCase()] || item.name
             }));
           } else {
             this.complaintType = [
-              { name: "暂无数据", value: 0, itemStyle: { color: "#e0e0e0" } }
+              { name: "暂无数据", value: 0, itemStyle: { color: "#c7ccd5" } }
             ];
           }
         } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/dashboard/index.vue:283", "加载看板数据失败", e);
+          formatAppLog("error", "at admin/pages/admin/dashboard/index.vue:274", "加载看板数据失败", e);
         }
       },
       navigateTo(url) {
@@ -5905,56 +6313,28 @@ if (uni.restoreGlobal) {
         if (!menu || !menu.badgeKey)
           return 0;
         return Number(this.menuBadges[menu.badgeKey] || 0);
-      },
-      handleLogout() {
-        uni.showModal({
-          title: "提示",
-          content: "确定要退出登录吗？",
-          success: (res) => {
-            if (res.confirm) {
-              uni.clearStorageSync();
-              uni.reLaunch({ url: "/owner/pages/login/login" });
-            }
-          }
-        });
       }
     }
   };
   function _sfc_render$n(_ctx, _cache, $props, $setup, $data, $options) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
-      showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[2] || (_cache[2] = ($event) => $data.showSidebar = $event),
       pageTitle: "仪表盘",
-      currentPage: "/admin/pages/admin/dashboard/index"
+      currentPage: "/admin/pages/admin/dashboard/index",
+      pageBreadcrumb: "管理后台 / 仪表盘"
     }, {
       default: vue.withCtx(() => [
         vue.createElementVNode("view", { class: "dashboard" }, [
-          vue.createCommentVNode(" 顶部欢迎区 "),
-          vue.createElementVNode("view", { class: "welcome-card" }, [
-            vue.createElementVNode("view", { class: "welcome-text" }, [
-              vue.createElementVNode(
-                "text",
-                { class: "greeting" },
-                "你好，" + vue.toDisplayString($data.userInfo.name || $data.userInfo.username || "管理员"),
-                1
-                /* TEXT */
-              ),
-              vue.createElementVNode("text", { class: "role-badge" }, "系统管理员")
+          vue.createElementVNode("view", { class: "dashboard-topbar" }, [
+            vue.createElementVNode("view", { class: "dashboard-title-group" }, [
+              vue.createElementVNode("text", { class: "dashboard-title" }, "清晰、明亮、高效"),
+              vue.createElementVNode("text", { class: "dashboard-subtitle" }, "更清爽的社区后台控制台，优先强化卡片边框、层级和可读性。")
             ]),
-            vue.createElementVNode("view", {
-              class: "logout-btn",
-              onClick: _cache[0] || (_cache[0] = (...args) => $options.handleLogout && $options.handleLogout(...args))
-            }, [
-              vue.createElementVNode("text", null, "退出登录")
-            ])
-          ]),
-          vue.createElementVNode("view", { class: "stats-filter" }, [
             vue.createElementVNode("picker", {
               mode: "selector",
               range: $data.monthOptions,
               "range-key": "label",
-              onChange: _cache[1] || (_cache[1] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
+              onChange: _cache[0] || (_cache[0] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
             }, [
               vue.createElementVNode("view", { class: "stats-filter-btn" }, [
                 vue.createElementVNode(
@@ -5968,26 +6348,46 @@ if (uni.restoreGlobal) {
               ])
             ], 40, ["range"])
           ]),
-          vue.createCommentVNode(" 数据概览 "),
-          vue.createElementVNode("view", { class: "stats-grid" }, [
-            (vue.openBlock(true), vue.createElementBlock(
-              vue.Fragment,
-              null,
-              vue.renderList($data.stats, (item, index) => {
-                return vue.openBlock(), vue.createElementBlock(
-                  "view",
-                  {
+          vue.createElementVNode("view", { class: "panel-card stats-panel" }, [
+            vue.createElementVNode("view", { class: "panel-header" }, [
+              vue.createElementVNode("text", { class: "panel-title" }, "核心指标")
+            ]),
+            vue.createElementVNode("view", { class: "stats-grid" }, [
+              (vue.openBlock(true), vue.createElementBlock(
+                vue.Fragment,
+                null,
+                vue.renderList($data.stats, (item, index) => {
+                  return vue.openBlock(), vue.createElementBlock("view", {
                     class: "stat-card",
-                    key: index,
-                    style: vue.normalizeStyle({ background: item.bg })
-                  },
-                  [
+                    key: index
+                  }, [
                     vue.createElementVNode(
                       "view",
-                      { class: "stat-icon" },
-                      vue.toDisplayString(item.icon),
-                      1
-                      /* TEXT */
+                      {
+                        class: "stat-accent",
+                        style: vue.normalizeStyle({ background: item.bg })
+                      },
+                      null,
+                      4
+                      /* STYLE */
+                    ),
+                    vue.createElementVNode(
+                      "view",
+                      {
+                        class: "stat-icon-wrap",
+                        style: vue.normalizeStyle({ background: item.bg })
+                      },
+                      [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "stat-icon" },
+                          vue.toDisplayString(item.icon),
+                          1
+                          /* TEXT */
+                        )
+                      ],
+                      4
+                      /* STYLE */
                     ),
                     vue.createElementVNode("view", { class: "stat-info" }, [
                       vue.createElementVNode(
@@ -6005,64 +6405,65 @@ if (uni.restoreGlobal) {
                         /* TEXT */
                       )
                     ])
-                  ],
-                  4
-                  /* STYLE */
-                );
-              }),
-              128
-              /* KEYED_FRAGMENT */
-            ))
-          ]),
-          vue.createCommentVNode(" 图表区域 "),
-          vue.createElementVNode("view", { class: "charts-section" }, [
-            vue.createElementVNode("text", { class: "section-title" }, "数据分析"),
-            vue.createElementVNode("view", { class: "charts-container" }, [
-              vue.createCommentVNode(" 报修趋势图 "),
-              vue.createElementVNode("view", { class: "chart-box" }, [
-                vue.createElementVNode("view", { class: "chart-title" }, "近七日报修趋势"),
-                vue.createElementVNode("view", {
-                  id: "repairChart",
-                  class: "echart-container",
-                  prop: vue.wp($data.repairTrend),
-                  "change:prop": _ctx.echarts.updateRepairChart
-                }, null, 8, ["prop", "change:prop"])
-              ]),
-              vue.createCommentVNode(" 投诉分布图 "),
-              vue.createElementVNode("view", { class: "chart-box" }, [
-                vue.createElementVNode("view", { class: "chart-title" }, "投诉类型分布"),
-                vue.createElementVNode("view", {
-                  id: "complaintChart",
-                  class: "echart-container",
-                  prop: vue.wp($data.complaintType),
-                  "change:prop": _ctx.echarts.updateComplaintChart
-                }, null, 8, ["prop", "change:prop"])
-              ]),
-              vue.createCommentVNode(" 新增：工单状态占比 "),
-              vue.createElementVNode("view", { class: "chart-box full-width" }, [
-                vue.createElementVNode("view", { class: "chart-title" }, "工单处理状态"),
-                vue.createElementVNode("view", {
-                  id: "workOrderChart",
-                  class: "echart-container",
-                  prop: vue.wp($data.workOrderStats),
-                  "change:prop": _ctx.echarts.updateWorkOrderChart
-                }, null, 8, ["prop", "change:prop"])
-              ]),
-              vue.createCommentVNode(" 新增：报修与工单对比 "),
-              vue.createElementVNode("view", { class: "chart-box full-width" }, [
-                vue.createElementVNode("view", { class: "chart-title" }, "报修转工单对比"),
-                vue.createElementVNode("view", {
-                  id: "compareChart",
-                  class: "echart-container",
-                  prop: vue.wp($data.compareStats),
-                  "change:prop": _ctx.echarts.updateCompareChart
-                }, null, 8, ["prop", "change:prop"])
-              ])
+                  ]);
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
             ])
           ]),
-          vue.createCommentVNode(" 功能菜单 "),
-          vue.createElementVNode("view", { class: "menu-section" }, [
-            vue.createElementVNode("text", { class: "section-title" }, "常用功能"),
+          vue.createElementVNode("view", { class: "chart-grid" }, [
+            vue.createElementVNode("view", { class: "panel-card chart-panel" }, [
+              vue.createElementVNode("view", { class: "panel-header" }, [
+                vue.createElementVNode("text", { class: "panel-title" }, "近七日报修趋势")
+              ]),
+              vue.createElementVNode("view", {
+                id: "repairChart",
+                class: "echart-container",
+                prop: vue.wp($data.repairTrend),
+                "change:prop": _ctx.echarts.updateRepairChart
+              }, null, 8, ["prop", "change:prop"])
+            ]),
+            vue.createElementVNode("view", { class: "panel-card chart-panel" }, [
+              vue.createElementVNode("view", { class: "panel-header" }, [
+                vue.createElementVNode("text", { class: "panel-title" }, "投诉类型分布")
+              ]),
+              vue.createElementVNode("view", {
+                id: "complaintChart",
+                class: "echart-container",
+                prop: vue.wp($data.complaintType),
+                "change:prop": _ctx.echarts.updateComplaintChart
+              }, null, 8, ["prop", "change:prop"])
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "chart-grid" }, [
+            vue.createElementVNode("view", { class: "panel-card chart-panel" }, [
+              vue.createElementVNode("view", { class: "panel-header" }, [
+                vue.createElementVNode("text", { class: "panel-title" }, "工单处理状态")
+              ]),
+              vue.createElementVNode("view", {
+                id: "workOrderChart",
+                class: "echart-container",
+                prop: vue.wp($data.workOrderStats),
+                "change:prop": _ctx.echarts.updateWorkOrderChart
+              }, null, 8, ["prop", "change:prop"])
+            ]),
+            vue.createElementVNode("view", { class: "panel-card chart-panel" }, [
+              vue.createElementVNode("view", { class: "panel-header" }, [
+                vue.createElementVNode("text", { class: "panel-title" }, "报修与工单对比")
+              ]),
+              vue.createElementVNode("view", {
+                id: "compareChart",
+                class: "echart-container",
+                prop: vue.wp($data.compareStats),
+                "change:prop": _ctx.echarts.updateCompareChart
+              }, null, 8, ["prop", "change:prop"])
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "panel-card menu-panel" }, [
+            vue.createElementVNode("view", { class: "panel-header" }, [
+              vue.createElementVNode("text", { class: "panel-title" }, "快捷入口")
+            ]),
             vue.createElementVNode("view", { class: "menu-grid" }, [
               (vue.openBlock(true), vue.createElementBlock(
                 vue.Fragment,
@@ -6080,8 +6481,10 @@ if (uni.restoreGlobal) {
                         style: vue.normalizeStyle({ background: menu.color })
                       },
                       [
-                        vue.createTextVNode(
-                          vue.toDisplayString(menu.icon) + " ",
+                        vue.createElementVNode(
+                          "text",
+                          { class: "menu-icon-text" },
+                          vue.toDisplayString(menu.icon),
                           1
                           /* TEXT */
                         ),
@@ -6111,7 +6514,7 @@ if (uni.restoreGlobal) {
       ]),
       _: 1
       /* STABLE */
-    }, 8, ["showSidebar"]);
+    });
   }
   if (typeof block0 === "function")
     block0(_sfc_main$o);
@@ -6132,20 +6535,27 @@ if (uni.restoreGlobal) {
           { label: "管理员", value: "admin" },
           { label: "普通用户", value: "owner" }
         ],
+        editRoleOptions: [
+          { label: "业主", value: "owner" },
+          { label: "工作人员", value: "worker" },
+          { label: "管理员", value: "admin" },
+          { label: "超级管理员", value: "super_admin" }
+        ],
+        communityList: [],
+        communityListLoading: false,
+        communityLoadError: "",
         showEditPanel: false,
-        editingUser: null,
         editForm: {
           userId: null,
           realName: "",
           phone: "",
-          role: ""
+          role: "",
+          communityId: ""
         },
         saving: false,
-        // 分页相关
         currentPage: 1,
         pageSize: 10,
         total: 0,
-        // 统计数据
         stats: {
           total: 0,
           admin: 0,
@@ -6157,15 +6567,64 @@ if (uni.restoreGlobal) {
       };
     },
     computed: {
-      roleFilterValue() {
-        return this.roleFilter || "";
-      },
       totalPages() {
-        return Math.ceil(this.total / this.pageSize) || 1;
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50, 100];
+        return Math.max(0, options.indexOf(this.pageSize));
+      },
+      rolePickerIndex() {
+        return Math.max(0, this.roleOptions.findIndex((item) => item.value === this.roleFilter));
+      },
+      currentRoleLabel() {
+        const current = this.roleOptions.find((item) => item.value === this.roleFilter);
+        return current ? current.label : "全部角色";
       },
       currentMonthLabel() {
-        const opt = this.monthOptions && this.monthOptions[this.monthIndex];
-        return opt && opt.label || this.monthValue || "选择月份";
+        const option = this.monthOptions[this.monthIndex];
+        return option ? option.label : this.monthValue || "选择月份";
+      },
+      normalizedEditRole() {
+        return String(this.editForm.role || "").toLowerCase();
+      },
+      editRoleIndex() {
+        return Math.max(0, this.editRoleOptions.findIndex((item) => item.value === this.normalizedEditRole));
+      },
+      currentEditRoleLabel() {
+        const current = this.editRoleOptions.find((item) => item.value === this.normalizedEditRole);
+        return current ? current.label : "业主";
+      },
+      needsEditCommunityAssignment() {
+        return this.normalizedEditRole === "admin" || this.normalizedEditRole === "worker";
+      },
+      editCommunityIndex() {
+        const index = this.communityList.findIndex((item) => String(item.id) === String(this.editForm.communityId));
+        return index >= 0 ? index : 0;
+      },
+      editCommunityLabel() {
+        const current = this.communityList.find((item) => String(item.id) === String(this.editForm.communityId));
+        return current ? current.name : "";
+      },
+      editCommunityDisplayText() {
+        if (this.communityListLoading)
+          return "社区列表加载中...";
+        if (this.editCommunityLabel)
+          return this.editCommunityLabel;
+        if (this.communityLoadError)
+          return "社区列表加载失败";
+        if (!this.communityList.length)
+          return "暂无可选社区";
+        return this.normalizedEditRole === "admin" ? "请选择负责社区" : "请选择所属社区";
+      },
+      editCommunityTip() {
+        if (this.communityListLoading)
+          return "正在加载社区列表，请稍候。";
+        if (this.communityLoadError)
+          return this.communityLoadError;
+        if (!this.communityList.length)
+          return "当前未获取到社区数据，无法完成该角色编辑。";
+        return this.normalizedEditRole === "admin" ? "管理员账号需要绑定负责社区，便于后续按社区管理业务。" : "工作人员账号需要绑定所属社区，便于后续按社区接收任务。";
       }
     },
     onLoad() {
@@ -6176,27 +6635,38 @@ if (uni.restoreGlobal) {
     methods: {
       initMonthOptions() {
         const now = /* @__PURE__ */ new Date();
-        const y = now.getFullYear();
-        const m = now.getMonth() + 1;
-        const current = `${y}-${String(m).padStart(2, "0")}`;
-        const opts = [];
+        const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const options = [];
         for (let i = 0; i < 12; i++) {
-          const d = new Date(y, m - 1 - i, 1);
-          const yy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, "0");
-          const value = `${yy}-${mm}`;
-          opts.push({ label: value, value });
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          options.push({ label: value, value });
         }
-        this.monthOptions = opts;
+        this.monthOptions = options;
         this.monthValue = current;
-        this.monthIndex = Math.max(0, opts.findIndex((o) => o.value === current));
+        this.monthIndex = Math.max(0, options.findIndex((item) => item.value === current));
+      },
+      extractTotal(data) {
+        var _a, _b;
+        if (typeof (data == null ? void 0 : data.total) === "number")
+          return data.total;
+        if (typeof ((_a = data == null ? void 0 : data.data) == null ? void 0 : _a.total) === "number")
+          return data.data.total;
+        if (Array.isArray(data == null ? void 0 : data.records))
+          return data.records.length;
+        if (Array.isArray((_b = data == null ? void 0 : data.data) == null ? void 0 : _b.records))
+          return data.data.records.length;
+        if (Array.isArray(data))
+          return data.length;
+        return 0;
       },
       handleMonthChange(e) {
-        const idx = Number(e && e.detail ? e.detail.value : 0);
-        const option = this.monthOptions && this.monthOptions[idx];
+        var _a;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        const option = this.monthOptions[index];
         if (!option)
           return;
-        this.monthIndex = idx;
+        this.monthIndex = index;
         this.monthValue = option.value;
         this.currentPage = 1;
         this.loadUserList();
@@ -6204,17 +6674,19 @@ if (uni.restoreGlobal) {
       },
       getRoleLabel(role) {
         const val = role == null ? "" : String(role).toLowerCase();
-        if (val === "admin") {
+        if (val === "admin")
           return "管理员";
-        }
-        return "普通用户";
-      },
-      getRoleFilterLabel() {
-        const current = this.roleOptions.find((item) => item.value === this.roleFilter);
-        return current ? current.label : "全部角色";
+        if (val === "worker")
+          return "工作人员";
+        if (val === "super_admin")
+          return "超级管理员";
+        if (val === "owner")
+          return "业主";
+        return role || "未知角色";
       },
       handleRoleChange(e) {
-        const index = Number(e.detail.value);
+        var _a;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
         const option = this.roleOptions[index];
         this.roleFilter = option ? option.value : "";
         this.currentPage = 1;
@@ -6232,22 +6704,26 @@ if (uni.restoreGlobal) {
           const params = {
             pageNum: this.currentPage,
             pageSize: this.pageSize,
-            keyword: this.searchKey,
-            month: this.monthValue || void 0
+            keyword: this.searchKey || void 0,
+            month: this.monthValue || void 0,
+            role: this.roleFilter || void 0
           };
-          if (this.roleFilterValue) {
-            params.role = this.roleFilterValue;
-          }
-          const res = await request(
-            "/api/admin/user/list",
-            { params },
-            "GET"
-          );
+          const res = await request("/api/admin/user/list", { params }, "GET");
           const records = (res == null ? void 0 : res.records) || ((_a = res == null ? void 0 : res.data) == null ? void 0 : _a.records) || [];
-          this.userList = Array.isArray(records) ? records : [];
-          this.total = (res == null ? void 0 : res.total) || ((_b = res == null ? void 0 : res.data) == null ? void 0 : _b.total) || 0;
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/user-manage.vue:324", "加载用户列表失败:", err);
+          this.userList = (Array.isArray(records) ? records : []).map((item) => ({
+            userId: item.userId || item.id,
+            realName: item.realName,
+            username: item.username,
+            phone: item.phone,
+            role: item.role,
+            communityId: item.communityId,
+            communityName: item.communityName,
+            status: item.status,
+            createTime: item.createTime || item.registerTime || item.applyTime
+          }));
+          this.total = Number((res == null ? void 0 : res.total) || ((_b = res == null ? void 0 : res.data) == null ? void 0 : _b.total) || 0);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/user-manage.vue:421", "加载用户列表失败:", error);
           uni.showToast({ title: "加载失败", icon: "none" });
           this.userList = [];
           this.total = 0;
@@ -6255,78 +6731,126 @@ if (uni.restoreGlobal) {
           this.loading = false;
         }
       },
-      // 加载统计数据
       async loadStats() {
-        var _a, _b, _c;
         try {
           const month = this.monthValue || void 0;
-          const totalReq = request("/api/admin/user/list", { params: { pageSize: 1, month } }, "GET");
-          const adminReq = request("/api/admin/user/list", { params: { pageSize: 1, role: "admin", month } }, "GET");
-          const ownerReq = request("/api/admin/user/list", { params: { pageSize: 1, role: "owner", month } }, "GET");
-          const [totalRes, adminRes, ownerRes] = await Promise.all([totalReq, adminReq, ownerReq]);
+          const [totalRes, adminRes, ownerRes] = await Promise.all([
+            request("/api/admin/user/list", { params: { pageSize: 1, month } }, "GET"),
+            request("/api/admin/user/list", { params: { pageSize: 1, role: "admin", month } }, "GET"),
+            request("/api/admin/user/list", { params: { pageSize: 1, role: "owner", month } }, "GET")
+          ]);
           this.stats = {
-            total: totalRes.total || ((_a = totalRes.data) == null ? void 0 : _a.total) || 0,
-            admin: adminRes.total || ((_b = adminRes.data) == null ? void 0 : _b.total) || 0,
-            owner: ownerRes.total || ((_c = ownerRes.data) == null ? void 0 : _c.total) || 0
+            total: this.extractTotal(totalRes),
+            admin: this.extractTotal(adminRes),
+            owner: this.extractTotal(ownerRes)
           };
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/user-manage.vue:349", "加载统计数据失败", e);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/user-manage.vue:443", "加载用户统计失败", error);
         }
       },
       handleSearch() {
         this.currentPage = 1;
         this.loadUserList();
       },
+      handleResetFilters() {
+        this.searchKey = "";
+        this.roleFilter = "";
+        this.currentPage = 1;
+        this.loadUserList();
+      },
       handlePrevPage() {
-        if (this.currentPage > 1) {
-          this.currentPage--;
-          this.loadUserList();
-        }
+        if (this.currentPage <= 1)
+          return;
+        this.currentPage -= 1;
+        this.loadUserList();
       },
       handleNextPage() {
-        if (this.currentPage < this.totalPages) {
-          this.currentPage++;
-          this.loadUserList();
+        if (this.currentPage >= this.totalPages)
+          return;
+        this.currentPage += 1;
+        this.loadUserList();
+      },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50, 100];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 10;
+        this.currentPage = 1;
+        this.loadUserList();
+      },
+      async ensureCommunityList() {
+        if (this.communityListLoading || this.communityList.length > 0)
+          return;
+        this.communityListLoading = true;
+        this.communityLoadError = "";
+        try {
+          const data = await request("/api/house/community/all", {}, "GET");
+          const list = Array.isArray(data) ? data : Array.isArray(data == null ? void 0 : data.records) ? data.records : [];
+          this.communityList = list.map((item) => ({
+            id: item == null ? void 0 : item.id,
+            name: (item == null ? void 0 : item.name) || (item == null ? void 0 : item.communityName) || `社区${(item == null ? void 0 : item.id) || ""}`
+          })).filter((item) => item.id != null);
+          if (!this.communityList.length) {
+            this.communityLoadError = "社区列表为空，请先确认社区数据是否已配置。";
+          }
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/user-manage.vue:490", "加载社区列表失败:", error);
+          this.communityList = [];
+          this.communityLoadError = (error == null ? void 0 : error.message) || "社区列表加载失败，请检查社区查询接口。";
+        } finally {
+          this.communityListLoading = false;
         }
       },
-      handleEditUser(user) {
-        const userId = user.id || user.userId;
-        this.editingUser = user;
+      async handleEditUser(user) {
         this.editForm = {
-          userId,
+          userId: user.userId,
           realName: user.realName || "",
           phone: user.phone || "",
-          role: user.role || ""
+          role: String(user.role || "").toLowerCase(),
+          communityId: user.communityId != null ? String(user.communityId) : ""
         };
         this.showEditPanel = true;
+        if (this.needsEditCommunityAssignment) {
+          await this.ensureCommunityList();
+        }
+      },
+      handleEditRoleChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.editForm.role = ((_b = this.editRoleOptions[index]) == null ? void 0 : _b.value) || "owner";
+        if (!this.needsEditCommunityAssignment) {
+          this.editForm.communityId = "";
+          return;
+        }
+        this.ensureCommunityList();
+      },
+      handleEditCommunityChange(e) {
+        var _a;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        const selected = this.communityList[index];
+        this.editForm.communityId = (selected == null ? void 0 : selected.id) != null ? String(selected.id) : "";
       },
       async handleToggleStatus(user) {
-        const userId = user.id || user.userId;
+        const userId = user.userId;
         if (!userId) {
           uni.showToast({ title: "缺少用户ID", icon: "none" });
           return;
         }
         const currentStatus = user.status;
         const targetStatus = currentStatus === 1 ? 0 : 1;
-        const title = targetStatus === 0 ? "禁用用户" : "启用用户";
-        const content = targetStatus === 0 ? "确定要禁用该用户吗？" : "确定要启用该用户吗？";
         uni.showModal({
-          title,
-          content,
+          title: targetStatus === 0 ? "禁用用户" : "启用用户",
+          content: targetStatus === 0 ? "确定要禁用该用户吗？" : "确定要启用该用户吗？",
           success: async (res) => {
             if (!res.confirm)
               return;
             try {
-              await request(
-                `/api/admin/user/${userId}/status`,
-                { params: { status: targetStatus } },
-                "PUT"
-              );
+              await request(`/api/admin/user/${userId}/status`, { params: { status: targetStatus } }, "PUT");
               uni.showToast({ title: "操作成功", icon: "success" });
               this.loadUserList();
-            } catch (err) {
-              formatAppLog("error", "at admin/pages/admin/user-manage.vue:409", "修改用户状态失败:", err);
-              uni.showToast({ title: (err == null ? void 0 : err.message) || "操作失败", icon: "none" });
+            } catch (error) {
+              formatAppLog("error", "at admin/pages/admin/user-manage.vue:542", "修改用户状态失败:", error);
+              uni.showToast({ title: (error == null ? void 0 : error.message) || "操作失败", icon: "none" });
             }
           }
         });
@@ -6335,12 +6859,12 @@ if (uni.restoreGlobal) {
         if (this.saving)
           return;
         this.showEditPanel = false;
-        this.editingUser = null;
         this.editForm = {
           userId: null,
           realName: "",
           phone: "",
-          role: ""
+          role: "",
+          communityId: ""
         };
       },
       async submitEdit() {
@@ -6356,29 +6880,42 @@ if (uni.restoreGlobal) {
           uni.showToast({ title: "请输入手机号", icon: "none" });
           return;
         }
+        if (this.needsEditCommunityAssignment && !this.editForm.communityId) {
+          uni.showToast({
+            title: this.normalizedEditRole === "admin" ? "请选择负责社区" : "请选择所属社区",
+            icon: "none"
+          });
+          return;
+        }
         this.saving = true;
         try {
-          await request(
-            "/api/admin/user/update",
-            {
-              data: {
-                userId: this.editForm.userId,
-                realName: this.editForm.realName,
-                phone: this.editForm.phone,
-                role: this.editForm.role
-              }
-            },
-            "PUT"
-          );
+          const payload = {
+            userId: this.editForm.userId,
+            realName: this.editForm.realName,
+            phone: this.editForm.phone,
+            role: this.editForm.role,
+            communityId: this.needsEditCommunityAssignment ? Number(this.editForm.communityId) : null
+          };
+          await request("/api/admin/user/update", {
+            data: payload
+          }, "PUT");
           uni.showToast({ title: "保存成功", icon: "success" });
           this.closeEditPanel();
           this.loadUserList();
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/user-manage.vue:460", "保存用户信息失败:", err);
-          uni.showToast({ title: (err == null ? void 0 : err.message) || "保存失败", icon: "none" });
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/user-manage.vue:595", "保存用户信息失败:", error);
+          uni.showToast({ title: (error == null ? void 0 : error.message) || "保存失败", icon: "none" });
         } finally {
           this.saving = false;
         }
+      },
+      formatTime(time) {
+        if (!time)
+          return "-";
+        const date = new Date(String(time).replace(" ", "T"));
+        if (Number.isNaN(date.getTime()))
+          return String(time);
+        return date.toLocaleString();
       }
     }
   };
@@ -6386,296 +6923,459 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[13] || (_cache[13] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[21] || (_cache[21] = ($event) => $data.showSidebar = $event),
       pageTitle: "用户管理",
-      currentPage: "/admin/pages/admin/user-manage"
+      currentPage: "/admin/pages/admin/user-manage",
+      pageBreadcrumb: "管理后台 / 用户管理",
+      showPageBanner: false
     }, {
       default: vue.withCtx(() => [
         vue.createElementVNode("view", { class: "manage-container" }, [
-          vue.createCommentVNode(" 统计卡片 "),
-          vue.createElementVNode("view", { class: "stats-card-container" }, [
-            vue.createElementVNode("view", {
-              class: "stats-card",
-              onClick: _cache[0] || (_cache[0] = ($event) => $options.handleStatsClick(""))
-            }, [
-              vue.createElementVNode(
-                "text",
-                { class: "stats-number" },
-                vue.toDisplayString($data.stats.total),
-                1
-                /* TEXT */
-              ),
-              vue.createElementVNode("text", { class: "stats-label" }, "总用户数")
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "用户列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一为后台表格页，保留按月份统计、角色筛选、用户编辑与启停用操作。")
             ]),
-            vue.createElementVNode("view", {
-              class: "stats-card status-admin",
-              onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick("admin"))
-            }, [
-              vue.createElementVNode(
-                "text",
-                { class: "stats-number" },
-                vue.toDisplayString($data.stats.admin),
-                1
-                /* TEXT */
-              ),
-              vue.createElementVNode("text", { class: "stats-label" }, "管理员")
-            ]),
-            vue.createElementVNode("view", {
-              class: "stats-card status-owner",
-              onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("owner"))
-            }, [
-              vue.createElementVNode(
-                "text",
-                { class: "stats-number" },
-                vue.toDisplayString($data.stats.owner),
-                1
-                /* TEXT */
-              ),
-              vue.createElementVNode("text", { class: "stats-label" }, "业主")
-            ])
-          ]),
-          vue.createElementVNode("view", { class: "stats-filter" }, [
             vue.createElementVNode("picker", {
               mode: "selector",
               range: $data.monthOptions,
               "range-key": "label",
-              onChange: _cache[3] || (_cache[3] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
+              onChange: _cache[0] || (_cache[0] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
             }, [
-              vue.createElementVNode("view", { class: "stats-filter-btn" }, [
+              vue.createElementVNode("view", { class: "month-filter-chip" }, [
+                vue.createElementVNode("text", { class: "month-filter-label" }, "统计月份"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-filter-text" },
+                  { class: "month-filter-value" },
                   vue.toDisplayString($options.currentMonthLabel),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-filter-arrow" }, "▼")
+                )
               ])
             ], 40, ["range"])
           ]),
-          vue.createElementVNode("view", { class: "search-section" }, [
-            vue.createElementVNode("view", { class: "search-left" }, [
-              vue.withDirectives(vue.createElementVNode(
-                "input",
-                {
-                  class: "search-input",
-                  placeholder: "搜索用户姓名或手机号",
-                  "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchKey = $event),
-                  onInput: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-                },
-                null,
-                544
-                /* NEED_HYDRATION, NEED_PATCH */
-              ), [
-                [vue.vModelText, $data.searchKey]
+          vue.createElementVNode("view", { class: "status-summary-bar user-status-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.roleFilter === "" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick(""))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "总用户数"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.total),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card admin", { active: $data.roleFilter === "admin" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("admin"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "管理员"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.admin),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card owner", { active: $data.roleFilter === "owner" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.handleStatsClick("owner"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "业主"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.owner),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid user-query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchKey = $event),
+                    class: "query-input",
+                    type: "text",
+                    placeholder: "搜索姓名、账号或手机号",
+                    onConfirm: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+                  },
+                  null,
+                  544
+                  /* NEED_HYDRATION, NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.searchKey]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "用户角色"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.roleOptions,
+                  "range-key": "label",
+                  value: $options.rolePickerIndex,
+                  onChange: _cache[6] || (_cache[6] = (...args) => $options.handleRoleChange && $options.handleRoleChange(...args))
+                }, [
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentRoleLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
               ])
             ]),
-            vue.createElementVNode("view", { class: "search-right" }, [
-              vue.createElementVNode("picker", {
-                mode: "selector",
-                range: $data.roleOptions,
-                "range-key": "label",
-                onChange: _cache[6] || (_cache[6] = (...args) => $options.handleRoleChange && $options.handleRoleChange(...args))
-              }, [
-                vue.createElementVNode("view", { class: "role-picker" }, [
-                  vue.createElementVNode(
-                    "text",
-                    { class: "role-picker-text" },
-                    vue.toDisplayString($options.getRoleFilterLabel()),
-                    1
-                    /* TEXT */
-                  )
-                ])
-              ], 40, ["range"])
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[7] || (_cache[7] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
             ])
           ]),
-          vue.createCommentVNode(" 用户列表 / 状态 "),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                "当前筛选：" + vue.toDisplayString($options.currentRoleLabel),
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "月份：" + vue.toDisplayString($options.currentMonthLabel),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
           $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
             key: 0,
-            class: "empty-state"
+            class: "loading-state"
           }, [
-            vue.createElementVNode("text", null, "加载中...")
-          ])) : $data.userList.length ? (vue.openBlock(), vue.createElementBlock("view", {
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
             key: 1,
-            class: "user-list"
+            class: "table-panel"
           }, [
-            (vue.openBlock(true), vue.createElementBlock(
-              vue.Fragment,
-              null,
-              vue.renderList($data.userList, (user) => {
-                return vue.openBlock(), vue.createElementBlock("view", {
-                  key: user.id || user.userId,
-                  class: "user-item"
-                }, [
-                  vue.createElementVNode("view", { class: "user-info" }, [
-                    vue.createElementVNode("view", { class: "user-avatar" }, [
-                      vue.createElementVNode(
-                        "text",
-                        { class: "avatar-text" },
-                        vue.toDisplayString((user.realName || user.username || "用").slice(0, 1)),
-                        1
-                        /* TEXT */
-                      )
-                    ]),
-                    vue.createElementVNode("view", { class: "user-main" }, [
-                      vue.createElementVNode(
-                        "text",
-                        { class: "user-name" },
-                        vue.toDisplayString(user.realName || user.username || "未填写姓名"),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode("view", { class: "user-meta" }, [
+            vue.createElementVNode("view", { class: "scroll-table" }, [
+              vue.createElementVNode("view", { class: "table-head user-table" }, [
+                vue.createElementVNode("text", { class: "table-col col-name" }, "姓名"),
+                vue.createElementVNode("text", { class: "table-col col-username" }, "账号"),
+                vue.createElementVNode("text", { class: "table-col col-phone" }, "手机号"),
+                vue.createElementVNode("text", { class: "table-col col-role" }, "角色"),
+                vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+                vue.createElementVNode("text", { class: "table-col col-time" }, "最近时间"),
+                vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+              ]),
+              (vue.openBlock(true), vue.createElementBlock(
+                vue.Fragment,
+                null,
+                vue.renderList($data.userList, (user, index) => {
+                  return vue.openBlock(), vue.createElementBlock(
+                    "view",
+                    {
+                      key: user.userId,
+                      class: "table-row user-table",
+                      style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                    },
+                    [
+                      vue.createElementVNode("view", { class: "table-col col-name" }, [
                         vue.createElementVNode(
                           "text",
-                          { class: "user-line" },
-                          " 账号：" + vue.toDisplayString(user.username || "-"),
-                          1
-                          /* TEXT */
-                        ),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "user-line" },
-                          " 手机：" + vue.toDisplayString(user.phone || "-"),
+                          { class: "primary-text" },
+                          vue.toDisplayString(user.realName || user.username || "未填写姓名"),
                           1
                           /* TEXT */
                         )
                       ]),
-                      vue.createElementVNode("view", { class: "user-tags" }, [
+                      vue.createElementVNode("view", { class: "table-col col-username" }, [
                         vue.createElementVNode(
                           "text",
-                          { class: "user-role" },
+                          { class: "plain-text" },
+                          vue.toDisplayString(user.username || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-phone" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString(user.phone || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-role" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
                           vue.toDisplayString($options.getRoleLabel(user.role)),
                           1
                           /* TEXT */
-                        ),
-                        user.status !== void 0 ? (vue.openBlock(), vue.createElementBlock(
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-status" }, [
+                        vue.createElementVNode(
                           "text",
                           {
-                            key: 0,
-                            class: vue.normalizeClass(["user-status", user.status === 1 ? "active" : "disabled"])
+                            class: vue.normalizeClass(["status-pill", user.status === 1 ? "status-active" : "status-disabled"])
                           },
                           vue.toDisplayString(user.status === 1 ? "正常" : "已禁用"),
                           3
                           /* TEXT, CLASS */
-                        )) : vue.createCommentVNode("v-if", true)
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-time" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString($options.formatTime(user.createTime)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                        vue.createElementVNode("button", {
+                          class: "row-btn ghost",
+                          onClick: ($event) => $options.handleEditUser(user)
+                        }, "编辑", 8, ["onClick"]),
+                        vue.createElementVNode("button", {
+                          class: vue.normalizeClass(["row-btn", user.status === 1 ? "secondary-warn" : "primary"]),
+                          onClick: ($event) => $options.handleToggleStatus(user)
+                        }, vue.toDisplayString(user.status === 1 ? "禁用" : "启用"), 11, ["onClick"])
                       ])
-                    ])
-                  ]),
-                  vue.createElementVNode("view", { class: "user-actions" }, [
-                    vue.createElementVNode("button", {
-                      class: "edit-btn",
-                      onClick: ($event) => $options.handleEditUser(user)
-                    }, " 编辑 ", 8, ["onClick"]),
-                    user.status !== void 0 ? (vue.openBlock(), vue.createElementBlock("button", {
-                      key: 0,
-                      class: vue.normalizeClass(["status-btn", user.status === 1 ? "to-disable" : "to-enable"]),
-                      onClick: ($event) => $options.handleToggleStatus(user)
-                    }, vue.toDisplayString(user.status === 1 ? "禁用" : "启用"), 11, ["onClick"])) : vue.createCommentVNode("v-if", true)
-                  ])
-                ]);
-              }),
-              128
-              /* KEYED_FRAGMENT */
-            )),
-            vue.createCommentVNode(" 分页组件 "),
-            $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+                    ],
+                    4
+                    /* STYLE */
+                  );
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ]),
+            $data.userList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
               key: 0,
-              class: "pagination"
+              class: "empty-state"
             }, [
+              vue.createElementVNode("text", null, "暂无用户数据")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === 1,
-                onClick: _cache[7] || (_cache[7] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
-              }, " 上一页 ", 8, ["disabled"]),
-              vue.createElementVNode("view", { class: "page-info" }, [
-                vue.createElementVNode(
-                  "text",
-                  null,
-                  vue.toDisplayString($data.currentPage),
-                  1
-                  /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "page-separator" }, "/"),
-                vue.createElementVNode(
-                  "text",
-                  null,
-                  vue.toDisplayString($options.totalPages),
-                  1
-                  /* TEXT */
-                )
-              ]),
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
+              }, "上一页", 8, ["disabled"]),
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === $options.totalPages,
-                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
-              }, " 下一页 ", 8, ["disabled"])
-            ])) : vue.createCommentVNode("v-if", true)
-          ])) : (vue.openBlock(), vue.createElementBlock("view", {
-            key: 2,
-            class: "empty-state"
-          }, [
-            vue.createElementVNode("text", null, "暂无用户数据")
-          ])),
-          vue.createCommentVNode(" 编辑弹层 "),
+                onClick: _cache[10] || (_cache[10] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: [10, 20, 50, 100],
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[11] || (_cache[11] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
+                  vue.createElementVNode(
+                    "text",
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.pageSize) + " 条",
+                    1
+                    /* TEXT */
+                  )
+                ], 40, ["value"])
+              ])
+            ])
+          ])) : vue.createCommentVNode("v-if", true),
           $data.showEditPanel ? (vue.openBlock(), vue.createElementBlock("view", {
             key: 3,
-            class: "edit-mask"
+            class: "detail-modal",
+            onClick: _cache[20] || (_cache[20] = (...args) => $options.closeEditPanel && $options.closeEditPanel(...args))
           }, [
-            vue.createElementVNode("view", { class: "edit-panel" }, [
-              vue.createElementVNode("view", { class: "edit-title" }, "编辑用户"),
-              vue.createElementVNode("view", { class: "edit-field" }, [
-                vue.createElementVNode("text", { class: "field-label" }, "姓名"),
-                vue.withDirectives(vue.createElementVNode(
-                  "input",
-                  {
-                    class: "field-input",
-                    "onUpdate:modelValue": _cache[9] || (_cache[9] = ($event) => $data.editForm.realName = $event),
-                    placeholder: "请输入姓名"
-                  },
-                  null,
-                  512
-                  /* NEED_PATCH */
-                ), [
-                  [vue.vModelText, $data.editForm.realName]
-                ])
-              ]),
-              vue.createElementVNode("view", { class: "edit-field" }, [
-                vue.createElementVNode("text", { class: "field-label" }, "手机号"),
-                vue.withDirectives(vue.createElementVNode(
-                  "input",
-                  {
-                    class: "field-input",
-                    "onUpdate:modelValue": _cache[10] || (_cache[10] = ($event) => $data.editForm.phone = $event),
-                    placeholder: "请输入手机号"
-                  },
-                  null,
-                  512
-                  /* NEED_PATCH */
-                ), [
-                  [vue.vModelText, $data.editForm.phone]
-                ])
-              ]),
-              vue.createElementVNode("view", { class: "edit-field" }, [
-                vue.createElementVNode("text", { class: "field-label" }, "角色"),
-                vue.createElementVNode(
-                  "text",
-                  { class: "field-value" },
-                  vue.toDisplayString($options.getRoleLabel($data.editForm.role)),
-                  1
-                  /* TEXT */
-                )
-              ]),
-              vue.createElementVNode("view", { class: "edit-actions" }, [
+            vue.createElementVNode("view", {
+              class: "detail-content",
+              onClick: _cache[19] || (_cache[19] = vue.withModifiers(() => {
+              }, ["stop"]))
+            }, [
+              vue.createElementVNode("view", { class: "detail-header" }, [
+                vue.createElementVNode("text", { class: "detail-title" }, "编辑用户"),
                 vue.createElementVNode("button", {
-                  class: "edit-cancel",
-                  onClick: _cache[11] || (_cache[11] = (...args) => $options.closeEditPanel && $options.closeEditPanel(...args))
-                }, "取消"),
-                vue.createElementVNode("button", {
-                  class: "edit-save",
-                  disabled: $data.saving,
-                  onClick: _cache[12] || (_cache[12] = (...args) => $options.submitEdit && $options.submitEdit(...args))
-                }, " 保存 ", 8, ["disabled"])
+                  class: "close-btn",
+                  onClick: _cache[12] || (_cache[12] = (...args) => $options.closeEditPanel && $options.closeEditPanel(...args))
+                }, "关闭")
+              ]),
+              vue.createElementVNode("view", { class: "detail-body" }, [
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "角色:"),
+                  vue.createElementVNode("picker", {
+                    mode: "selector",
+                    range: $data.editRoleOptions,
+                    "range-key": "label",
+                    value: $options.editRoleIndex,
+                    onChange: _cache[13] || (_cache[13] = (...args) => $options.handleEditRoleChange && $options.handleEditRoleChange(...args))
+                  }, [
+                    vue.createElementVNode("view", { class: "modal-picker" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "modal-picker-text" },
+                        vue.toDisplayString($options.currentEditRoleLabel),
+                        1
+                        /* TEXT */
+                      ),
+                      vue.createElementVNode("text", { class: "modal-picker-arrow" }, ">")
+                    ])
+                  ], 40, ["range", "value"])
+                ]),
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "姓名:"),
+                  vue.withDirectives(vue.createElementVNode(
+                    "input",
+                    {
+                      class: "form-input-inline",
+                      "onUpdate:modelValue": _cache[14] || (_cache[14] = ($event) => $data.editForm.realName = $event),
+                      placeholder: "请输入姓名"
+                    },
+                    null,
+                    512
+                    /* NEED_PATCH */
+                  ), [
+                    [vue.vModelText, $data.editForm.realName]
+                  ])
+                ]),
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "手机号:"),
+                  vue.withDirectives(vue.createElementVNode(
+                    "input",
+                    {
+                      class: "form-input-inline",
+                      "onUpdate:modelValue": _cache[15] || (_cache[15] = ($event) => $data.editForm.phone = $event),
+                      placeholder: "请输入手机号"
+                    },
+                    null,
+                    512
+                    /* NEED_PATCH */
+                  ), [
+                    [vue.vModelText, $data.editForm.phone]
+                  ])
+                ]),
+                $options.needsEditCommunityAssignment ? (vue.openBlock(), vue.createElementBlock("view", {
+                  key: 0,
+                  class: "detail-item detail-item-block"
+                }, [
+                  vue.createElementVNode(
+                    "text",
+                    { class: "detail-label" },
+                    vue.toDisplayString($options.normalizedEditRole === "admin" ? "负责社区:" : "所属社区:"),
+                    1
+                    /* TEXT */
+                  ),
+                  vue.createElementVNode("picker", {
+                    mode: "selector",
+                    range: $data.communityList,
+                    "range-key": "name",
+                    value: $options.editCommunityIndex,
+                    disabled: $data.communityListLoading || $data.communityList.length === 0,
+                    onChange: _cache[16] || (_cache[16] = (...args) => $options.handleEditCommunityChange && $options.handleEditCommunityChange(...args))
+                  }, [
+                    vue.createElementVNode(
+                      "view",
+                      {
+                        class: vue.normalizeClass(["modal-picker", { placeholder: !$options.editCommunityLabel }])
+                      },
+                      [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "modal-picker-text" },
+                          vue.toDisplayString($options.editCommunityDisplayText),
+                          1
+                          /* TEXT */
+                        ),
+                        vue.createElementVNode("text", { class: "modal-picker-arrow" }, ">")
+                      ],
+                      2
+                      /* CLASS */
+                    )
+                  ], 40, ["range", "value", "disabled"]),
+                  vue.createElementVNode(
+                    "text",
+                    { class: "detail-tip" },
+                    vue.toDisplayString($options.editCommunityTip),
+                    1
+                    /* TEXT */
+                  )
+                ])) : vue.createCommentVNode("v-if", true),
+                vue.createElementVNode("view", { class: "detail-actions" }, [
+                  vue.createElementVNode("button", {
+                    class: "detail-btn secondary",
+                    onClick: _cache[17] || (_cache[17] = (...args) => $options.closeEditPanel && $options.closeEditPanel(...args))
+                  }, "取消"),
+                  vue.createElementVNode("button", {
+                    class: "detail-btn primary",
+                    disabled: $data.saving,
+                    onClick: _cache[18] || (_cache[18] = (...args) => $options.submitEdit && $options.submitEdit(...args))
+                  }, "保存", 8, ["disabled"])
+                ])
               ])
             ])
           ])) : vue.createCommentVNode("v-if", true)
@@ -6697,21 +7397,22 @@ if (uni.restoreGlobal) {
         pageSize: 10,
         total: 0,
         selectAll: false,
-        // 筛选条件
         filters: {
           title: "",
           publishStatus: "",
           topFlag: ""
         },
-        // 批量选择
         selectedIds: [],
-        // 选项数据
+        statusStats: {
+          published: 0,
+          draft: 0,
+          offline: 0
+        },
         statusOptions: [
           { label: "全部状态", value: "" },
           { label: "已发布", value: "PUBLISHED" },
           { label: "草稿", value: "DRAFT" },
           { label: "已下架", value: "OFFLINE" }
-          // 假设有OFFLINE状态，或者未发布即DRAFT
         ],
         topOptions: [
           { label: "全部置顶", value: "" },
@@ -6722,10 +7423,26 @@ if (uni.restoreGlobal) {
     },
     computed: {
       totalPage() {
-        return Math.ceil(this.total / this.pageSize) || 1;
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50, 100];
+        return Math.max(0, options.indexOf(this.pageSize));
       },
       isAllSelected() {
         return this.noticeList.length > 0 && this.selectedIds.length === this.noticeList.length;
+      },
+      statusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.filters.publishStatus));
+      },
+      topPickerIndex() {
+        return Math.max(0, this.topOptions.findIndex((item) => item.value === this.filters.topFlag));
+      },
+      currentStatusLabel() {
+        return this.getStatusLabel(this.filters.publishStatus) || "全部状态";
+      },
+      currentTopLabel() {
+        return this.getTopLabel(this.filters.topFlag) || "全部置顶";
       }
     },
     onLoad() {
@@ -6742,135 +7459,175 @@ if (uni.restoreGlobal) {
           uni.redirectTo({ url: "/owner/pages/login/login" });
         }
       },
-      // 加载列表（使用新接口）
+      normalizeNoticeList(res) {
+        if (Array.isArray(res))
+          return { records: res, total: res.length };
+        if (Array.isArray(res.records))
+          return { records: res.records, total: res.total || res.records.length };
+        if (res.data && Array.isArray(res.data.records))
+          return { records: res.data.records, total: res.data.total || res.data.records.length };
+        if (res.data && Array.isArray(res.data))
+          return { records: res.data, total: res.total || res.data.length };
+        return { records: [], total: 0 };
+      },
+      calculateStatusStats() {
+        const stats = {
+          published: 0,
+          draft: 0,
+          offline: 0
+        };
+        this.noticeList.forEach((item) => {
+          const status = String(item.publishStatus || "").toUpperCase();
+          if (status === "PUBLISHED")
+            stats.published += 1;
+          if (status === "DRAFT")
+            stats.draft += 1;
+          if (status === "OFFLINE")
+            stats.offline += 1;
+        });
+        this.statusStats = stats;
+      },
       async loadNoticeList() {
         this.loading = true;
         this.selectedIds = [];
+        this.selectAll = false;
         try {
           const params = {
             pageNum: this.currentPage,
             pageSize: this.pageSize,
-            // 优先置顶，其次按发布时间
             orderByColumn: "top_flag desc, publish_time",
             isAsc: "desc",
             ...this.filters
           };
           Object.keys(params).forEach((key) => {
-            if (params[key] === "" || params[key] === null)
+            if (params[key] === "" || params[key] === null || params[key] === void 0) {
               delete params[key];
+            }
           });
-          const res = await request(
-            "/api/notice/admin/list",
-            { params },
-            "GET"
-          );
-          this.noticeList = res.records || [];
-          this.total = res.total || 0;
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/notice-manage.vue:274", e);
+          const res = await request("/api/notice/admin/list", { params }, "GET");
+          const normalized = this.normalizeNoticeList(res);
+          this.noticeList = normalized.records;
+          this.total = Number(normalized.total || 0);
+          this.calculateStatusStats();
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/notice-manage.vue:301", error);
+          this.noticeList = [];
+          this.total = 0;
+          this.calculateStatusStats();
           uni.showToast({ title: "加载失败", icon: "none" });
         } finally {
           this.loading = false;
         }
       },
-      // 搜索处理
       handleSearch() {
         this.currentPage = 1;
         this.loadNoticeList();
       },
+      handleResetFilters() {
+        this.filters = {
+          title: "",
+          publishStatus: "",
+          topFlag: ""
+        };
+        this.currentPage = 1;
+        this.loadNoticeList();
+      },
+      applyQuickFilter(status, topFlag) {
+        this.filters.publishStatus = status;
+        this.filters.topFlag = topFlag;
+        this.currentPage = 1;
+        this.loadNoticeList();
+      },
       handleStatusChange(e) {
-        this.filters.publishStatus = this.statusOptions[e.detail.value].value;
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.filters.publishStatus = ((_b = this.statusOptions[index]) == null ? void 0 : _b.value) || "";
         this.handleSearch();
       },
       handleTopChange(e) {
-        this.filters.topFlag = this.topOptions[e.detail.value].value;
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.filters.topFlag = ((_b = this.topOptions[index]) == null ? void 0 : _b.value) || "";
         this.handleSearch();
       },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50, 100];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 10;
+        this.currentPage = 1;
+        this.loadNoticeList();
+      },
       getStatusLabel(val) {
-        const opt = this.statusOptions.find((o) => o.value === val);
-        return opt ? opt.label : "";
+        const option = this.statusOptions.find((item) => item.value === val);
+        return option ? option.label : "";
       },
       getTopLabel(val) {
-        const opt = this.topOptions.find((o) => o.value === val);
-        return opt ? opt.label : "";
+        const option = this.topOptions.find((item) => item.value === val);
+        return option ? option.label : "";
       },
       getStatusText(status) {
         const map = {
-          "PUBLISHED": "已发布",
-          "DRAFT": "草稿",
-          "OFFLINE": "已下架"
+          PUBLISHED: "已发布",
+          DRAFT: "草稿",
+          OFFLINE: "已下架"
         };
-        return map[status] || status;
+        return map[String(status || "").toUpperCase()] || status || "-";
       },
-      // 页面跳转
+      getStatusClass(status) {
+        const map = {
+          PUBLISHED: "status-published",
+          DRAFT: "status-draft",
+          OFFLINE: "status-offline"
+        };
+        return map[String(status || "").toUpperCase()] || "status-offline";
+      },
       handleAddNotice() {
         uni.navigateTo({ url: "/admin/pages/admin/notice-edit" });
       },
       handleEditNotice(id) {
-        uni.navigateTo({
-          url: `/admin/pages/admin/notice-edit?noticeId=${id}`
-        });
+        uni.navigateTo({ url: `/admin/pages/admin/notice-edit?noticeId=${id}` });
       },
-      // 单个操作：发布
       async handlePublish(id) {
         try {
           const userInfo = uni.getStorageSync("userInfo");
-          formatAppLog("log", "at admin/pages/admin/notice-manage.vue:331", "准备发布公告", { id, adminId: userInfo && userInfo.id });
-          await request(
-            `/api/notice/${id}/publish`,
-            { params: { adminId: userInfo.id } },
-            "PUT"
-          );
-          formatAppLog("log", "at admin/pages/admin/notice-manage.vue:337", "发布成功", { id });
+          await request(`/api/notice/${id}/publish`, { params: { adminId: userInfo.id } }, "PUT");
           uni.showToast({ title: "发布成功" });
           this.loadNoticeList();
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/notice-manage.vue:341", "发布失败详情", e && e.message ? e.message : e, e && e.stack ? e.stack : "");
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/notice-manage.vue:383", "发布失败详情", error);
           uni.showToast({ title: "发布失败", icon: "none" });
         }
       },
-      // 单个操作：下架
       async handleOffline(id) {
         try {
           const userInfo = uni.getStorageSync("userInfo");
-          formatAppLog("log", "at admin/pages/admin/notice-manage.vue:350", "准备下架公告", { id, adminId: userInfo && userInfo.id });
-          await request(
-            `/api/notice/${id}/offline`,
-            { params: { adminId: userInfo.id } },
-            "PUT"
-          );
-          formatAppLog("log", "at admin/pages/admin/notice-manage.vue:356", "下架成功", { id });
+          await request(`/api/notice/${id}/offline`, { params: { adminId: userInfo.id } }, "PUT");
           uni.showToast({ title: "下架成功" });
           this.loadNoticeList();
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/notice-manage.vue:360", "下架失败详情", e && e.message ? e.message : e, e && e.stack ? e.stack : "");
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/notice-manage.vue:394", "下架失败详情", error);
           uni.showToast({ title: "下架失败", icon: "none" });
         }
       },
-      // 单个操作：删除
       async handleDeleteNotice(id) {
         const userInfo = uni.getStorageSync("userInfo");
         uni.showModal({
           title: "确认删除",
           content: "确定要删除这条公告吗？",
           success: async (res) => {
-            if (res.confirm) {
-              try {
-                await request(
-                  `/api/notice/${id}`,
-                  { params: { adminId: userInfo.id } },
-                  "DELETE"
-                );
-                uni.showToast({ title: "删除成功" });
-                this.loadNoticeList();
-              } catch (e) {
-                uni.showToast({ title: "删除失败", icon: "none" });
-              }
+            if (!res.confirm)
+              return;
+            try {
+              await request(`/api/notice/${id}`, { params: { adminId: userInfo.id } }, "DELETE");
+              uni.showToast({ title: "删除成功" });
+              this.loadNoticeList();
+            } catch (error) {
+              uni.showToast({ title: "删除失败", icon: "none" });
             }
           }
         });
       },
-      // 批量操作：删除
       async handleBatchDelete() {
         if (!this.selectedIds.length)
           return;
@@ -6879,26 +7636,21 @@ if (uni.restoreGlobal) {
           title: "批量删除",
           content: `确定要删除选中的 ${this.selectedIds.length} 条公告吗？`,
           success: async (res) => {
-            if (res.confirm) {
-              try {
-                await request(
-                  "/api/notice/batch/delete",
-                  {
-                    data: { noticeIds: this.selectedIds },
-                    params: { adminId: userInfo.id }
-                  },
-                  "POST"
-                );
-                uni.showToast({ title: "批量删除成功" });
-                this.loadNoticeList();
-              } catch (e) {
-                uni.showToast({ title: "批量删除失败", icon: "none" });
-              }
+            if (!res.confirm)
+              return;
+            try {
+              await request("/api/notice/batch/delete", {
+                data: { noticeIds: this.selectedIds },
+                params: { adminId: userInfo.id }
+              }, "POST");
+              uni.showToast({ title: "批量删除成功" });
+              this.loadNoticeList();
+            } catch (error) {
+              uni.showToast({ title: "批量删除失败", icon: "none" });
             }
           }
         });
       },
-      // 批量操作：下架
       async handleBatchOffline() {
         if (!this.selectedIds.length)
           return;
@@ -6907,33 +7659,24 @@ if (uni.restoreGlobal) {
           title: "批量下架",
           content: `确定要下架选中的 ${this.selectedIds.length} 条公告吗？`,
           success: async (res) => {
-            if (res.confirm) {
-              try {
-                await request(
-                  "/api/notice/batch/offline",
-                  {
-                    data: { noticeIds: this.selectedIds },
-                    params: { adminId: userInfo.id }
-                  },
-                  "POST"
-                );
-                uni.showToast({ title: "批量下架成功" });
-                this.loadNoticeList();
-              } catch (e) {
-                uni.showToast({ title: "批量下架失败", icon: "none" });
-              }
+            if (!res.confirm)
+              return;
+            try {
+              await request("/api/notice/batch/offline", {
+                data: { noticeIds: this.selectedIds },
+                params: { adminId: userInfo.id }
+              }, "POST");
+              uni.showToast({ title: "批量下架成功" });
+              this.loadNoticeList();
+            } catch (error) {
+              uni.showToast({ title: "批量下架失败", icon: "none" });
             }
           }
         });
       },
-      // 查看统计
       async handleReadStat(id) {
         try {
-          const res = await request(
-            `/api/notice/${id}/read-stat`,
-            {},
-            "GET"
-          );
+          const res = await request(`/api/notice/${id}/read-stat`, {}, "GET");
           const content = `阅读量：${res.readCount || 0}
 点赞数：${res.likeCount || 0}
 收藏数：${res.collectCount || 0}`;
@@ -6942,11 +7685,10 @@ if (uni.restoreGlobal) {
             content,
             showCancel: false
           });
-        } catch (e) {
+        } catch (error) {
           uni.showToast({ title: "获取统计失败", icon: "none" });
         }
       },
-      // 选择相关
       toggleSelect(id) {
         const index = this.selectedIds.indexOf(id);
         if (index > -1) {
@@ -6955,39 +7697,25 @@ if (uni.restoreGlobal) {
           this.selectedIds.push(id);
         }
         this.selectedIds = [...this.selectedIds];
+        this.selectAll = this.isAllSelected;
       },
-      toggleSelectAll() {
-        if (this.isAllSelected) {
-          this.selectedIds = [];
-        } else {
-          this.selectedIds = this.noticeList.map((item) => item.id);
-        }
-      },
-      // 参考 repair-manage 的全选逻辑，确保视图更新
       testSelectAll() {
-        const shouldSelectAll = !this.selectAll;
+        const shouldSelectAll = !this.isAllSelected;
         this.selectAll = shouldSelectAll;
-        if (shouldSelectAll) {
-          this.selectedIds = [...this.noticeList.map((item) => item.id)];
-        } else {
-          this.selectedIds = [];
-        }
+        this.selectedIds = shouldSelectAll ? this.noticeList.map((item) => item.id) : [];
         this.$forceUpdate();
-        setTimeout(() => {
-          this.selectedIds = [...this.selectedIds];
-        }, 10);
       },
       prevPage() {
-        if (this.currentPage > 1) {
-          this.currentPage--;
-          this.loadNoticeList();
-        }
+        if (this.currentPage <= 1)
+          return;
+        this.currentPage -= 1;
+        this.loadNoticeList();
       },
       nextPage() {
-        if (this.currentPage < this.totalPage) {
-          this.currentPage++;
-          this.loadNoticeList();
-        }
+        if (this.currentPage >= this.totalPage)
+          return;
+        this.currentPage += 1;
+        this.loadNoticeList();
       }
     }
   };
@@ -6995,269 +7723,365 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[12] || (_cache[12] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[17] || (_cache[17] = ($event) => $data.showSidebar = $event),
       pageTitle: "公告管理",
-      currentPage: "/admin/pages/admin/notice-manage"
+      currentPage: "/admin/pages/admin/notice-manage",
+      pageBreadcrumb: "管理后台 / 公告管理",
+      showPageBanner: false
     }, {
       default: vue.withCtx(() => [
         vue.createElementVNode("view", { class: "manage-container" }, [
-          vue.createCommentVNode(" 筛选栏 "),
-          vue.createElementVNode("view", { class: "filter-bar" }, [
-            vue.withDirectives(vue.createElementVNode(
-              "input",
-              {
-                class: "search-input",
-                "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.filters.title = $event),
-                placeholder: "搜索标题",
-                "confirm-type": "search",
-                onConfirm: _cache[1] || (_cache[1] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-              },
-              null,
-              544
-              /* NEED_HYDRATION, NEED_PATCH */
-            ), [
-              [vue.vModelText, $data.filters.title]
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "公告发布列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一使用后台列表页结构，保留搜索、批量操作、发布、下架与数据统计。")
             ]),
-            vue.createElementVNode("picker", {
-              mode: "selector",
-              range: $data.statusOptions,
-              "range-key": "label",
-              onChange: _cache[2] || (_cache[2] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
-            }, [
-              vue.createElementVNode("view", { class: "picker-item" }, [
-                vue.createTextVNode(
-                  vue.toDisplayString($options.getStatusLabel($data.filters.publishStatus) || "全部状态") + " ",
-                  1
-                  /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "icon" }, "▼")
-              ])
-            ], 40, ["range"]),
-            vue.createElementVNode("picker", {
-              mode: "selector",
-              range: $data.topOptions,
-              "range-key": "label",
-              onChange: _cache[3] || (_cache[3] = (...args) => $options.handleTopChange && $options.handleTopChange(...args))
-            }, [
-              vue.createElementVNode("view", { class: "picker-item" }, [
-                vue.createTextVNode(
-                  vue.toDisplayString($options.getTopLabel($data.filters.topFlag) || "全部置顶") + " ",
-                  1
-                  /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "icon" }, "▼")
-              ])
-            ], 40, ["range"]),
             vue.createElementVNode("button", {
-              class: "search-btn",
-              onClick: _cache[4] || (_cache[4] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-            }, "搜索")
+              class: "primary-action-btn",
+              onClick: _cache[0] || (_cache[0] = (...args) => $options.handleAddNotice && $options.handleAddNotice(...args))
+            }, "发布公告")
           ]),
-          vue.createCommentVNode(" 工具栏 "),
-          vue.createElementVNode("view", { class: "tool-bar" }, [
-            vue.createElementVNode("view", { class: "tool-left" }, [
-              vue.createCommentVNode(" 全选 (仅列表有数据时显示) "),
-              $data.noticeList.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 0,
-                class: "check-wrap",
-                onClick: _cache[6] || (_cache[6] = (...args) => $options.testSelectAll && $options.testSelectAll(...args))
-              }, [
-                vue.createElementVNode("checkbox", {
-                  checked: $options.isAllSelected,
-                  color: "#2D81FF",
-                  style: { "transform": "scale(0.8)" },
-                  onClick: _cache[5] || (_cache[5] = vue.withModifiers((...args) => $options.testSelectAll && $options.testSelectAll(...args), ["stop"]))
-                }, null, 8, ["checked"]),
-                vue.createElementVNode("text", { class: "check-text" }, "全选")
-              ])) : vue.createCommentVNode("v-if", true),
-              vue.createCommentVNode(" 选中统计 "),
+          vue.createElementVNode("view", { class: "status-summary-bar" }, [
+            vue.createElementVNode("view", {
+              class: "status-summary-card",
+              onClick: _cache[1] || (_cache[1] = ($event) => $options.applyQuickFilter("", ""))
+            }, [
+              vue.createElementVNode("text", { class: "summary-label" }, "当前列表"),
+              vue.createElementVNode(
+                "text",
+                { class: "summary-value" },
+                vue.toDisplayString($data.total),
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", {
+              class: "status-summary-card published",
+              onClick: _cache[2] || (_cache[2] = ($event) => $options.applyQuickFilter("PUBLISHED", ""))
+            }, [
+              vue.createElementVNode("text", { class: "summary-label" }, "已发布"),
+              vue.createElementVNode(
+                "text",
+                { class: "summary-value" },
+                vue.toDisplayString($data.statusStats.published),
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", {
+              class: "status-summary-card draft",
+              onClick: _cache[3] || (_cache[3] = ($event) => $options.applyQuickFilter("DRAFT", ""))
+            }, [
+              vue.createElementVNode("text", { class: "summary-label" }, "草稿"),
+              vue.createElementVNode(
+                "text",
+                { class: "summary-value" },
+                vue.toDisplayString($data.statusStats.draft),
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", {
+              class: "status-summary-card offline",
+              onClick: _cache[4] || (_cache[4] = ($event) => $options.applyQuickFilter("OFFLINE", ""))
+            }, [
+              vue.createElementVNode("text", { class: "summary-label" }, "已下架"),
+              vue.createElementVNode(
+                "text",
+                { class: "summary-value" },
+                vue.toDisplayString($data.statusStats.offline),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "标题关键词"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => $data.filters.title = $event),
+                    class: "query-input",
+                    placeholder: "搜索公告标题",
+                    "confirm-type": "search",
+                    onConfirm: _cache[6] || (_cache[6] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+                  },
+                  null,
+                  544
+                  /* NEED_HYDRATION, NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.filters.title]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "发布状态"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.statusOptions,
+                  "range-key": "label",
+                  value: $options.statusPickerIndex,
+                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
+                }, [
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "置顶状态"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.topOptions,
+                  "range-key": "label",
+                  value: $options.topPickerIndex,
+                  onChange: _cache[8] || (_cache[8] = (...args) => $options.handleTopChange && $options.handleTopChange(...args))
+                }, [
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentTopLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
+              ])
+            ]),
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[10] || (_cache[10] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "button",
+                {
+                  class: "toolbar-chip",
+                  onClick: _cache[11] || (_cache[11] = (...args) => $options.testSelectAll && $options.testSelectAll(...args))
+                },
+                vue.toDisplayString($options.isAllSelected ? "取消全选" : "全选当前页"),
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
               $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock(
                 "text",
                 {
-                  key: 1,
-                  class: "selected-hint"
+                  key: 0,
+                  class: "toolbar-meta active"
                 },
-                " 已选 " + vue.toDisplayString($data.selectedIds.length),
+                "已选 " + vue.toDisplayString($data.selectedIds.length) + " 条",
                 1
                 /* TEXT */
               )) : vue.createCommentVNode("v-if", true)
             ]),
-            vue.createCommentVNode(" 批量操作 (仅选中时显示) "),
-            $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 0,
-              class: "tool-actions"
-            }, [
-              vue.createElementVNode("view", {
-                class: "action-item delete",
-                onClick: _cache[7] || (_cache[7] = (...args) => $options.handleBatchDelete && $options.handleBatchDelete(...args))
-              }, [
-                vue.createElementVNode("text", null, "删除")
-              ]),
-              vue.createElementVNode("view", {
-                class: "action-item offline",
-                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleBatchOffline && $options.handleBatchOffline(...args))
-              }, [
-                vue.createElementVNode("text", null, "下架")
-              ])
-            ])) : vue.createCommentVNode("v-if", true),
-            vue.createCommentVNode(" 发布按钮 "),
-            vue.createElementVNode("view", { class: "tool-right" }, [
-              vue.createElementVNode("button", {
-                class: "create-btn",
-                onClick: _cache[9] || (_cache[9] = (...args) => $options.handleAddNotice && $options.handleAddNotice(...args))
-              }, "发布公告")
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock("button", {
+                key: 0,
+                class: "toolbar-action danger",
+                onClick: _cache[12] || (_cache[12] = (...args) => $options.handleBatchDelete && $options.handleBatchDelete(...args))
+              }, "批量删除")) : vue.createCommentVNode("v-if", true),
+              $data.selectedIds.length > 0 ? (vue.openBlock(), vue.createElementBlock("button", {
+                key: 1,
+                class: "toolbar-action ghost",
+                onClick: _cache[13] || (_cache[13] = (...args) => $options.handleBatchOffline && $options.handleBatchOffline(...args))
+              }, "批量下架")) : vue.createCommentVNode("v-if", true)
             ])
           ]),
-          vue.createCommentVNode(" 加载 "),
           $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
             key: 0,
             class: "loading-state"
           }, [
             vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-          ])) : $data.noticeList.length ? (vue.openBlock(), vue.createElementBlock(
-            vue.Fragment,
-            { key: 1 },
-            [
-              vue.createCommentVNode(" 列表 "),
-              vue.createElementVNode("view", { class: "notice-list" }, [
-                vue.createElementVNode("view", { class: "list-header" }, [
-                  vue.createElementVNode(
-                    "text",
-                    { class: "total-count" },
-                    "共 " + vue.toDisplayString($data.total) + " 条公告",
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                (vue.openBlock(true), vue.createElementBlock(
-                  vue.Fragment,
-                  null,
-                  vue.renderList($data.noticeList, (notice) => {
-                    return vue.openBlock(), vue.createElementBlock("view", {
-                      key: notice.id,
-                      class: "notice-item"
-                    }, [
-                      vue.createElementVNode("view", { class: "notice-header" }, [
-                        vue.createElementVNode("view", {
-                          class: "header-left",
-                          onClick: ($event) => $options.toggleSelect(notice.id)
-                        }, [
-                          vue.createElementVNode("checkbox", {
-                            checked: $data.selectedIds.includes(notice.id),
-                            color: "#2D81FF",
-                            style: { "transform": "scale(0.8)" },
-                            onClick: vue.withModifiers(($event) => $options.toggleSelect(notice.id), ["stop"])
-                          }, null, 8, ["checked", "onClick"])
-                        ], 8, ["onClick"]),
-                        vue.createElementVNode("view", { class: "tags" }, [
-                          notice.topFlag ? (vue.openBlock(), vue.createElementBlock("text", {
-                            key: 0,
-                            class: "tag top"
-                          }, "置顶")) : vue.createCommentVNode("v-if", true),
-                          vue.createElementVNode(
-                            "text",
-                            {
-                              class: vue.normalizeClass(["tag status", notice.publishStatus.toLowerCase()])
-                            },
-                            vue.toDisplayString($options.getStatusText(notice.publishStatus)),
-                            3
-                            /* TEXT, CLASS */
-                          )
-                        ])
-                      ]),
-                      vue.createElementVNode("view", { class: "notice-info" }, [
-                        vue.createElementVNode(
-                          "text",
-                          { class: "notice-title" },
-                          vue.toDisplayString(notice.title),
-                          1
-                          /* TEXT */
-                        ),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "notice-content" },
-                          vue.toDisplayString(notice.content),
-                          1
-                          /* TEXT */
-                        ),
-                        vue.createElementVNode("view", { class: "meta-row" }, [
-                          vue.createElementVNode(
-                            "text",
-                            { class: "notice-time" },
-                            "发布于: " + vue.toDisplayString(notice.publishTime || "未发布"),
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode("text", {
-                            class: "read-count",
-                            onClick: ($event) => $options.handleReadStat(notice.id)
-                          }, "查看数据 📊", 8, ["onClick"])
-                        ])
-                      ]),
-                      vue.createElementVNode("view", { class: "notice-actions" }, [
-                        vue.createElementVNode("button", {
-                          class: "action-btn edit",
-                          onClick: ($event) => $options.handleEditNotice(notice.id)
-                        }, "编辑", 8, ["onClick"]),
-                        notice.publishStatus !== "PUBLISHED" ? (vue.openBlock(), vue.createElementBlock("button", {
-                          key: 0,
-                          class: "action-btn publish",
-                          onClick: ($event) => $options.handlePublish(notice.id)
-                        }, " 发布 ", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
-                        notice.publishStatus === "PUBLISHED" ? (vue.openBlock(), vue.createElementBlock("button", {
-                          key: 1,
-                          class: "action-btn offline",
-                          onClick: ($event) => $options.handleOffline(notice.id)
-                        }, " 下架 ", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
-                        vue.createElementVNode("button", {
-                          class: "action-btn delete",
-                          onClick: ($event) => $options.handleDeleteNotice(notice.id)
-                        }, "删除", 8, ["onClick"])
-                      ])
-                    ]);
-                  }),
-                  128
-                  /* KEYED_FRAGMENT */
-                ))
-              ])
-            ],
-            2112
-            /* STABLE_FRAGMENT, DEV_ROOT_FRAGMENT */
-          )) : (vue.openBlock(), vue.createElementBlock(
-            vue.Fragment,
-            { key: 2 },
-            [
-              vue.createCommentVNode(" 空 "),
-              vue.createElementVNode("view", { class: "empty-state" }, [
-                vue.createElementVNode("text", null, "暂无公告数据")
-              ])
-            ],
-            2112
-            /* STABLE_FRAGMENT, DEV_ROOT_FRAGMENT */
-          )),
-          vue.createCommentVNode(" 分页 "),
-          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 3,
-            class: "pagination-container"
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
           }, [
-            vue.createElementVNode(
-              "text",
-              { class: "page-info" },
-              "共 " + vue.toDisplayString($data.total) + " 条，当前第 " + vue.toDisplayString($data.currentPage) + "/" + vue.toDisplayString($options.totalPage) + " 页",
-              1
-              /* TEXT */
-            ),
-            vue.createElementVNode("view", { class: "pagination-btns" }, [
+            vue.createElementVNode("view", { class: "table-head" }, [
+              vue.createElementVNode("text", { class: "table-col col-check" }, "选择"),
+              vue.createElementVNode("text", { class: "table-col col-title" }, "标题"),
+              vue.createElementVNode("text", { class: "table-col col-content" }, "内容摘要"),
+              vue.createElementVNode("text", { class: "table-col col-top" }, "置顶"),
+              vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+              vue.createElementVNode("text", { class: "table-col col-time" }, "发布时间"),
+              vue.createElementVNode("text", { class: "table-col col-read" }, "数据"),
+              vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+            ]),
+            (vue.openBlock(true), vue.createElementBlock(
+              vue.Fragment,
+              null,
+              vue.renderList($data.noticeList, (notice, index) => {
+                return vue.openBlock(), vue.createElementBlock(
+                  "view",
+                  {
+                    key: notice.id,
+                    class: "table-row",
+                    style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                  },
+                  [
+                    vue.createElementVNode("view", {
+                      class: "table-col col-check row-check",
+                      onClick: vue.withModifiers(($event) => $options.toggleSelect(notice.id), ["stop"])
+                    }, [
+                      vue.createElementVNode("checkbox", {
+                        checked: $data.selectedIds.includes(notice.id),
+                        color: "#2D81FF",
+                        style: { "transform": "scale(0.8)" }
+                      }, null, 8, ["checked"])
+                    ], 8, ["onClick"]),
+                    vue.createElementVNode("view", { class: "table-col col-title" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "primary-text" },
+                        vue.toDisplayString(notice.title || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-content" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "desc-text" },
+                        vue.toDisplayString(notice.content || "暂无内容"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-top" }, [
+                      vue.createElementVNode(
+                        "text",
+                        {
+                          class: vue.normalizeClass(["badge-pill", notice.topFlag ? "badge-top" : "badge-plain"])
+                        },
+                        vue.toDisplayString(notice.topFlag ? "置顶" : "普通"),
+                        3
+                        /* TEXT, CLASS */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-status" }, [
+                      vue.createElementVNode(
+                        "text",
+                        {
+                          class: vue.normalizeClass(["status-pill", $options.getStatusClass(notice.publishStatus)])
+                        },
+                        vue.toDisplayString($options.getStatusText(notice.publishStatus)),
+                        3
+                        /* TEXT, CLASS */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-time" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString(notice.publishTime || "未发布"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-read" }, [
+                      vue.createElementVNode("button", {
+                        class: "row-btn ghost",
+                        onClick: ($event) => $options.handleReadStat(notice.id)
+                      }, "查看数据", 8, ["onClick"])
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                      vue.createElementVNode("button", {
+                        class: "row-btn ghost",
+                        onClick: ($event) => $options.handleEditNotice(notice.id)
+                      }, "编辑", 8, ["onClick"]),
+                      notice.publishStatus !== "PUBLISHED" ? (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 0,
+                        class: "row-btn primary",
+                        onClick: ($event) => $options.handlePublish(notice.id)
+                      }, "发布", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
+                      notice.publishStatus === "PUBLISHED" ? (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 1,
+                        class: "row-btn secondary-warn",
+                        onClick: ($event) => $options.handleOffline(notice.id)
+                      }, "下架", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
+                      vue.createElementVNode("button", {
+                        class: "row-btn danger",
+                        onClick: ($event) => $options.handleDeleteNotice(notice.id)
+                      }, "删除", 8, ["onClick"])
+                    ])
+                  ],
+                  4
+                  /* STYLE */
+                );
+              }),
+              128
+              /* KEYED_FRAGMENT */
+            )),
+            $data.noticeList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", null, "暂无公告数据")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPage) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === 1,
-                onClick: _cache[10] || (_cache[10] = (...args) => $options.prevPage && $options.prevPage(...args))
-              }, " 上一页 ", 8, ["disabled"]),
+                onClick: _cache[14] || (_cache[14] = (...args) => $options.prevPage && $options.prevPage(...args))
+              }, "上一页", 8, ["disabled"]),
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === $options.totalPage,
-                onClick: _cache[11] || (_cache[11] = (...args) => $options.nextPage && $options.nextPage(...args))
-              }, " 下一页 ", 8, ["disabled"])
+                onClick: _cache[15] || (_cache[15] = (...args) => $options.nextPage && $options.nextPage(...args))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: [10, 20, 50, 100],
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[16] || (_cache[16] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
+                  vue.createElementVNode(
+                    "text",
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.pageSize) + " 条",
+                    1
+                    /* TEXT */
+                  )
+                ], 40, ["value"])
+              ])
             ])
           ])) : vue.createCommentVNode("v-if", true)
         ])
@@ -7273,13 +8097,20 @@ if (uni.restoreGlobal) {
     },
     data() {
       return {
-        parkingList: [],
         showSidebar: false,
         loading: false,
+        currentTab: "order",
+        pageSizeOptions: [10, 20, 50],
+        parkingList: [],
         currentPage: 1,
         pageSize: 10,
         total: 0,
-        currentTab: "order",
+        orderStats: {
+          total: 0,
+          unpaid: 0,
+          paid: 0,
+          cancelled: 0
+        },
         queryParams: {
           plateNo: "",
           status: ""
@@ -7290,7 +8121,6 @@ if (uni.restoreGlobal) {
           { label: "已支付", value: "PAID" },
           { label: "已取消", value: "CANCELLED" }
         ],
-        // 车位数据
         spaceList: [],
         spacePageNum: 1,
         spacePageSize: 10,
@@ -7336,115 +8166,136 @@ if (uni.restoreGlobal) {
         ]
       };
     },
+    computed: {
+      currentTabLabel() {
+        return this.currentTab === "space" ? "车位管理" : "停车订单";
+      },
+      currentOrderStatusLabel() {
+        const option = this.statusOptions.find((item) => item.value === this.queryParams.status);
+        return option ? option.label : "全部状态";
+      },
+      currentSpaceStatusLabel() {
+        const option = this.spaceStatusOptions.find((item) => item.value === this.spaceQueryParams.status);
+        return option ? option.label : "全部状态";
+      },
+      orderStatusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.queryParams.status));
+      },
+      spaceStatusPickerIndex() {
+        return Math.max(0, this.spaceStatusOptions.findIndex((item) => item.value === this.spaceQueryParams.status));
+      },
+      orderPageSizeIndex() {
+        return Math.max(0, this.pageSizeOptions.indexOf(this.pageSize));
+      },
+      spacePageSizeIndex() {
+        return Math.max(0, this.pageSizeOptions.indexOf(this.spacePageSize));
+      },
+      orderTotalPages() {
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      spaceTotalPages() {
+        return Math.max(1, Math.ceil(this.spaceTotal / this.spacePageSize));
+      }
+    },
     onLoad() {
-      this.checkAdminRole();
-      this.loadAllStats();
-      this.loadParkingList();
+      if (!this.checkAdminRole())
+        return;
+      this.refreshCurrentTab();
     },
     onShow() {
-      this.loadAllStats();
-      this.loadParkingList();
+      if (!this.checkAdminRole())
+        return;
+      this.refreshCurrentTab();
     },
     methods: {
-      // 加载全局统计信息
-      async loadAllStats() {
-        this.loadOrderStats();
-        this.loadSpaceStats();
-      },
-      async loadOrderStats() {
-        try {
-          const params = {
-            pageNum: 1,
-            pageSize: 1
-          };
-          if (this.queryParams.plateNo)
-            params.plateNo = this.queryParams.plateNo;
-          if (this.queryParams.status)
-            params.status = this.queryParams.status;
-          const res = await request("/api/parking/order/admin/list", {
-            params
-          }, "GET");
-          if (res && typeof res.total === "number") {
-            this.total = res.total;
-          }
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:440", "加载订单统计失败:", err);
-        }
-      },
-      async loadSpaceStats() {
-        try {
-          const params = {
-            pageNum: 1,
-            pageSize: 1e3
-            // 获取足够多的数据以进行状态统计
-          };
-          if (this.spaceQueryParams.spaceNo)
-            params.spaceNo = this.spaceQueryParams.spaceNo;
-          if (this.spaceQueryParams.status)
-            params.status = this.spaceQueryParams.status;
-          const res = await request("/api/parking/space/admin/list", {
-            params
-          }, "GET");
-          const records = Array.isArray(res && res.records) ? res.records : [];
-          const stats = {
-            total: res.total || records.length,
-            available: 0,
-            occupied: 0,
-            reserved: 0,
-            disabled: 0
-          };
-          records.forEach((item) => {
-            const val = (item.status || "").toString().toUpperCase();
-            if (val === "AVAILABLE" || val === "FREE")
-              stats.available += 1;
-            else if (val === "OCCUPIED")
-              stats.occupied += 1;
-            else if (val === "RESERVED")
-              stats.reserved += 1;
-            else if (val === "DISABLED")
-              stats.disabled += 1;
-          });
-          this.spaceStats = stats;
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:476", "加载车位统计失败:", err);
-        }
-      },
       checkAdminRole() {
         const userInfo = uni.getStorageSync("userInfo");
         if (!userInfo || userInfo.role !== "admin" && userInfo.role !== "super_admin") {
           uni.showToast({ title: "无权限访问", icon: "none" });
           uni.redirectTo({ url: "/owner/pages/login/login" });
-          return;
+          return false;
+        }
+        return true;
+      },
+      refreshCurrentTab() {
+        if (this.currentTab === "space") {
+          this.loadSpaceStats();
+          this.loadSpaceList();
+        } else {
+          this.loadOrderStats();
+          this.loadParkingList();
         }
       },
       switchTab(tab) {
         if (this.currentTab === tab)
           return;
         this.currentTab = tab;
-        if (tab === "order") {
-          if (this.parkingList.length === 0) {
-            this.loadParkingList();
-          }
-        } else if (tab === "space") {
-          this.spacePageNum = 1;
-          this.loadSpaceList();
-        }
+        this.refreshCurrentTab();
       },
-      // 跳转车辆审核页面
       goCarAudit() {
         uni.navigateTo({
           url: "/admin/pages/admin/car-audit"
         });
+      },
+      async fetchOrderTotal(status) {
+        const params = {
+          pageNum: 1,
+          pageSize: 1
+        };
+        if (this.queryParams.plateNo)
+          params.plateNo = this.queryParams.plateNo;
+        if (status)
+          params.status = status;
+        const res = await request("/api/parking/order/admin/list", { params }, "GET");
+        return typeof (res == null ? void 0 : res.total) === "number" ? res.total : 0;
+      },
+      async loadOrderStats() {
+        try {
+          const [total, unpaid, paid, cancelled] = await Promise.all([
+            this.fetchOrderTotal(""),
+            this.fetchOrderTotal("UNPAID"),
+            this.fetchOrderTotal("PAID"),
+            this.fetchOrderTotal("CANCELLED")
+          ]);
+          this.orderStats = { total, unpaid, paid, cancelled };
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:574", "加载订单统计失败:", error);
+        }
       },
       handleSearch() {
         this.currentPage = 1;
         this.loadOrderStats();
         this.loadParkingList();
       },
+      resetOrderQuery() {
+        this.queryParams = {
+          plateNo: "",
+          status: ""
+        };
+        this.currentPage = 1;
+        this.pageSize = 10;
+        this.loadOrderStats();
+        this.loadParkingList();
+      },
       handleStatusChange(e) {
-        const index = e.detail.value;
-        this.queryParams.status = this.statusOptions[index].value;
-        this.handleSearch();
+        const index = Number(e.detail.value);
+        const option = this.statusOptions[index];
+        this.queryParams.status = option ? option.value : "";
+      },
+      applyQuickOrderStatus(status) {
+        this.queryParams.status = status;
+        this.currentPage = 1;
+        this.loadOrderStats();
+        this.loadParkingList();
+      },
+      handleOrderPageSizeChange(e) {
+        const index = Number(e.detail.value);
+        const pageSize = this.pageSizeOptions[index];
+        if (pageSize) {
+          this.pageSize = pageSize;
+          this.currentPage = 1;
+          this.loadParkingList();
+        }
       },
       async loadParkingList() {
         this.loading = true;
@@ -7457,9 +8308,7 @@ if (uni.restoreGlobal) {
             params.plateNo = this.queryParams.plateNo;
           if (this.queryParams.status)
             params.status = this.queryParams.status;
-          const res = await request("/api/parking/order/admin/list", {
-            params
-          }, "GET");
+          const res = await request("/api/parking/order/admin/list", { params }, "GET");
           const records = Array.isArray(res && res.records) ? res.records : [];
           const statusFilter = (this.queryParams.status || "").toString().toUpperCase();
           const filteredRecords = statusFilter ? records.filter((item) => {
@@ -7468,9 +8317,9 @@ if (uni.restoreGlobal) {
               return val === "CANCELLED" || val === "CANCEL";
             return val === statusFilter;
           }) : records;
-          const backendTotal = typeof (res && res.total) === "number" ? res.total : 0;
-          const backendPageNum = Number(res && res.pageNum ? res.pageNum : this.currentPage);
-          const backendPageSize = Number(res && res.pageSize ? res.pageSize : this.pageSize);
+          const backendTotal = typeof (res == null ? void 0 : res.total) === "number" ? res.total : 0;
+          const backendPageNum = Number((res == null ? void 0 : res.pageNum) ? res.pageNum : this.currentPage);
+          const backendPageSize = Number((res == null ? void 0 : res.pageSize) ? res.pageSize : this.pageSize);
           const shouldSlice = filteredRecords.length > backendPageSize && (backendTotal === 0 || backendTotal === filteredRecords.length);
           const effectivePageNum = shouldSlice ? this.currentPage : backendPageNum;
           const effectivePageSize = shouldSlice ? this.pageSize : backendPageSize;
@@ -7494,10 +8343,10 @@ if (uni.restoreGlobal) {
             payTime: item.payTime,
             payChannel: item.payChannel
           }));
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:578", "加载停车列表失败:", err);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:660", "加载停车列表失败:", error);
           uni.showToast({
-            title: (err == null ? void 0 : err.message) || "加载失败",
+            title: (error == null ? void 0 : error.message) || "加载失败",
             icon: "none"
           });
         } finally {
@@ -7507,14 +8356,15 @@ if (uni.restoreGlobal) {
       async handleRenew(orderId) {
         try {
           const userInfo = uni.getStorageSync("userInfo");
-          if (!userInfo || !userInfo.id) {
+          const userId = userInfo && (userInfo.id || userInfo.userId);
+          if (!userId) {
             uni.showToast({ title: "请先登录", icon: "none" });
             return;
           }
           uni.showLoading({ title: "处理中..." });
           await request(`/api/parking/order/${orderId}/pay`, {
             data: {
-              userId: userInfo.id,
+              userId,
               payChannel: "WECHAT",
               payRemark: "管理员端支付"
             }
@@ -7522,36 +8372,42 @@ if (uni.restoreGlobal) {
           uni.showToast({ title: "支付成功", icon: "success" });
           this.loadOrderStats();
           this.loadParkingList();
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:610", "支付失败:", err);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:689", "支付失败:", error);
           uni.showToast({
-            title: (err == null ? void 0 : err.message) || "支付失败",
+            title: (error == null ? void 0 : error.message) || "支付失败",
             icon: "none"
           });
         } finally {
           uni.hideLoading();
         }
       },
-      getStatusClass(status) {
+      getOrderStatusClass(status) {
         const val = (status || "").toString().toUpperCase();
-        return {
-          "status-active": val === "PAID" || val === "SUCCESS" || val === "ACTIVE",
-          "status-expired": val === "UNPAID" || val === "WAITING_PAY" || val === "EXPIRED"
-        };
+        if (val === "PAID" || val === "SUCCESS" || val === "ACTIVE")
+          return "order-paid";
+        if (val === "UNPAID" || val === "WAITING_PAY")
+          return "order-unpaid";
+        if (val === "CANCELLED" || val === "CANCEL")
+          return "order-cancelled";
+        return "order-expired";
       },
-      getStatusText(status) {
+      getOrderStatusText(status) {
         const val = (status || "").toString().toUpperCase();
         const statusMap = {
-          "UNPAID": "待支付",
-          "WAITING_PAY": "待支付",
-          "PAID": "已支付",
-          "SUCCESS": "已支付",
-          "ACTIVE": "正常",
-          "EXPIRED": "已过期",
-          "CANCELLED": "已取消",
-          "CANCEL": "已取消"
+          UNPAID: "待支付",
+          WAITING_PAY: "待支付",
+          PAID: "已支付",
+          SUCCESS: "已支付",
+          ACTIVE: "正常",
+          EXPIRED: "已过期",
+          CANCELLED: "已取消",
+          CANCEL: "已取消"
         };
         return statusMap[val] || status || "";
+      },
+      getOrderTypeText(type) {
+        return String(type).toUpperCase() === "TEMP" ? "临时停车" : "固定车位";
       },
       isUnpaid(status) {
         const val = (status || "").toString().toUpperCase();
@@ -7565,38 +8421,77 @@ if (uni.restoreGlobal) {
           return "支付宝";
         if (val === "CASH")
           return "现金";
+        if (val === "BALANCE")
+          return "余额";
         return channel || "-";
       },
-      formatTime(time) {
-        if (!time)
-          return "";
-        return new Date(time).toLocaleString();
+      async fetchSpaceTotal(status) {
+        const params = {
+          pageNum: 1,
+          pageSize: 1
+        };
+        if (this.spaceQueryParams.spaceNo)
+          params.spaceNo = this.spaceQueryParams.spaceNo;
+        if (status)
+          params.status = status;
+        const res = await request("/api/parking/space/admin/list", { params }, "GET");
+        return typeof (res == null ? void 0 : res.total) === "number" ? res.total : 0;
       },
-      getStatusLabel(value) {
-        const option = this.statusOptions && this.statusOptions.find((opt) => opt.value === value);
-        return option ? option.label : "";
+      async loadSpaceStats() {
+        try {
+          const [total, available, occupied, reserved, disabled] = await Promise.all([
+            this.fetchSpaceTotal(""),
+            this.fetchSpaceTotal("AVAILABLE"),
+            this.fetchSpaceTotal("OCCUPIED"),
+            this.fetchSpaceTotal("RESERVED"),
+            this.fetchSpaceTotal("DISABLED")
+          ]);
+          this.spaceStats = { total, available, occupied, reserved, disabled };
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:755", "加载车位统计失败:", error);
+        }
       },
-      // --- 车位管理相关方法 ---
       handleSpaceSearch() {
         this.spacePageNum = 1;
         this.loadSpaceStats();
         this.loadSpaceList();
       },
-      handleSpaceStatusChange(e) {
-        const index = e.detail.value;
-        this.spaceQueryParams.status = this.spaceStatusOptions[index].value;
-        this.handleSpaceSearch();
+      resetSpaceQuery() {
+        this.spaceQueryParams = {
+          spaceNo: "",
+          status: ""
+        };
+        this.spacePageNum = 1;
+        this.spacePageSize = 10;
+        this.loadSpaceStats();
+        this.loadSpaceList();
       },
-      getSpaceStatusLabel(value) {
-        const option = this.spaceStatusOptions.find((opt) => opt.value === value);
-        return option ? option.label : "";
+      handleSpaceStatusChange(e) {
+        const index = Number(e.detail.value);
+        const option = this.spaceStatusOptions[index];
+        this.spaceQueryParams.status = option ? option.value : "";
+      },
+      applyQuickSpaceStatus(status) {
+        this.spaceQueryParams.status = status;
+        this.spacePageNum = 1;
+        this.loadSpaceStats();
+        this.loadSpaceList();
+      },
+      handleSpacePageSizeChange(e) {
+        const index = Number(e.detail.value);
+        const pageSize = this.pageSizeOptions[index];
+        if (pageSize) {
+          this.spacePageSize = pageSize;
+          this.spacePageNum = 1;
+          this.loadSpaceList();
+        }
       },
       getLeaseTypeLabel(value) {
-        const option = this.leaseTypeOptions.find((opt) => opt.value === value);
+        const option = this.leaseTypeOptions.find((item) => item.value === value);
         return option ? option.label : "请选择类型";
       },
       getPayChannelLabel(value) {
-        const option = this.payChannelOptions.find((opt) => opt.value === value);
+        const option = this.payChannelOptions.find((item) => item.value === value);
         return option ? option.label : "请选择支付方式";
       },
       isSpaceReservable(space) {
@@ -7609,37 +8504,32 @@ if (uni.restoreGlobal) {
         const expire = new Date(time).getTime();
         if (!expire || Number.isNaN(expire))
           return false;
-        const now = Date.now();
-        const diff = expire - now;
+        const diff = expire - Date.now();
         const sevenDays = 7 * 24 * 60 * 60 * 1e3;
         return diff > 0 && diff <= sevenDays;
       },
       getSpaceStatusText(status) {
         const val = (status || "").toString().toUpperCase();
         const statusMap = {
-          "AVAILABLE": "空闲可用",
-          "FREE": "空闲可用",
-          "OCCUPIED": "已占用",
-          "RESERVED": "已预订",
-          "DISABLED": "已禁用"
+          AVAILABLE: "空闲可用",
+          FREE: "空闲可用",
+          OCCUPIED: "已占用",
+          RESERVED: "已预订",
+          DISABLED: "已禁用"
         };
         return statusMap[val] || status || "";
       },
       getSpaceStatusClass(status) {
         const val = (status || "").toString().toUpperCase();
-        if (val === "AVAILABLE" || val === "FREE") {
-          return "status-available";
-        }
-        if (val === "OCCUPIED") {
-          return "status-occupied";
-        }
-        if (val === "RESERVED") {
-          return "status-reserved";
-        }
-        if (val === "DISABLED") {
-          return "status-disabled";
-        }
-        return "";
+        if (val === "AVAILABLE" || val === "FREE")
+          return "space-available";
+        if (val === "OCCUPIED")
+          return "space-occupied";
+        if (val === "RESERVED")
+          return "space-reserved";
+        if (val === "DISABLED")
+          return "space-disabled";
+        return "space-disabled";
       },
       async loadSpaceList() {
         this.loading = true;
@@ -7652,9 +8542,7 @@ if (uni.restoreGlobal) {
             params.spaceNo = this.spaceQueryParams.spaceNo;
           if (this.spaceQueryParams.status)
             params.status = this.spaceQueryParams.status;
-          const res = await request("/api/parking/space/admin/list", {
-            params
-          }, "GET");
+          const res = await request("/api/parking/space/admin/list", { params }, "GET");
           const records = Array.isArray(res && res.records) ? res.records : [];
           const spaceStatusFilter = (this.spaceQueryParams.status || "").toString().toUpperCase();
           const filteredRecords = spaceStatusFilter ? records.filter((item) => {
@@ -7664,9 +8552,9 @@ if (uni.restoreGlobal) {
             }
             return val === spaceStatusFilter;
           }) : records;
-          const backendTotal = typeof (res && res.total) === "number" ? res.total : 0;
-          const backendPageNum = Number(res && res.pageNum ? res.pageNum : this.spacePageNum);
-          const backendPageSize = Number(res && res.pageSize ? res.pageSize : this.spacePageSize);
+          const backendTotal = typeof (res == null ? void 0 : res.total) === "number" ? res.total : 0;
+          const backendPageNum = Number((res == null ? void 0 : res.pageNum) ? res.pageNum : this.spacePageNum);
+          const backendPageSize = Number((res == null ? void 0 : res.pageSize) ? res.pageSize : this.spacePageSize);
           const shouldSlice = filteredRecords.length > backendPageSize && (backendTotal === 0 || backendTotal === filteredRecords.length);
           const effectivePageNum = shouldSlice ? this.spacePageNum : backendPageNum;
           const effectivePageSize = shouldSlice ? this.spacePageSize : backendPageSize;
@@ -7676,17 +8564,18 @@ if (uni.restoreGlobal) {
             this.spacePageSize = backendPageSize;
           }
           const uniqueRecords = [];
-          const spaceIds = /* @__PURE__ */ new Set();
+          const seenKeys = /* @__PURE__ */ new Set();
           filteredRecords.forEach((item) => {
-            if (!spaceIds.has(item.id)) {
-              spaceIds.add(item.id);
+            const key = item.id || item.spaceNo;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
               uniqueRecords.push(item);
             }
           });
-          const finalList = shouldSlice ? uniqueRecords.slice((effectivePageNum - 1) * effectivePageSize, effectivePageNum * effectivePageSize) : uniqueRecords;
-          this.spaceList = finalList;
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:792", "加载车位列表失败:", err);
+          this.spaceList = shouldSlice ? uniqueRecords.slice((effectivePageNum - 1) * effectivePageSize, effectivePageNum * effectivePageSize) : uniqueRecords;
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:877", "加载车位列表失败:", error);
+          uni.showToast({ title: "加载失败", icon: "none" });
         } finally {
           this.loading = false;
         }
@@ -7717,9 +8606,9 @@ if (uni.restoreGlobal) {
               uni.showToast({ title: "预订成功", icon: "success" });
               this.loadSpaceStats();
               this.loadSpaceList();
-            } catch (e) {
-              formatAppLog("error", "at admin/pages/admin/parking-manage.vue:824", "预订失败:", e);
-              uni.showToast({ title: (e == null ? void 0 : e.message) || "预订失败", icon: "none" });
+            } catch (error) {
+              formatAppLog("error", "at admin/pages/admin/parking-manage.vue:909", "预订失败:", error);
+              uni.showToast({ title: (error == null ? void 0 : error.message) || "预订失败", icon: "none" });
             } finally {
               uni.hideLoading();
             }
@@ -7728,30 +8617,31 @@ if (uni.restoreGlobal) {
       },
       handleOpenLease(space) {
         this.leaseDialogSpace = space;
-        this.leaseForm.userId = space.userId || space.ownerId || "";
-        this.leaseForm.plateNo = space.plateNo || "";
-        this.leaseForm.leaseType = "MONTHLY";
-        this.leaseForm.durationMonths = 1;
-        this.leaseForm.payChannel = "CASH";
-        this.leaseForm.remark = "";
+        this.leaseForm = {
+          userId: space.userId || space.ownerId || "",
+          plateNo: space.plateNo || "",
+          leaseType: "MONTHLY",
+          durationMonths: 1,
+          payChannel: "CASH",
+          remark: ""
+        };
         this.showLeaseDialog = true;
       },
       closeLeaseDialog() {
         this.showLeaseDialog = false;
+        this.leaseDialogSpace = null;
       },
       handleLeaseTypeChange(e) {
-        const index = e.detail.value;
+        const index = Number(e.detail.value);
         const option = this.leaseTypeOptions[index];
-        if (option) {
+        if (option)
           this.leaseForm.leaseType = option.value;
-        }
       },
       handlePayChannelChange(e) {
-        const index = e.detail.value;
+        const index = Number(e.detail.value);
         const option = this.payChannelOptions[index];
-        if (option) {
+        if (option)
           this.leaseForm.payChannel = option.value;
-        }
       },
       async confirmLease() {
         if (!this.leaseDialogSpace || !this.leaseDialogSpace.id) {
@@ -7769,9 +8659,8 @@ if (uni.restoreGlobal) {
           return;
         }
         let duration = Number(this.leaseForm.durationMonths);
-        if (!duration || duration <= 0) {
+        if (!duration || duration <= 0)
           duration = 1;
-        }
         try {
           uni.showLoading({ title: "创建订单中..." });
           const orderId = await request("/api/parking/lease/order/create", {
@@ -7779,7 +8668,6 @@ if (uni.restoreGlobal) {
               userId,
               spaceId: this.leaseDialogSpace.id,
               plateNo,
-              // 传递车牌号
               leaseType: this.leaseForm.leaseType,
               durationMonths: duration,
               remark: this.leaseForm.remark
@@ -7793,591 +8681,946 @@ if (uni.restoreGlobal) {
             }
           }, "POST");
           uni.showToast({ title: "办理成功", icon: "success" });
-          this.showLeaseDialog = false;
+          this.closeLeaseDialog();
           this.loadSpaceStats();
           this.loadSpaceList();
-        } catch (err) {
-          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:912", "办理失败:", err);
-          uni.showToast({ title: (err == null ? void 0 : err.message) || "办理失败", icon: "none" });
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/parking-manage.vue:984", "办理失败:", error);
+          uni.showToast({ title: (error == null ? void 0 : error.message) || "办理失败", icon: "none" });
         } finally {
           uni.hideLoading();
         }
       },
-      // -----------------------
       changePage(delta) {
-        this.currentPage += delta;
+        const next = this.currentPage + delta;
+        if (next < 1 || next > this.orderTotalPages)
+          return;
+        this.currentPage = next;
         this.loadParkingList();
       },
       changeSpacePage(delta) {
-        this.spacePageNum += delta;
-        if (this.spacePageNum < 1)
-          this.spacePageNum = 1;
+        const next = this.spacePageNum + delta;
+        if (next < 1 || next > this.spaceTotalPages)
+          return;
+        this.spacePageNum = next;
         this.loadSpaceList();
+      },
+      formatTime(time) {
+        if (!time)
+          return "";
+        const date = new Date(time);
+        if (Number.isNaN(date.getTime()))
+          return time;
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hour = String(date.getHours()).padStart(2, "0");
+        const minute = String(date.getMinutes()).padStart(2, "0");
+        return `${year}-${month}-${day} ${hour}:${minute}`;
       }
     }
   };
   function _sfc_render$k(_ctx, _cache, $props, $setup, $data, $options) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
-    return vue.openBlock(), vue.createElementBlock(
-      vue.Fragment,
-      null,
-      [
-        vue.createVNode(_component_admin_sidebar, {
-          showSidebar: $data.showSidebar,
-          "onUpdate:showSidebar": _cache[15] || (_cache[15] = ($event) => $data.showSidebar = $event),
-          pageTitle: "停车管理",
-          currentPage: "/admin/pages/admin/parking-manage"
-        }, {
-          default: vue.withCtx(() => [
-            vue.createElementVNode("view", { class: "manage-container" }, [
-              vue.createCommentVNode(" 顶部标签栏 "),
-              vue.createElementVNode("view", { class: "tabs" }, [
+    return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
+      showSidebar: $data.showSidebar,
+      "onUpdate:showSidebar": _cache[39] || (_cache[39] = ($event) => $data.showSidebar = $event),
+      pageTitle: "停车管理",
+      currentPage: "/admin/pages/admin/parking-manage",
+      pageBreadcrumb: "管理后台 / 停车管理",
+      showPageBanner: false
+    }, {
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "停车业务中心"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一管理停车订单和车位资源，并保留车辆审核、订单支付、车位预订和月卡办理流程。")
+            ]),
+            vue.createElementVNode("view", { class: "overview-actions" }, [
+              vue.createElementVNode("view", { class: "overview-chip" }, [
+                vue.createElementVNode("text", { class: "overview-chip-label" }, "当前模块"),
                 vue.createElementVNode(
-                  "view",
-                  {
-                    class: vue.normalizeClass(["tab-item", { active: $data.currentTab === "order" }]),
-                    onClick: _cache[0] || (_cache[0] = ($event) => $options.switchTab("order"))
-                  },
-                  [
-                    vue.createElementVNode("text", null, "停车订单"),
-                    $data.currentTab === "order" ? (vue.openBlock(), vue.createElementBlock("view", {
-                      key: 0,
-                      class: "tab-line"
-                    })) : vue.createCommentVNode("v-if", true)
-                  ],
-                  2
-                  /* CLASS */
-                ),
-                vue.createElementVNode(
-                  "view",
-                  {
-                    class: vue.normalizeClass(["tab-item", { active: $data.currentTab === "space" }]),
-                    onClick: _cache[1] || (_cache[1] = ($event) => $options.switchTab("space"))
-                  },
-                  [
-                    vue.createElementVNode("text", null, "车位管理"),
-                    $data.currentTab === "space" ? (vue.openBlock(), vue.createElementBlock("view", {
-                      key: 0,
-                      class: "tab-line"
-                    })) : vue.createCommentVNode("v-if", true)
-                  ],
-                  2
-                  /* CLASS */
-                ),
-                vue.createCommentVNode(" 新增车辆审核入口 "),
-                vue.createElementVNode("view", {
-                  class: "tab-item",
-                  onClick: _cache[2] || (_cache[2] = (...args) => $options.goCarAudit && $options.goCarAudit(...args))
-                }, [
-                  vue.createElementVNode("text", null, "车辆审核")
-                ])
+                  "text",
+                  { class: "overview-chip-value" },
+                  vue.toDisplayString($options.currentTabLabel),
+                  1
+                  /* TEXT */
+                )
               ]),
-              vue.createCommentVNode(" 停车订单列表 "),
-              $data.currentTab === "order" ? (vue.openBlock(), vue.createElementBlock("view", { key: 0 }, [
-                vue.createCommentVNode(" 搜索筛选区 "),
-                vue.createElementVNode("view", { class: "filter-section" }, [
-                  vue.createElementVNode("view", { class: "filter-row" }, [
+              vue.createElementVNode("button", {
+                class: "primary-action-btn",
+                onClick: _cache[0] || (_cache[0] = (...args) => $options.goCarAudit && $options.goCarAudit(...args))
+              }, "车辆审核")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "tab-switch-bar" }, [
+            vue.createElementVNode(
+              "button",
+              {
+                class: vue.normalizeClass(["tab-switch-btn", { active: $data.currentTab === "order" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.switchTab("order"))
+              },
+              " 停车订单 ",
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "button",
+              {
+                class: vue.normalizeClass(["tab-switch-btn", { active: $data.currentTab === "space" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.switchTab("space"))
+              },
+              " 车位管理 ",
+              2
+              /* CLASS */
+            )
+          ]),
+          $data.currentTab === "order" ? (vue.openBlock(), vue.createElementBlock(
+            vue.Fragment,
+            { key: 0 },
+            [
+              vue.createElementVNode("view", { class: "status-summary-bar parking-order-bar" }, [
+                vue.createElementVNode(
+                  "view",
+                  {
+                    class: vue.normalizeClass(["status-summary-card", { active: $data.queryParams.status === "" }]),
+                    onClick: _cache[3] || (_cache[3] = ($event) => $options.applyQuickOrderStatus(""))
+                  },
+                  [
+                    vue.createElementVNode("text", { class: "summary-label" }, "全部订单"),
+                    vue.createElementVNode(
+                      "text",
+                      { class: "summary-value" },
+                      vue.toDisplayString($data.orderStats.total),
+                      1
+                      /* TEXT */
+                    )
+                  ],
+                  2
+                  /* CLASS */
+                ),
+                vue.createElementVNode(
+                  "view",
+                  {
+                    class: vue.normalizeClass(["status-summary-card unpaid", { active: $data.queryParams.status === "UNPAID" }]),
+                    onClick: _cache[4] || (_cache[4] = ($event) => $options.applyQuickOrderStatus("UNPAID"))
+                  },
+                  [
+                    vue.createElementVNode("text", { class: "summary-label" }, "待支付"),
+                    vue.createElementVNode(
+                      "text",
+                      { class: "summary-value" },
+                      vue.toDisplayString($data.orderStats.unpaid),
+                      1
+                      /* TEXT */
+                    )
+                  ],
+                  2
+                  /* CLASS */
+                ),
+                vue.createElementVNode(
+                  "view",
+                  {
+                    class: vue.normalizeClass(["status-summary-card paid", { active: $data.queryParams.status === "PAID" }]),
+                    onClick: _cache[5] || (_cache[5] = ($event) => $options.applyQuickOrderStatus("PAID"))
+                  },
+                  [
+                    vue.createElementVNode("text", { class: "summary-label" }, "已支付"),
+                    vue.createElementVNode(
+                      "text",
+                      { class: "summary-value" },
+                      vue.toDisplayString($data.orderStats.paid),
+                      1
+                      /* TEXT */
+                    )
+                  ],
+                  2
+                  /* CLASS */
+                ),
+                vue.createElementVNode(
+                  "view",
+                  {
+                    class: vue.normalizeClass(["status-summary-card cancelled", { active: $data.queryParams.status === "CANCELLED" }]),
+                    onClick: _cache[6] || (_cache[6] = ($event) => $options.applyQuickOrderStatus("CANCELLED"))
+                  },
+                  [
+                    vue.createElementVNode("text", { class: "summary-label" }, "已取消"),
+                    vue.createElementVNode(
+                      "text",
+                      { class: "summary-value" },
+                      vue.toDisplayString($data.orderStats.cancelled),
+                      1
+                      /* TEXT */
+                    )
+                  ],
+                  2
+                  /* CLASS */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "query-panel" }, [
+                vue.createElementVNode("view", { class: "query-grid parking-query-grid" }, [
+                  vue.createElementVNode("view", { class: "query-field" }, [
+                    vue.createElementVNode("text", { class: "query-label" }, "车牌号"),
                     vue.withDirectives(vue.createElementVNode(
                       "input",
                       {
-                        class: "search-input",
-                        "onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => $data.queryParams.plateNo = $event),
+                        "onUpdate:modelValue": _cache[7] || (_cache[7] = ($event) => $data.queryParams.plateNo = $event),
+                        class: "query-input",
+                        type: "text",
                         placeholder: "请输入车牌号",
-                        "confirm-type": "search",
-                        onConfirm: _cache[4] || (_cache[4] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+                        onConfirm: _cache[8] || (_cache[8] = (...args) => $options.handleSearch && $options.handleSearch(...args))
                       },
                       null,
                       544
                       /* NEED_HYDRATION, NEED_PATCH */
                     ), [
                       [vue.vModelText, $data.queryParams.plateNo]
-                    ]),
+                    ])
+                  ]),
+                  vue.createElementVNode("view", { class: "query-field" }, [
+                    vue.createElementVNode("text", { class: "query-label" }, "订单状态"),
                     vue.createElementVNode("picker", {
-                      class: "status-picker",
                       mode: "selector",
                       range: $data.statusOptions,
                       "range-key": "label",
-                      onChange: _cache[5] || (_cache[5] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
+                      value: $options.orderStatusPickerIndex,
+                      onChange: _cache[9] || (_cache[9] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
                     }, [
-                      vue.createElementVNode("view", { class: "picker-value" }, [
-                        vue.createTextVNode(
-                          vue.toDisplayString($options.getStatusLabel($data.queryParams.status) || "全部状态") + " ",
+                      vue.createElementVNode("view", { class: "query-picker" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "query-picker-text" },
+                          vue.toDisplayString($options.currentOrderStatusLabel),
                           1
                           /* TEXT */
-                        ),
-                        vue.createElementVNode("text", { class: "iconfont" }, "▼")
+                        )
                       ])
-                    ], 40, ["range"])
-                  ]),
+                    ], 40, ["range", "value"])
+                  ])
+                ]),
+                vue.createElementVNode("view", { class: "query-actions" }, [
                   vue.createElementVNode("button", {
-                    class: "search-btn",
-                    onClick: _cache[6] || (_cache[6] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-                  }, "查询")
+                    class: "query-btn primary",
+                    onClick: _cache[10] || (_cache[10] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+                  }, "查询"),
+                  vue.createElementVNode("button", {
+                    class: "query-btn secondary",
+                    onClick: _cache[11] || (_cache[11] = (...args) => $options.resetOrderQuery && $options.resetOrderQuery(...args))
+                  }, "重置")
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "table-toolbar" }, [
+                vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+                  vue.createElementVNode(
+                    "text",
+                    { class: "toolbar-meta" },
+                    "共 " + vue.toDisplayString($data.total) + " 条订单",
+                    1
+                    /* TEXT */
+                  ),
+                  vue.createElementVNode(
+                    "text",
+                    { class: "toolbar-meta active" },
+                    "当前状态：" + vue.toDisplayString($options.currentOrderStatusLabel),
+                    1
+                    /* TEXT */
+                  )
                 ]),
-                vue.createCommentVNode(" 统计卡片 "),
-                vue.createElementVNode("view", { class: "stats-card" }, [
-                  vue.createElementVNode("view", { class: "stat-item" }, [
-                    vue.createElementVNode(
-                      "text",
-                      { class: "stat-num" },
-                      vue.toDisplayString($data.total),
-                      1
-                      /* TEXT */
-                    ),
-                    vue.createElementVNode("text", { class: "stat-label" }, "总订单数")
+                vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+                  vue.createElementVNode(
+                    "text",
+                    { class: "toolbar-meta" },
+                    "当前页 " + vue.toDisplayString($data.parkingList.length) + " 条",
+                    1
+                    /* TEXT */
+                  )
+                ])
+              ]),
+              $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+                key: 0,
+                class: "loading-state"
+              }, [
+                vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+              ])) : (vue.openBlock(), vue.createElementBlock("view", {
+                key: 1,
+                class: "table-panel"
+              }, [
+                vue.createElementVNode("view", { class: "scroll-table" }, [
+                  vue.createElementVNode("view", { class: "table-head parking-order-table" }, [
+                    vue.createElementVNode("text", { class: "table-col col-order" }, "订单号"),
+                    vue.createElementVNode("text", { class: "table-col col-plate" }, "车牌号"),
+                    vue.createElementVNode("text", { class: "table-col col-space" }, "车位 / 业主"),
+                    vue.createElementVNode("text", { class: "table-col col-type" }, "类型 / 金额"),
+                    vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+                    vue.createElementVNode("text", { class: "table-col col-time" }, "停车时段"),
+                    vue.createElementVNode("text", { class: "table-col col-pay" }, "支付信息"),
+                    vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
                   ]),
-                  vue.createCommentVNode(" 可以根据API返回添加更多统计 ")
-                ]),
-                vue.createElementVNode("view", { class: "parking-list" }, [
                   (vue.openBlock(true), vue.createElementBlock(
                     vue.Fragment,
                     null,
-                    vue.renderList($data.parkingList, (parking) => {
-                      return vue.openBlock(), vue.createElementBlock("view", {
-                        key: parking.orderId,
-                        class: "parking-item"
-                      }, [
-                        vue.createElementVNode("view", { class: "parking-info" }, [
-                          vue.createElementVNode(
-                            "text",
-                            { class: "parking-number" },
-                            "订单号：" + vue.toDisplayString(parking.orderNo),
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode(
-                            "text",
-                            { class: "car-number" },
-                            "车牌号：" + vue.toDisplayString(parking.plateNo || "-"),
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode(
-                            "text",
-                            { class: "owner-name" },
-                            " 车位号：" + vue.toDisplayString(parking.spaceNo || "-") + " 业主：" + vue.toDisplayString(parking.ownerName || "-"),
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode(
-                            "text",
-                            { class: "owner-name" },
-                            " 类型：" + vue.toDisplayString(parking.orderType === "TEMP" ? "临时停车" : "固定车位") + "，金额：" + vue.toDisplayString(parking.amount) + " 元 ",
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode(
-                            "text",
-                            {
-                              class: vue.normalizeClass(["status", $options.getStatusClass(parking.status)])
-                            },
-                            vue.toDisplayString($options.getStatusText(parking.status)),
-                            3
-                            /* TEXT, CLASS */
-                          ),
-                          vue.createElementVNode(
-                            "text",
-                            { class: "expire-time" },
-                            " 时段：" + vue.toDisplayString($options.formatTime(parking.startTime)) + " ~ " + vue.toDisplayString($options.formatTime(parking.endTime)),
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode("text", { class: "expire-time" }, [
-                            vue.createTextVNode(
-                              " 支付方式：" + vue.toDisplayString($options.formatPayChannel(parking.payChannel)) + " ",
+                    vue.renderList($data.parkingList, (parking, index) => {
+                      return vue.openBlock(), vue.createElementBlock(
+                        "view",
+                        {
+                          key: parking.orderId || index,
+                          class: "table-row parking-order-table",
+                          style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                        },
+                        [
+                          vue.createElementVNode("view", { class: "table-col col-order" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "primary-text" },
+                              vue.toDisplayString(parking.orderNo || "-"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-plate" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "plain-text" },
+                              vue.toDisplayString(parking.plateNo || "-"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-space" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "primary-text" },
+                              vue.toDisplayString(parking.spaceNo || "-"),
                               1
                               /* TEXT */
                             ),
-                            parking.payTime ? (vue.openBlock(), vue.createElementBlock(
+                            vue.createElementVNode(
                               "text",
-                              { key: 0 },
-                              "，支付时间：" + vue.toDisplayString($options.formatTime(parking.payTime)),
+                              { class: "minor-text" },
+                              vue.toDisplayString(parking.ownerName || "暂无业主"),
                               1
                               /* TEXT */
-                            )) : vue.createCommentVNode("v-if", true)
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-type" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "plain-text" },
+                              vue.toDisplayString($options.getOrderTypeText(parking.orderType)),
+                              1
+                              /* TEXT */
+                            ),
+                            vue.createElementVNode(
+                              "text",
+                              { class: "minor-text" },
+                              vue.toDisplayString(parking.amount != null ? `${parking.amount} 元` : "-"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-status" }, [
+                            vue.createElementVNode(
+                              "text",
+                              {
+                                class: vue.normalizeClass(["status-pill", $options.getOrderStatusClass(parking.status)])
+                              },
+                              vue.toDisplayString($options.getOrderStatusText(parking.status)),
+                              3
+                              /* TEXT, CLASS */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-time" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "desc-text" },
+                              vue.toDisplayString($options.formatTime(parking.startTime)) + " ~ " + vue.toDisplayString($options.formatTime(parking.endTime)),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-pay" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "plain-text" },
+                              vue.toDisplayString($options.formatPayChannel(parking.payChannel)),
+                              1
+                              /* TEXT */
+                            ),
+                            vue.createElementVNode(
+                              "text",
+                              { class: "minor-text" },
+                              vue.toDisplayString(parking.payTime ? $options.formatTime(parking.payTime) : "未支付"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                            $options.isUnpaid(parking.status) ? (vue.openBlock(), vue.createElementBlock("button", {
+                              key: 0,
+                              class: "row-btn primary",
+                              onClick: ($event) => $options.handleRenew(parking.orderId)
+                            }, "去支付", 8, ["onClick"])) : (vue.openBlock(), vue.createElementBlock("text", {
+                              key: 1,
+                              class: "minor-text"
+                            }, "无需处理"))
                           ])
-                        ]),
-                        $options.isUnpaid(parking.status) ? (vue.openBlock(), vue.createElementBlock("button", {
-                          key: 0,
-                          class: "renew-btn",
-                          onClick: ($event) => $options.handleRenew(parking.orderId)
-                        }, " 去支付 ", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
-                      ]);
+                        ],
+                        4
+                        /* STYLE */
+                      );
                     }),
                     128
                     /* KEYED_FRAGMENT */
                   ))
                 ]),
-                vue.createCommentVNode(" 空状态 "),
-                $data.parkingList.length === 0 && !$data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+                $data.parkingList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
                   key: 0,
                   class: "empty-state"
                 }, [
-                  vue.createElementVNode("text", null, "暂无停车记录")
-                ])) : vue.createCommentVNode("v-if", true),
-                vue.createCommentVNode(" 分页控制 "),
-                $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                  key: 1,
-                  class: "pagination"
-                }, [
+                  vue.createElementVNode("text", null, "暂无停车订单")
+                ])) : vue.createCommentVNode("v-if", true)
+              ])),
+              $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+                key: 2,
+                class: "pagination"
+              }, [
+                vue.createElementVNode("view", { class: "page-meta" }, [
+                  vue.createElementVNode(
+                    "text",
+                    null,
+                    "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.orderTotalPages) + " 页",
+                    1
+                    /* TEXT */
+                  )
+                ]),
+                vue.createElementVNode("view", { class: "page-controls" }, [
                   vue.createElementVNode("button", {
                     class: "page-btn",
                     disabled: $data.currentPage <= 1,
-                    onClick: _cache[7] || (_cache[7] = ($event) => $options.changePage(-1))
+                    onClick: _cache[12] || (_cache[12] = ($event) => $options.changePage(-1))
                   }, "上一页", 8, ["disabled"]),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "page-info" },
-                    vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString(Math.ceil($data.total / $data.pageSize) || 1),
-                    1
-                    /* TEXT */
-                  ),
                   vue.createElementVNode("button", {
                     class: "page-btn",
-                    disabled: $data.currentPage >= Math.ceil($data.total / $data.pageSize),
-                    onClick: _cache[8] || (_cache[8] = ($event) => $options.changePage(1))
-                  }, "下一页", 8, ["disabled"])
-                ])) : vue.createCommentVNode("v-if", true)
-              ])) : vue.createCommentVNode("v-if", true),
-              vue.createCommentVNode(" 车位管理列表 "),
-              $data.currentTab === "space" ? (vue.openBlock(), vue.createElementBlock("view", { key: 1 }, [
-                vue.createElementVNode("view", { class: "stats-card" }, [
-                  vue.createElementVNode("view", { class: "stat-item" }, [
+                    disabled: $data.currentPage >= $options.orderTotalPages,
+                    onClick: _cache[13] || (_cache[13] = ($event) => $options.changePage(1))
+                  }, "下一页", 8, ["disabled"]),
+                  vue.createElementVNode("view", { class: "page-size" }, [
+                    vue.createElementVNode("text", null, "每页"),
+                    vue.createElementVNode("picker", {
+                      mode: "selector",
+                      range: $data.pageSizeOptions,
+                      value: $options.orderPageSizeIndex,
+                      onChange: _cache[14] || (_cache[14] = (...args) => $options.handleOrderPageSizeChange && $options.handleOrderPageSizeChange(...args))
+                    }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "page-size-text" },
+                        vue.toDisplayString($data.pageSize) + " 条",
+                        1
+                        /* TEXT */
+                      )
+                    ], 40, ["range", "value"])
+                  ])
+                ])
+              ])) : vue.createCommentVNode("v-if", true)
+            ],
+            64
+            /* STABLE_FRAGMENT */
+          )) : (vue.openBlock(), vue.createElementBlock(
+            vue.Fragment,
+            { key: 1 },
+            [
+              vue.createElementVNode("view", { class: "status-summary-bar parking-space-bar" }, [
+                vue.createElementVNode(
+                  "view",
+                  {
+                    class: vue.normalizeClass(["status-summary-card", { active: $data.spaceQueryParams.status === "" }]),
+                    onClick: _cache[15] || (_cache[15] = ($event) => $options.applyQuickSpaceStatus(""))
+                  },
+                  [
+                    vue.createElementVNode("text", { class: "summary-label" }, "全部车位"),
                     vue.createElementVNode(
                       "text",
-                      { class: "stat-num" },
+                      { class: "summary-value" },
                       vue.toDisplayString($data.spaceStats.total),
                       1
                       /* TEXT */
-                    ),
-                    vue.createElementVNode("text", { class: "stat-label" }, "总车位数")
-                  ]),
-                  vue.createElementVNode("view", { class: "stat-item" }, [
+                    )
+                  ],
+                  2
+                  /* CLASS */
+                ),
+                vue.createElementVNode(
+                  "view",
+                  {
+                    class: vue.normalizeClass(["status-summary-card available", { active: $data.spaceQueryParams.status === "AVAILABLE" }]),
+                    onClick: _cache[16] || (_cache[16] = ($event) => $options.applyQuickSpaceStatus("AVAILABLE"))
+                  },
+                  [
+                    vue.createElementVNode("text", { class: "summary-label" }, "空闲可用"),
                     vue.createElementVNode(
                       "text",
-                      { class: "stat-num" },
+                      { class: "summary-value" },
                       vue.toDisplayString($data.spaceStats.available),
                       1
                       /* TEXT */
-                    ),
-                    vue.createElementVNode("text", { class: "stat-label" }, "空闲可用")
-                  ]),
-                  vue.createElementVNode("view", { class: "stat-item" }, [
+                    )
+                  ],
+                  2
+                  /* CLASS */
+                ),
+                vue.createElementVNode(
+                  "view",
+                  {
+                    class: vue.normalizeClass(["status-summary-card occupied", { active: $data.spaceQueryParams.status === "OCCUPIED" }]),
+                    onClick: _cache[17] || (_cache[17] = ($event) => $options.applyQuickSpaceStatus("OCCUPIED"))
+                  },
+                  [
+                    vue.createElementVNode("text", { class: "summary-label" }, "已占用"),
                     vue.createElementVNode(
                       "text",
-                      { class: "stat-num" },
+                      { class: "summary-value" },
                       vue.toDisplayString($data.spaceStats.occupied),
                       1
                       /* TEXT */
-                    ),
-                    vue.createElementVNode("text", { class: "stat-label" }, "已占用")
-                  ]),
-                  vue.createElementVNode("view", { class: "stat-item" }, [
+                    )
+                  ],
+                  2
+                  /* CLASS */
+                ),
+                vue.createElementVNode(
+                  "view",
+                  {
+                    class: vue.normalizeClass(["status-summary-card reserved", { active: $data.spaceQueryParams.status === "RESERVED" }]),
+                    onClick: _cache[18] || (_cache[18] = ($event) => $options.applyQuickSpaceStatus("RESERVED"))
+                  },
+                  [
+                    vue.createElementVNode("text", { class: "summary-label" }, "已预订"),
                     vue.createElementVNode(
                       "text",
-                      { class: "stat-num" },
+                      { class: "summary-value" },
                       vue.toDisplayString($data.spaceStats.reserved),
                       1
                       /* TEXT */
-                    ),
-                    vue.createElementVNode("text", { class: "stat-label" }, "已预订")
-                  ]),
-                  vue.createElementVNode("view", { class: "stat-item" }, [
+                    )
+                  ],
+                  2
+                  /* CLASS */
+                ),
+                vue.createElementVNode(
+                  "view",
+                  {
+                    class: vue.normalizeClass(["status-summary-card disabled", { active: $data.spaceQueryParams.status === "DISABLED" }]),
+                    onClick: _cache[19] || (_cache[19] = ($event) => $options.applyQuickSpaceStatus("DISABLED"))
+                  },
+                  [
+                    vue.createElementVNode("text", { class: "summary-label" }, "已禁用"),
                     vue.createElementVNode(
                       "text",
-                      { class: "stat-num" },
+                      { class: "summary-value" },
                       vue.toDisplayString($data.spaceStats.disabled),
                       1
                       /* TEXT */
-                    ),
-                    vue.createElementVNode("text", { class: "stat-label" }, "已禁用")
-                  ])
-                ]),
-                vue.createCommentVNode(" 车位筛选 "),
-                vue.createElementVNode("view", { class: "filter-section" }, [
-                  vue.createElementVNode("view", { class: "filter-row" }, [
+                    )
+                  ],
+                  2
+                  /* CLASS */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "query-panel" }, [
+                vue.createElementVNode("view", { class: "query-grid parking-query-grid" }, [
+                  vue.createElementVNode("view", { class: "query-field" }, [
+                    vue.createElementVNode("text", { class: "query-label" }, "车位号"),
                     vue.withDirectives(vue.createElementVNode(
                       "input",
                       {
-                        class: "search-input",
-                        "onUpdate:modelValue": _cache[9] || (_cache[9] = ($event) => $data.spaceQueryParams.spaceNo = $event),
+                        "onUpdate:modelValue": _cache[20] || (_cache[20] = ($event) => $data.spaceQueryParams.spaceNo = $event),
+                        class: "query-input",
+                        type: "text",
                         placeholder: "请输入车位号",
-                        "confirm-type": "search",
-                        onConfirm: _cache[10] || (_cache[10] = (...args) => $options.handleSpaceSearch && $options.handleSpaceSearch(...args))
+                        onConfirm: _cache[21] || (_cache[21] = (...args) => $options.handleSpaceSearch && $options.handleSpaceSearch(...args))
                       },
                       null,
                       544
                       /* NEED_HYDRATION, NEED_PATCH */
                     ), [
                       [vue.vModelText, $data.spaceQueryParams.spaceNo]
-                    ]),
+                    ])
+                  ]),
+                  vue.createElementVNode("view", { class: "query-field" }, [
+                    vue.createElementVNode("text", { class: "query-label" }, "车位状态"),
                     vue.createElementVNode("picker", {
-                      class: "status-picker",
                       mode: "selector",
                       range: $data.spaceStatusOptions,
                       "range-key": "label",
-                      onChange: _cache[11] || (_cache[11] = (...args) => $options.handleSpaceStatusChange && $options.handleSpaceStatusChange(...args))
+                      value: $options.spaceStatusPickerIndex,
+                      onChange: _cache[22] || (_cache[22] = (...args) => $options.handleSpaceStatusChange && $options.handleSpaceStatusChange(...args))
                     }, [
-                      vue.createElementVNode("view", { class: "picker-value" }, [
-                        vue.createTextVNode(
-                          vue.toDisplayString($options.getSpaceStatusLabel($data.spaceQueryParams.status) || "全部状态") + " ",
+                      vue.createElementVNode("view", { class: "query-picker" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "query-picker-text" },
+                          vue.toDisplayString($options.currentSpaceStatusLabel),
                           1
                           /* TEXT */
-                        ),
-                        vue.createElementVNode("text", { class: "iconfont" }, "▼")
+                        )
                       ])
-                    ], 40, ["range"])
-                  ]),
-                  vue.createElementVNode("button", {
-                    class: "search-btn",
-                    onClick: _cache[12] || (_cache[12] = (...args) => $options.handleSpaceSearch && $options.handleSpaceSearch(...args))
-                  }, "查询")
+                    ], 40, ["range", "value"])
+                  ])
                 ]),
-                vue.createElementVNode("view", { class: "parking-list" }, [
+                vue.createElementVNode("view", { class: "query-actions" }, [
+                  vue.createElementVNode("button", {
+                    class: "query-btn primary",
+                    onClick: _cache[23] || (_cache[23] = (...args) => $options.handleSpaceSearch && $options.handleSpaceSearch(...args))
+                  }, "查询"),
+                  vue.createElementVNode("button", {
+                    class: "query-btn secondary",
+                    onClick: _cache[24] || (_cache[24] = (...args) => $options.resetSpaceQuery && $options.resetSpaceQuery(...args))
+                  }, "重置")
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "table-toolbar" }, [
+                vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+                  vue.createElementVNode(
+                    "text",
+                    { class: "toolbar-meta" },
+                    "共 " + vue.toDisplayString($data.spaceTotal) + " 个车位",
+                    1
+                    /* TEXT */
+                  ),
+                  vue.createElementVNode(
+                    "text",
+                    { class: "toolbar-meta active" },
+                    "当前状态：" + vue.toDisplayString($options.currentSpaceStatusLabel),
+                    1
+                    /* TEXT */
+                  )
+                ]),
+                vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+                  vue.createElementVNode(
+                    "text",
+                    { class: "toolbar-meta" },
+                    "当前页 " + vue.toDisplayString($data.spaceList.length) + " 条",
+                    1
+                    /* TEXT */
+                  )
+                ])
+              ]),
+              $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+                key: 0,
+                class: "loading-state"
+              }, [
+                vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+              ])) : (vue.openBlock(), vue.createElementBlock("view", {
+                key: 1,
+                class: "table-panel"
+              }, [
+                vue.createElementVNode("view", { class: "scroll-table" }, [
+                  vue.createElementVNode("view", { class: "table-head parking-space-table" }, [
+                    vue.createElementVNode("text", { class: "table-col col-space-no" }, "车位号"),
+                    vue.createElementVNode("text", { class: "table-col col-space-status" }, "状态"),
+                    vue.createElementVNode("text", { class: "table-col col-owner" }, "业主"),
+                    vue.createElementVNode("text", { class: "table-col col-plate" }, "车牌号"),
+                    vue.createElementVNode("text", { class: "table-col col-expire" }, "到期时间"),
+                    vue.createElementVNode("text", { class: "table-col col-remind" }, "续期提醒"),
+                    vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+                  ]),
                   (vue.openBlock(true), vue.createElementBlock(
                     vue.Fragment,
                     null,
                     vue.renderList($data.spaceList, (space, index) => {
-                      return vue.openBlock(), vue.createElementBlock("view", {
-                        key: space.id ? `${space.id}-${index}` : index,
-                        class: "parking-item"
-                      }, [
-                        vue.createElementVNode("view", { class: "parking-info" }, [
-                          vue.createElementVNode("view", { class: "parking-number" }, [
+                      return vue.openBlock(), vue.createElementBlock(
+                        "view",
+                        {
+                          key: space.id ? `${space.id}-${index}` : `${space.spaceNo}-${index}`,
+                          class: "table-row parking-space-table",
+                          style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                        },
+                        [
+                          vue.createElementVNode("view", { class: "table-col col-space-no" }, [
                             vue.createElementVNode(
                               "text",
-                              null,
-                              vue.toDisplayString(space.spaceNo),
+                              { class: "primary-text" },
+                              vue.toDisplayString(space.spaceNo || "-"),
                               1
                               /* TEXT */
-                            ),
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-space-status" }, [
                             vue.createElementVNode(
                               "text",
                               {
-                                class: vue.normalizeClass(["status", $options.getSpaceStatusClass(space.status)])
+                                class: vue.normalizeClass(["status-pill", $options.getSpaceStatusClass(space.status)])
                               },
                               vue.toDisplayString($options.getSpaceStatusText(space.status)),
                               3
                               /* TEXT, CLASS */
                             )
                           ]),
-                          space.ownerName ? (vue.openBlock(), vue.createElementBlock(
-                            "view",
-                            {
-                              key: 0,
-                              class: "car-number"
-                            },
-                            " 业主：" + vue.toDisplayString(space.ownerName) + " (" + vue.toDisplayString(space.plateNo || "无车牌") + ") ",
-                            1
-                            /* TEXT */
-                          )) : (vue.openBlock(), vue.createElementBlock("view", {
-                            key: 1,
-                            class: "owner-name"
-                          }, " 暂无业主信息 ")),
-                          space.expireTime ? (vue.openBlock(), vue.createElementBlock("view", {
-                            key: 2,
-                            class: "expire-time"
-                          }, [
-                            vue.createTextVNode(
-                              " 到期：" + vue.toDisplayString($options.formatTime(space.expireTime)) + " ",
+                          vue.createElementVNode("view", { class: "table-col col-owner" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "plain-text" },
+                              vue.toDisplayString(space.ownerName || "暂无业主"),
                               1
                               /* TEXT */
-                            ),
-                            $options.isSpaceNearExpire(space.expireTime) ? (vue.openBlock(), vue.createElementBlock("text", {
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-plate" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "plain-text" },
+                              vue.toDisplayString(space.plateNo || "-"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-expire" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "minor-text" },
+                              vue.toDisplayString($options.formatTime(space.expireTime) || "未设置"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-remind" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "minor-text" },
+                              vue.toDisplayString($options.isSpaceNearExpire(space.expireTime) ? "即将到期" : "正常"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                            vue.createElementVNode("button", {
+                              class: "row-btn primary",
+                              onClick: ($event) => $options.handleOpenLease(space)
+                            }, "办理月卡", 8, ["onClick"]),
+                            $options.isSpaceReservable(space) ? (vue.openBlock(), vue.createElementBlock("button", {
                               key: 0,
-                              class: "expire-badge"
-                            }, " 即将到期 ")) : vue.createCommentVNode("v-if", true)
-                          ])) : vue.createCommentVNode("v-if", true)
-                        ]),
-                        vue.createElementVNode("button", {
-                          class: "renew-btn",
-                          onClick: ($event) => $options.handleOpenLease(space)
-                        }, " 办理月卡 ", 8, ["onClick"]),
-                        $options.isSpaceReservable(space) ? (vue.openBlock(), vue.createElementBlock("button", {
-                          key: 0,
-                          class: "renew-btn",
-                          onClick: ($event) => $options.handleReserve(space)
-                        }, " 预订车位 ", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
-                      ]);
+                              class: "row-btn secondary-warn",
+                              onClick: ($event) => $options.handleReserve(space)
+                            }, "预订车位", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
+                          ])
+                        ],
+                        4
+                        /* STYLE */
+                      );
                     }),
                     128
                     /* KEYED_FRAGMENT */
                   ))
                 ]),
-                vue.createCommentVNode(" 车位为空状态 "),
-                $data.spaceList.length === 0 && !$data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+                $data.spaceList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
                   key: 0,
                   class: "empty-state"
                 }, [
                   vue.createElementVNode("text", null, "暂无车位信息")
-                ])) : vue.createCommentVNode("v-if", true),
-                vue.createCommentVNode(" 车位分页 "),
-                $data.spaceTotal > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                  key: 1,
-                  class: "pagination"
-                }, [
+                ])) : vue.createCommentVNode("v-if", true)
+              ])),
+              $data.spaceTotal > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+                key: 2,
+                class: "pagination"
+              }, [
+                vue.createElementVNode("view", { class: "page-meta" }, [
+                  vue.createElementVNode(
+                    "text",
+                    null,
+                    "第 " + vue.toDisplayString($data.spacePageNum) + " / " + vue.toDisplayString($options.spaceTotalPages) + " 页",
+                    1
+                    /* TEXT */
+                  )
+                ]),
+                vue.createElementVNode("view", { class: "page-controls" }, [
                   vue.createElementVNode("button", {
                     class: "page-btn",
                     disabled: $data.spacePageNum <= 1,
-                    onClick: _cache[13] || (_cache[13] = ($event) => $options.changeSpacePage(-1))
+                    onClick: _cache[25] || (_cache[25] = ($event) => $options.changeSpacePage(-1))
                   }, "上一页", 8, ["disabled"]),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "page-info" },
-                    vue.toDisplayString($data.spacePageNum) + " / " + vue.toDisplayString(Math.ceil($data.spaceTotal / $data.spacePageSize) || 1),
-                    1
-                    /* TEXT */
-                  ),
                   vue.createElementVNode("button", {
                     class: "page-btn",
-                    disabled: $data.spacePageNum >= Math.ceil($data.spaceTotal / $data.spacePageSize),
-                    onClick: _cache[14] || (_cache[14] = ($event) => $options.changeSpacePage(1))
-                  }, "下一页", 8, ["disabled"])
-                ])) : vue.createCommentVNode("v-if", true)
+                    disabled: $data.spacePageNum >= $options.spaceTotalPages,
+                    onClick: _cache[26] || (_cache[26] = ($event) => $options.changeSpacePage(1))
+                  }, "下一页", 8, ["disabled"]),
+                  vue.createElementVNode("view", { class: "page-size" }, [
+                    vue.createElementVNode("text", null, "每页"),
+                    vue.createElementVNode("picker", {
+                      mode: "selector",
+                      range: $data.pageSizeOptions,
+                      value: $options.spacePageSizeIndex,
+                      onChange: _cache[27] || (_cache[27] = (...args) => $options.handleSpacePageSizeChange && $options.handleSpacePageSizeChange(...args))
+                    }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "page-size-text" },
+                        vue.toDisplayString($data.spacePageSize) + " 条",
+                        1
+                        /* TEXT */
+                      )
+                    ], 40, ["range", "value"])
+                  ])
+                ])
               ])) : vue.createCommentVNode("v-if", true)
-            ])
-          ]),
-          _: 1
-          /* STABLE */
-        }, 8, ["showSidebar"]),
-        $data.showLeaseDialog ? (vue.openBlock(), vue.createElementBlock("view", {
-          key: 0,
-          class: "dialog-mask"
-        }, [
-          vue.createElementVNode("view", { class: "dialog-panel" }, [
-            vue.createElementVNode("view", { class: "dialog-title" }, "办理月卡/年卡"),
-            vue.createElementVNode("view", { class: "dialog-body" }, [
-              vue.createElementVNode("view", { class: "dialog-row" }, [
-                vue.createElementVNode("text", { class: "dialog-label" }, "车位号"),
-                vue.createElementVNode(
-                  "text",
-                  { class: "dialog-value" },
-                  vue.toDisplayString($data.leaseDialogSpace && $data.leaseDialogSpace.spaceNo),
-                  1
-                  /* TEXT */
-                )
+            ],
+            64
+            /* STABLE_FRAGMENT */
+          )),
+          $data.showLeaseDialog ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "detail-modal",
+            onClick: _cache[38] || (_cache[38] = (...args) => $options.closeLeaseDialog && $options.closeLeaseDialog(...args))
+          }, [
+            vue.createElementVNode("view", {
+              class: "detail-content lease-detail-content",
+              onClick: _cache[37] || (_cache[37] = vue.withModifiers(() => {
+              }, ["stop"]))
+            }, [
+              vue.createElementVNode("view", { class: "detail-header" }, [
+                vue.createElementVNode("text", { class: "detail-title" }, "办理月卡 / 年卡"),
+                vue.createElementVNode("button", {
+                  class: "close-btn",
+                  onClick: _cache[28] || (_cache[28] = (...args) => $options.closeLeaseDialog && $options.closeLeaseDialog(...args))
+                }, "关闭")
               ]),
-              vue.createElementVNode("view", { class: "dialog-row" }, [
-                vue.createElementVNode("text", { class: "dialog-label" }, "用户ID"),
-                vue.withDirectives(vue.createElementVNode(
-                  "input",
-                  {
-                    class: "dialog-input",
-                    "onUpdate:modelValue": _cache[16] || (_cache[16] = ($event) => $data.leaseForm.userId = $event),
-                    placeholder: "请输入用户ID",
-                    type: "number"
-                  },
-                  null,
-                  512
-                  /* NEED_PATCH */
-                ), [
-                  [vue.vModelText, $data.leaseForm.userId]
-                ])
-              ]),
-              vue.createElementVNode("view", { class: "dialog-row" }, [
-                vue.createElementVNode("text", { class: "dialog-label" }, "车牌号"),
-                vue.withDirectives(vue.createElementVNode(
-                  "input",
-                  {
-                    class: "dialog-input",
-                    "onUpdate:modelValue": _cache[17] || (_cache[17] = ($event) => $data.leaseForm.plateNo = $event),
-                    placeholder: "请输入车牌号 (必填)"
-                  },
-                  null,
-                  512
-                  /* NEED_PATCH */
-                ), [
-                  [vue.vModelText, $data.leaseForm.plateNo]
-                ])
-              ]),
-              vue.createElementVNode("view", { class: "dialog-row" }, [
-                vue.createElementVNode("text", { class: "dialog-label" }, "卡类型"),
-                vue.createElementVNode("picker", {
-                  class: "dialog-picker",
-                  mode: "selector",
-                  range: $data.leaseTypeOptions,
-                  "range-key": "label",
-                  onChange: _cache[18] || (_cache[18] = (...args) => $options.handleLeaseTypeChange && $options.handleLeaseTypeChange(...args))
-                }, [
-                  vue.createElementVNode("view", { class: "dialog-picker-value" }, [
-                    vue.createTextVNode(
-                      vue.toDisplayString($options.getLeaseTypeLabel($data.leaseForm.leaseType)) + " ",
+              vue.createElementVNode("view", { class: "detail-body" }, [
+                vue.createElementVNode("view", { class: "lease-grid" }, [
+                  vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                    vue.createElementVNode("text", { class: "detail-label" }, "车位号:"),
+                    vue.createElementVNode(
+                      "text",
+                      { class: "detail-value lease-static-value" },
+                      vue.toDisplayString($data.leaseDialogSpace && $data.leaseDialogSpace.spaceNo),
                       1
                       /* TEXT */
-                    ),
-                    vue.createElementVNode("text", { class: "iconfont" }, "▼")
+                    )
+                  ]),
+                  vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                    vue.createElementVNode("text", { class: "detail-label" }, "用户ID:"),
+                    vue.withDirectives(vue.createElementVNode(
+                      "input",
+                      {
+                        class: "form-input-inline",
+                        "onUpdate:modelValue": _cache[29] || (_cache[29] = ($event) => $data.leaseForm.userId = $event),
+                        type: "number",
+                        placeholder: "请输入用户ID"
+                      },
+                      null,
+                      512
+                      /* NEED_PATCH */
+                    ), [
+                      [vue.vModelText, $data.leaseForm.userId]
+                    ])
+                  ]),
+                  vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                    vue.createElementVNode("text", { class: "detail-label" }, "车牌号:"),
+                    vue.withDirectives(vue.createElementVNode(
+                      "input",
+                      {
+                        class: "form-input-inline",
+                        "onUpdate:modelValue": _cache[30] || (_cache[30] = ($event) => $data.leaseForm.plateNo = $event),
+                        placeholder: "请输入车牌号"
+                      },
+                      null,
+                      512
+                      /* NEED_PATCH */
+                    ), [
+                      [vue.vModelText, $data.leaseForm.plateNo]
+                    ])
+                  ]),
+                  vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                    vue.createElementVNode("text", { class: "detail-label" }, "时长(月):"),
+                    vue.withDirectives(vue.createElementVNode(
+                      "input",
+                      {
+                        class: "form-input-inline",
+                        "onUpdate:modelValue": _cache[31] || (_cache[31] = ($event) => $data.leaseForm.durationMonths = $event),
+                        type: "number",
+                        placeholder: "默认 1 个月"
+                      },
+                      null,
+                      512
+                      /* NEED_PATCH */
+                    ), [
+                      [vue.vModelText, $data.leaseForm.durationMonths]
+                    ])
+                  ]),
+                  vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                    vue.createElementVNode("text", { class: "detail-label" }, "卡类型:"),
+                    vue.createElementVNode("picker", {
+                      mode: "selector",
+                      range: $data.leaseTypeOptions,
+                      "range-key": "label",
+                      onChange: _cache[32] || (_cache[32] = (...args) => $options.handleLeaseTypeChange && $options.handleLeaseTypeChange(...args))
+                    }, [
+                      vue.createElementVNode("view", { class: "modal-picker" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "modal-picker-text" },
+                          vue.toDisplayString($options.getLeaseTypeLabel($data.leaseForm.leaseType)),
+                          1
+                          /* TEXT */
+                        )
+                      ])
+                    ], 40, ["range"])
+                  ]),
+                  vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                    vue.createElementVNode("text", { class: "detail-label" }, "支付方式:"),
+                    vue.createElementVNode("picker", {
+                      mode: "selector",
+                      range: $data.payChannelOptions,
+                      "range-key": "label",
+                      onChange: _cache[33] || (_cache[33] = (...args) => $options.handlePayChannelChange && $options.handlePayChannelChange(...args))
+                    }, [
+                      vue.createElementVNode("view", { class: "modal-picker" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "modal-picker-text" },
+                          vue.toDisplayString($options.getPayChannelLabel($data.leaseForm.payChannel)),
+                          1
+                          /* TEXT */
+                        )
+                      ])
+                    ], 40, ["range"])
                   ])
-                ], 40, ["range"])
-              ]),
-              vue.createElementVNode("view", { class: "dialog-row" }, [
-                vue.createElementVNode("text", { class: "dialog-label" }, "时长(月)"),
-                vue.withDirectives(vue.createElementVNode(
-                  "input",
-                  {
-                    class: "dialog-input",
-                    "onUpdate:modelValue": _cache[19] || (_cache[19] = ($event) => $data.leaseForm.durationMonths = $event),
-                    placeholder: "默认1个月",
-                    type: "number"
-                  },
-                  null,
-                  512
-                  /* NEED_PATCH */
-                ), [
-                  [vue.vModelText, $data.leaseForm.durationMonths]
+                ]),
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "备注:"),
+                  vue.withDirectives(vue.createElementVNode(
+                    "textarea",
+                    {
+                      class: "modal-textarea",
+                      "onUpdate:modelValue": _cache[34] || (_cache[34] = ($event) => $data.leaseForm.remark = $event),
+                      maxlength: "300",
+                      placeholder: "可填写办理说明"
+                    },
+                    null,
+                    512
+                    /* NEED_PATCH */
+                  ), [
+                    [vue.vModelText, $data.leaseForm.remark]
+                  ])
+                ]),
+                vue.createElementVNode("view", { class: "detail-actions" }, [
+                  vue.createElementVNode("button", {
+                    class: "detail-btn secondary",
+                    onClick: _cache[35] || (_cache[35] = (...args) => $options.closeLeaseDialog && $options.closeLeaseDialog(...args))
+                  }, "取消"),
+                  vue.createElementVNode("button", {
+                    class: "detail-btn primary",
+                    onClick: _cache[36] || (_cache[36] = (...args) => $options.confirmLease && $options.confirmLease(...args))
+                  }, "确认办理")
                 ])
-              ]),
-              vue.createElementVNode("view", { class: "dialog-row" }, [
-                vue.createElementVNode("text", { class: "dialog-label" }, "支付方式"),
-                vue.createElementVNode("picker", {
-                  class: "dialog-picker",
-                  mode: "selector",
-                  range: $data.payChannelOptions,
-                  "range-key": "label",
-                  onChange: _cache[20] || (_cache[20] = (...args) => $options.handlePayChannelChange && $options.handlePayChannelChange(...args))
-                }, [
-                  vue.createElementVNode("view", { class: "dialog-picker-value" }, [
-                    vue.createTextVNode(
-                      vue.toDisplayString($options.getPayChannelLabel($data.leaseForm.payChannel)) + " ",
-                      1
-                      /* TEXT */
-                    ),
-                    vue.createElementVNode("text", { class: "iconfont" }, "▼")
-                  ])
-                ], 40, ["range"])
-              ]),
-              vue.createElementVNode("view", { class: "dialog-row" }, [
-                vue.createElementVNode("text", { class: "dialog-label" }, "备注")
-              ]),
-              vue.withDirectives(vue.createElementVNode(
-                "textarea",
-                {
-                  class: "dialog-textarea",
-                  "onUpdate:modelValue": _cache[21] || (_cache[21] = ($event) => $data.leaseForm.remark = $event),
-                  placeholder: "可填写办理说明"
-                },
-                null,
-                512
-                /* NEED_PATCH */
-              ), [
-                [vue.vModelText, $data.leaseForm.remark]
-              ]),
-              vue.createElementVNode("view", { class: "dialog-footer" }, [
-                vue.createElementVNode("button", {
-                  class: "dialog-btn cancel",
-                  onClick: _cache[22] || (_cache[22] = (...args) => $options.closeLeaseDialog && $options.closeLeaseDialog(...args))
-                }, "取消"),
-                vue.createElementVNode("button", {
-                  class: "dialog-btn confirm",
-                  onClick: _cache[23] || (_cache[23] = (...args) => $options.confirmLease && $options.confirmLease(...args))
-                }, "确认办理")
               ])
             ])
-          ])
-        ])) : vue.createCommentVNode("v-if", true)
-      ],
-      64
-      /* STABLE_FRAGMENT */
-    );
+          ])) : vue.createCommentVNode("v-if", true)
+        ])
+      ]),
+      _: 1
+      /* STABLE */
+    }, 8, ["showSidebar"]);
   }
   const AdminPagesAdminParkingManage = /* @__PURE__ */ _export_sfc(_sfc_main$l, [["render", _sfc_render$k], ["__scopeId", "data-v-668f6823"], ["__file", "D:/HBuilderProjects/smart-community/admin/pages/admin/parking-manage.vue"]]);
   const _sfc_main$k = {
@@ -8417,7 +9660,7 @@ if (uni.restoreGlobal) {
         this.initialSnapshot = this.getFormSnapshot();
       }
       const userInfo = uni.getStorageSync("userInfo");
-      this.isSuperAdmin = userInfo && userInfo.role === "super_admin";
+      this.isSuperAdmin = !!(userInfo && userInfo.role === "super_admin");
       if (this.isSuperAdmin) {
         this.loadCommunityList();
       }
@@ -8425,13 +9668,11 @@ if (uni.restoreGlobal) {
     methods: {
       async loadCommunityList() {
         try {
-          formatAppLog("log", "at admin/pages/admin/notice-edit.vue:151", "加载社区列表");
           const data = await request("/api/house/community/all", {}, "GET");
           const list = Array.isArray(data) ? data : data && Array.isArray(data.records) ? data.records : [];
-          formatAppLog("log", "at admin/pages/admin/notice-edit.vue:154", "社区列表返回", list.length);
           this.communityList = list;
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/notice-edit.vue:157", "社区列表加载失败", e && e.message ? e.message : e);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/notice-edit.vue:158", "社区列表加载失败", error);
           this.communityList = [];
         }
       },
@@ -8441,27 +9682,28 @@ if (uni.restoreGlobal) {
         if (item) {
           this.selectedCommunityId = item.id;
           this.selectedCommunityName = item.name;
-          formatAppLog("log", "at admin/pages/admin/notice-edit.vue:167", "选择社区", { id: this.selectedCommunityId, name: this.selectedCommunityName });
         }
       },
       async loadNoticeDetail() {
         try {
           uni.showLoading({ title: "加载中..." });
-          const res = await request(
-            `/api/notice/${this.noticeId}`,
-            {},
-            "GET"
-          );
-          formatAppLog("log", "at admin/pages/admin/notice-edit.vue:180", "公告详情", res);
-          this.form.title = res.title;
-          this.form.content = res.content;
+          const res = await request(`/api/notice/${this.noticeId}`, {}, "GET");
+          this.form.title = res.title || "";
+          this.form.content = res.content || "";
           this.form.topFlag = !!res.topFlag;
           this.form.publishStatus = res.publishStatus || "DRAFT";
           if (res.expireTime) {
-            this.form.expireDate = res.expireTime.split("T")[0].split(" ")[0];
+            const normalized = String(res.expireTime).replace(" ", "T");
+            const [datePart, timePart = "23:59:00"] = normalized.split("T");
+            this.form.expireDate = datePart;
+            this.form.expireTimeVal = timePart.slice(0, 5);
           }
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/notice-edit.vue:192", e);
+          if (res.communityId && res.communityName) {
+            this.selectedCommunityId = res.communityId;
+            this.selectedCommunityName = res.communityName;
+          }
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/notice-edit.vue:189", "公告详情加载失败", error);
           uni.showToast({ title: "加载失败", icon: "none" });
         } finally {
           uni.hideLoading();
@@ -8475,25 +9717,25 @@ if (uni.restoreGlobal) {
         this.form.expireTimeVal = e.detail.value;
       },
       handleCancel() {
-        if (this.hasUnsavedChanges()) {
-          uni.showModal({
-            title: "保存为草稿",
-            content: "是否保存为草稿并退出？",
-            success: async (res) => {
-              if (res.confirm) {
-                try {
-                  await this.handleSaveDraft();
-                } finally {
-                  uni.navigateBack();
-                }
-              } else {
+        if (!this.hasUnsavedChanges()) {
+          uni.navigateBack();
+          return;
+        }
+        uni.showModal({
+          title: "保存为草稿",
+          content: "是否保存为草稿并退出？",
+          success: async (res) => {
+            if (res.confirm) {
+              try {
+                await this.handleSaveDraft();
+              } finally {
                 uni.navigateBack();
               }
+            } else {
+              uni.navigateBack();
             }
-          });
-        } else {
-          uni.navigateBack();
-        }
+          }
+        });
       },
       getFormSnapshot() {
         const { title, content, topFlag, expireDate, expireTimeVal } = this.form;
@@ -8504,13 +9746,16 @@ if (uni.restoreGlobal) {
       },
       async handleSubmit(status = "PUBLISHED") {
         if (!this.form.title.trim()) {
-          return uni.showToast({ title: "请输入标题", icon: "none" });
+          uni.showToast({ title: "请输入标题", icon: "none" });
+          return;
         }
         if (!this.form.content.trim()) {
-          return uni.showToast({ title: "请输入内容", icon: "none" });
+          uni.showToast({ title: "请输入内容", icon: "none" });
+          return;
         }
         if (this.isSuperAdmin && !this.selectedCommunityId) {
-          return uni.showToast({ title: "请选择发布社区", icon: "none" });
+          uni.showToast({ title: "请选择发布社区", icon: "none" });
+          return;
         }
         const userInfo = uni.getStorageSync("userInfo");
         uni.showLoading({ title: "提交中...", mask: true });
@@ -8524,84 +9769,58 @@ if (uni.restoreGlobal) {
             publishStatus: status,
             expireTime: this.form.expireDate ? `${this.form.expireDate}T${this.form.expireTimeVal}:00` : null
           };
-          formatAppLog("log", "at admin/pages/admin/notice-edit.vue:264", "提交参数", { dto, status, userId: userInfo && (userInfo.id || userInfo.userId) });
+          const userId = userInfo && (userInfo.id || userInfo.userId);
           let targetId = this.noticeId;
           if (this.isEdit) {
             try {
-              await request(
-                `/api/notice/${this.noticeId}`,
-                { data: dto, params: { userId: userInfo.id || userInfo.userId } },
-                "PUT"
-              );
-              formatAppLog("log", "at admin/pages/admin/notice-edit.vue:276", "更新公告成功", { id: this.noticeId });
-            } catch (updateErr) {
-              formatAppLog("error", "at admin/pages/admin/notice-edit.vue:278", "更新公告失败", updateErr && updateErr.message ? updateErr.message : updateErr);
+              await request(`/api/notice/${this.noticeId}`, {
+                data: dto,
+                params: { userId }
+              }, "PUT");
+            } catch (updateError) {
+              formatAppLog("error", "at admin/pages/admin/notice-edit.vue:264", "更新公告失败", updateError);
             }
           } else {
             try {
-              const res = await request(
-                "/api/notice",
-                { data: dto, params: { userId: userInfo.id || userInfo.userId } },
-                "POST"
-              );
+              const res = await request("/api/notice", {
+                data: dto,
+                params: { userId }
+              }, "POST");
               targetId = res && typeof res === "object" && (res.id || res.noticeId) ? res.id || res.noticeId : res;
-              formatAppLog("log", "at admin/pages/admin/notice-edit.vue:290", "创建公告成功", { id: targetId });
-            } catch (createErr) {
-              formatAppLog("error", "at admin/pages/admin/notice-edit.vue:292", "创建公告失败", createErr && createErr.message ? createErr.message : createErr);
+            } catch (createError) {
+              formatAppLog("error", "at admin/pages/admin/notice-edit.vue:274", "创建公告失败", createError);
             }
           }
-          if (status === "PUBLISHED" && this.isEdit && this.form.expireDate && targetId) {
+          if (status === "PUBLISHED" && this.isEdit && targetId) {
             try {
               const expireDto = {
                 noticeIds: [Number(targetId)],
-                expireType: "CUSTOM",
-                customExpireTime: `${this.form.expireDate}T${this.form.expireTimeVal}:00`,
+                expireType: this.form.expireDate ? "CUSTOM" : "NEVER",
+                customExpireTime: this.form.expireDate ? `${this.form.expireDate}T${this.form.expireTimeVal}:00` : null,
                 days: null
               };
-              await request(
-                "/api/notice/expire/batch",
-                {
-                  data: expireDto,
-                  params: { userId: userInfo.id || userInfo.userId }
-                },
-                "POST"
-              );
-              formatAppLog("log", "at admin/pages/admin/notice-edit.vue:314", "过期时间设置成功", { id: targetId });
-            } catch (expireErr) {
-              formatAppLog("error", "at admin/pages/admin/notice-edit.vue:316", "设置过期时间失败", expireErr && expireErr.message ? expireErr.message : expireErr);
-              uni.showToast({
-                title: "公告已更新，但过期时间设置失败",
-                icon: "none",
-                duration: 2e3
-              });
-            }
-          } else if (status === "PUBLISHED" && this.isEdit && !this.form.expireDate) {
-            try {
-              const expireDto = {
-                noticeIds: [Number(targetId)],
-                expireType: "NEVER",
-                customExpireTime: null,
-                days: null
-              };
-              await request(
-                "/api/notice/expire/batch",
-                {
-                  data: expireDto,
-                  params: { userId: userInfo.id || userInfo.userId }
-                },
-                "POST"
-              );
-            } catch (clearErr) {
-              formatAppLog("error", "at admin/pages/admin/notice-edit.vue:343", "清除过期时间失败", clearErr && clearErr.message ? clearErr.message : clearErr);
+              await request("/api/notice/expire/batch", {
+                data: expireDto,
+                params: { userId }
+              }, "POST");
+            } catch (expireError) {
+              formatAppLog("error", "at admin/pages/admin/notice-edit.vue:290", "设置过期时间失败", expireError);
+              if (this.form.expireDate) {
+                uni.showToast({
+                  title: "公告已更新，但过期时间设置失败",
+                  icon: "none",
+                  duration: 2e3
+                });
+              }
             }
           }
-          uni.showToast({ title: "操作成功" });
+          uni.showToast({ title: "操作成功", icon: "success" });
           setTimeout(() => {
             uni.navigateBack();
           }, 1500);
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/notice-edit.vue:353", "提交失败", e && e.message ? e.message : e, e && e.stack ? e.stack : "");
-          uni.showToast({ title: e.message || "操作失败", icon: "none" });
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/notice-edit.vue:305", "提交失败", error);
+          uni.showToast({ title: error.message || "操作失败", icon: "none" });
         } finally {
           uni.hideLoading();
         }
@@ -8622,93 +9841,87 @@ if (uni.restoreGlobal) {
       showSidebar: $data.showSidebar,
       "onUpdate:showSidebar": _cache[9] || (_cache[9] = ($event) => $data.showSidebar = $event),
       pageTitle: $data.isEdit ? "编辑公告" : "发布公告",
-      currentPage: "/admin/pages/admin/notice-edit"
+      currentPage: "/admin/pages/admin/notice-manage",
+      pageBreadcrumb: $data.isEdit ? "管理后台 / 公告管理 / 编辑公告" : "管理后台 / 公告管理 / 发布公告",
+      showPageBanner: false
     }, {
       default: vue.withCtx(() => [
         vue.createElementVNode("view", { class: "edit-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "overview-title" },
+                vue.toDisplayString($data.isEdit ? "公告编辑" : "公告发布"),
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一使用后台表单页结构，保留草稿保存、正式发布、过期时间和超管社区投放能力。")
+            ]),
+            vue.createElementVNode("view", { class: "overview-chip" }, [
+              vue.createElementVNode("text", { class: "overview-chip-label" }, "当前状态"),
+              vue.createElementVNode(
+                "text",
+                { class: "overview-chip-value" },
+                vue.toDisplayString($data.isEdit ? "编辑中" : "新建中"),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
           vue.createElementVNode("view", { class: "form-card" }, [
-            vue.createCommentVNode(" 标题 "),
-            vue.createElementVNode("view", { class: "form-item" }, [
-              vue.createElementVNode("text", { class: "label" }, "公告标题"),
-              vue.withDirectives(vue.createElementVNode(
-                "input",
-                {
-                  class: "input",
-                  "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.form.title = $event),
-                  placeholder: "请输入标题",
-                  "placeholder-class": "placeholder"
-                },
-                null,
-                512
-                /* NEED_PATCH */
-              ), [
-                [vue.vModelText, $data.form.title]
-              ])
-            ]),
-            vue.createCommentVNode(" 内容 "),
-            vue.createElementVNode("view", { class: "form-item" }, [
-              vue.createElementVNode("text", { class: "label" }, "公告内容"),
-              vue.withDirectives(vue.createElementVNode(
-                "textarea",
-                {
-                  class: "textarea",
-                  "onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => $data.form.content = $event),
-                  placeholder: "请输入公告详细内容...",
-                  "placeholder-class": "placeholder",
-                  maxlength: "-1"
-                },
-                null,
-                512
-                /* NEED_PATCH */
-              ), [
-                [vue.vModelText, $data.form.content]
-              ])
-            ]),
-            vue.createCommentVNode(" 过期时间 "),
-            vue.createElementVNode("view", { class: "form-item" }, [
-              vue.createElementVNode("text", { class: "label" }, "过期时间"),
-              vue.createElementVNode("view", { class: "datetime-row" }, [
+            vue.createElementVNode("view", { class: "form-grid" }, [
+              vue.createElementVNode("view", { class: "form-field form-field-wide" }, [
+                vue.createElementVNode("text", { class: "form-label required" }, "公告标题"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.form.title = $event),
+                    class: "form-input",
+                    type: "text",
+                    placeholder: "请输入公告标题"
+                  },
+                  null,
+                  512
+                  /* NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.form.title]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "form-field form-field-wide" }, [
+                vue.createElementVNode("text", { class: "form-label required" }, "公告内容"),
+                vue.withDirectives(vue.createElementVNode(
+                  "textarea",
+                  {
+                    "onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => $data.form.content = $event),
+                    class: "form-textarea notice-textarea",
+                    maxlength: "-1",
+                    placeholder: "请输入公告详细内容"
+                  },
+                  null,
+                  512
+                  /* NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.form.content]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "form-field" }, [
+                vue.createElementVNode("text", { class: "form-label" }, "过期日期"),
                 vue.createElementVNode("picker", {
                   mode: "date",
                   start: $options.startDate,
-                  onChange: _cache[2] || (_cache[2] = (...args) => $options.handleDateChange && $options.handleDateChange(...args)),
-                  class: "flex-1"
+                  onChange: _cache[2] || (_cache[2] = (...args) => $options.handleDateChange && $options.handleDateChange(...args))
                 }, [
                   vue.createElementVNode(
                     "view",
                     {
-                      class: vue.normalizeClass(["picker-box", { "has-val": $data.form.expireDate }])
+                      class: vue.normalizeClass(["picker-box", { "has-val": !!$data.form.expireDate }])
                     },
                     [
-                      vue.createTextVNode(
-                        vue.toDisplayString($data.form.expireDate || "选择日期") + " ",
-                        1
-                        /* TEXT */
-                      ),
-                      !$data.form.expireDate ? (vue.openBlock(), vue.createElementBlock("text", {
-                        key: 0,
-                        class: "picker-icon"
-                      }, ">")) : vue.createCommentVNode("v-if", true)
-                    ],
-                    2
-                    /* CLASS */
-                  )
-                ], 40, ["start"]),
-                vue.createElementVNode("view", { class: "gap" }),
-                vue.createElementVNode("picker", {
-                  mode: "time",
-                  onChange: _cache[3] || (_cache[3] = (...args) => $options.handleTimeChange && $options.handleTimeChange(...args)),
-                  class: "flex-1",
-                  disabled: !$data.form.expireDate
-                }, [
-                  vue.createElementVNode(
-                    "view",
-                    {
-                      class: vue.normalizeClass(["picker-box", { "has-val": $data.form.expireDate }])
-                    },
-                    [
-                      vue.createTextVNode(
-                        vue.toDisplayString($data.form.expireTimeVal) + " ",
+                      vue.createElementVNode(
+                        "text",
+                        null,
+                        vue.toDisplayString($data.form.expireDate || "请选择日期"),
                         1
                         /* TEXT */
                       ),
@@ -8717,71 +9930,106 @@ if (uni.restoreGlobal) {
                     2
                     /* CLASS */
                   )
-                ], 40, ["disabled"])
+                ], 40, ["start"]),
+                vue.createElementVNode("text", { class: "field-tip" }, "设置过期后，业主端将不再显示此公告。")
               ]),
-              vue.createElementVNode("text", { class: "tip" }, "设置过期后，业主端将不再显示此公告")
-            ]),
-            vue.createCommentVNode(" 发布范围 "),
-            $data.isSuperAdmin ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 0,
-              class: "form-item"
-            }, [
-              vue.createElementVNode("text", { class: "label" }, "发布范围"),
-              vue.createElementVNode("picker", {
-                mode: "selector",
-                range: $data.communityList,
-                "range-key": "name",
-                onChange: _cache[4] || (_cache[4] = (...args) => $options.handleCommunityChange && $options.handleCommunityChange(...args))
-              }, [
+              vue.createElementVNode("view", { class: "form-field" }, [
+                vue.createElementVNode("text", { class: "form-label" }, "过期时间"),
+                vue.createElementVNode("picker", {
+                  mode: "time",
+                  disabled: !$data.form.expireDate,
+                  onChange: _cache[3] || (_cache[3] = (...args) => $options.handleTimeChange && $options.handleTimeChange(...args))
+                }, [
+                  vue.createElementVNode(
+                    "view",
+                    {
+                      class: vue.normalizeClass(["picker-box", { "has-val": !!$data.form.expireDate }])
+                    },
+                    [
+                      vue.createElementVNode(
+                        "text",
+                        null,
+                        vue.toDisplayString($data.form.expireTimeVal),
+                        1
+                        /* TEXT */
+                      ),
+                      vue.createElementVNode("text", { class: "picker-icon" }, ">")
+                    ],
+                    2
+                    /* CLASS */
+                  )
+                ], 40, ["disabled"]),
                 vue.createElementVNode(
-                  "view",
-                  {
-                    class: vue.normalizeClass(["picker-box", { "has-val": !!$data.selectedCommunityName }])
-                  },
-                  [
-                    vue.createTextVNode(
-                      vue.toDisplayString($data.selectedCommunityName || "请选择发布社区") + " ",
-                      1
-                      /* TEXT */
-                    ),
-                    vue.createElementVNode("text", { class: "picker-icon" }, ">")
-                  ],
-                  2
-                  /* CLASS */
+                  "text",
+                  { class: "field-tip" },
+                  vue.toDisplayString($data.form.expireDate ? "默认精确到分钟。" : "请先选择过期日期。"),
+                  1
+                  /* TEXT */
                 )
-              ], 40, ["range"])
-            ])) : (vue.openBlock(), vue.createElementBlock("view", {
-              key: 1,
-              class: "form-item"
-            }, [
-              vue.createElementVNode("text", { class: "label" }, "发布范围"),
-              vue.createElementVNode("view", { class: "picker-box has-val" }, "当前社区")
-            ])),
-            vue.createCommentVNode(" 选项区 "),
-            vue.createElementVNode("view", { class: "form-item switch-row" }, [
-              vue.createElementVNode("text", { class: "label-inline" }, "置顶公告"),
-              vue.createElementVNode("switch", {
-                checked: $data.form.topFlag,
-                color: "#2D81FF",
-                style: { "transform": "scale(0.8)" },
-                onChange: _cache[5] || (_cache[5] = ($event) => $data.form.topFlag = $event.detail.value)
-              }, null, 40, ["checked"])
+              ]),
+              $data.isSuperAdmin ? (vue.openBlock(), vue.createElementBlock("view", {
+                key: 0,
+                class: "form-field"
+              }, [
+                vue.createElementVNode("text", { class: "form-label required" }, "发布社区"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.communityList,
+                  "range-key": "name",
+                  onChange: _cache[4] || (_cache[4] = (...args) => $options.handleCommunityChange && $options.handleCommunityChange(...args))
+                }, [
+                  vue.createElementVNode(
+                    "view",
+                    {
+                      class: vue.normalizeClass(["picker-box", { "has-val": !!$data.selectedCommunityName }])
+                    },
+                    [
+                      vue.createElementVNode(
+                        "text",
+                        null,
+                        vue.toDisplayString($data.selectedCommunityName || "请选择发布社区"),
+                        1
+                        /* TEXT */
+                      ),
+                      vue.createElementVNode("text", { class: "picker-icon" }, ">")
+                    ],
+                    2
+                    /* CLASS */
+                  )
+                ], 40, ["range"])
+              ])) : (vue.openBlock(), vue.createElementBlock("view", {
+                key: 1,
+                class: "form-field"
+              }, [
+                vue.createElementVNode("text", { class: "form-label" }, "发布范围"),
+                vue.createElementVNode("view", { class: "picker-box has-val" }, [
+                  vue.createElementVNode("text", null, "当前社区")
+                ])
+              ])),
+              vue.createElementVNode("view", { class: "form-field switch-row" }, [
+                vue.createElementVNode("text", { class: "field-label" }, "置顶公告"),
+                vue.createElementVNode("switch", {
+                  checked: $data.form.topFlag,
+                  color: "#2D81FF",
+                  style: { "transform": "scale(0.82)" },
+                  onChange: _cache[5] || (_cache[5] = ($event) => $data.form.topFlag = $event.detail.value)
+                }, null, 40, ["checked"])
+              ])
             ])
           ]),
-          vue.createCommentVNode(" 按钮组 "),
-          vue.createElementVNode("view", { class: "btn-group" }, [
+          vue.createElementVNode("view", { class: "action-bar-card" }, [
             vue.createElementVNode("button", {
-              class: "cancel-btn",
+              class: "ghost-btn",
               onClick: _cache[6] || (_cache[6] = (...args) => $options.handleCancel && $options.handleCancel(...args))
             }, "取消"),
             vue.createElementVNode("button", {
-              class: "draft-btn",
+              class: "warn-btn",
               onClick: _cache[7] || (_cache[7] = (...args) => $options.handleSaveDraft && $options.handleSaveDraft(...args))
             }, "存为草稿"),
             vue.createElementVNode(
               "button",
               {
-                class: "submit-btn",
+                class: "primary-btn",
                 onClick: _cache[8] || (_cache[8] = (...args) => $options.handlePublish && $options.handlePublish(...args))
               },
               vue.toDisplayString($data.isEdit ? "保存并发布" : "立即发布"),
@@ -8793,10 +10041,9 @@ if (uni.restoreGlobal) {
       ]),
       _: 1
       /* STABLE */
-    }, 8, ["showSidebar", "pageTitle"]);
+    }, 8, ["showSidebar", "pageTitle", "pageBreadcrumb"]);
   }
   const AdminPagesAdminNoticeEdit = /* @__PURE__ */ _export_sfc(_sfc_main$k, [["render", _sfc_render$j], ["__scopeId", "data-v-227539c9"], ["__file", "D:/HBuilderProjects/smart-community/admin/pages/admin/notice-edit.vue"]]);
-  const _imports_0 = "/static/empty.png";
   const _sfc_main$j = {
     components: {
       adminSidebar
@@ -8806,7 +10053,6 @@ if (uni.restoreGlobal) {
         showSidebar: false,
         searchQuery: "",
         typeFilter: "all",
-        // all, unpaid, paid
         loading: false,
         feeList: [],
         filterTabs: [
@@ -8824,7 +10070,6 @@ if (uni.restoreGlobal) {
           unpaid: 0,
           paid: 0
         },
-        // 生成账单相关
         showGenerateModal: false,
         generateForm: {
           month: "",
@@ -8838,7 +10083,6 @@ if (uni.restoreGlobal) {
           { label: "水费", value: "water" },
           { label: "电费", value: "electric" }
         ],
-        // 分页
         currentPage: 1,
         pageSize: 10,
         total: 0
@@ -8846,7 +10090,18 @@ if (uni.restoreGlobal) {
     },
     computed: {
       totalPages() {
-        return Math.ceil(this.total / this.pageSize) || 1;
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50, 100];
+        return Math.max(0, options.indexOf(this.pageSize));
+      },
+      tabPickerIndex() {
+        return Math.max(0, this.filterTabs.findIndex((item) => item.value === this.typeFilter));
+      },
+      currentTabLabel() {
+        const current = this.filterTabs.find((item) => item.value === this.typeFilter);
+        return current ? current.label : "全部";
       }
     },
     onLoad() {
@@ -8860,48 +10115,74 @@ if (uni.restoreGlobal) {
       this.loadCountStats();
     },
     methods: {
+      normalizeFeeResponse(data) {
+        if (Array.isArray(data))
+          return { records: data, total: data.length };
+        if (Array.isArray(data.records))
+          return { records: data.records, total: data.total || data.records.length };
+        if (data.data && Array.isArray(data.data.records))
+          return { records: data.data.records, total: data.data.total || data.data.records.length };
+        return { records: [], total: 0 };
+      },
       handleStatsClick(status) {
         this.typeFilter = status;
+        this.currentPage = 1;
+        this.loadData();
+      },
+      handleTabPickerChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.typeFilter = ((_b = this.filterTabs[index]) == null ? void 0 : _b.value) || "all";
+        this.currentPage = 1;
         this.loadData();
       },
       async loadCountStats() {
+        var _a, _b, _c;
         try {
           const totalReq = request("/api/fee/list", { pageNum: 1, pageSize: 1 }, "GET");
           const unpaidReq = request("/api/fee/list", { pageNum: 1, pageSize: 1, status: "UNPAID" }, "GET");
           const paidReq = request("/api/fee/list", { pageNum: 1, pageSize: 1, status: "PAID" }, "GET");
           const [totalRes, unpaidRes, paidRes] = await Promise.all([totalReq, unpaidReq, paidReq]);
           this.countStats = {
-            total: (totalRes == null ? void 0 : totalRes.total) || 0,
-            unpaid: (unpaidRes == null ? void 0 : unpaidRes.total) || 0,
-            paid: (paidRes == null ? void 0 : paidRes.total) || 0
+            total: (totalRes == null ? void 0 : totalRes.total) || ((_a = totalRes == null ? void 0 : totalRes.data) == null ? void 0 : _a.total) || 0,
+            unpaid: (unpaidRes == null ? void 0 : unpaidRes.total) || ((_b = unpaidRes == null ? void 0 : unpaidRes.data) == null ? void 0 : _b.total) || 0,
+            paid: (paidRes == null ? void 0 : paidRes.total) || ((_c = paidRes == null ? void 0 : paidRes.data) == null ? void 0 : _c.total) || 0
           };
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/fee-manage.vue:290", "加载统计数据失败", e);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/fee-manage.vue:336", "加载统计数据失败", error);
         }
       },
       onSearch() {
         this.currentPage = 1;
         this.loadData();
       },
-      switchTab(tabValue) {
-        this.typeFilter = tabValue;
+      handleResetFilters() {
+        this.searchQuery = "";
+        this.typeFilter = "all";
         this.currentPage = 1;
         this.loadData();
       },
       handlePrevPage() {
-        if (this.currentPage > 1) {
-          this.currentPage--;
-          this.loadData();
-        }
+        if (this.currentPage <= 1)
+          return;
+        this.currentPage -= 1;
+        this.loadData();
       },
       handleNextPage() {
-        if (this.currentPage < this.totalPages) {
-          this.currentPage++;
-          this.loadData();
-        }
+        if (this.currentPage >= this.totalPages)
+          return;
+        this.currentPage += 1;
+        this.loadData();
+      },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50, 100];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 10;
+        this.currentPage = 1;
+        this.loadData();
       },
       async loadData() {
-        var _a;
         this.loading = true;
         try {
           const isStatusFilter = ["unpaid", "paid"].includes(this.typeFilter);
@@ -8912,8 +10193,9 @@ if (uni.restoreGlobal) {
             pageSize: this.pageSize
           };
           const data = await request("/api/fee/list", params, "GET");
-          const records = data.records || [];
-          this.total = typeof data.total === "number" ? data.total : ((_a = data.data) == null ? void 0 : _a.total) || records.length || 0;
+          const normalized = this.normalizeFeeResponse(data);
+          const records = normalized.records;
+          this.total = Number(normalized.total || 0);
           this.feeList = records.map((item) => {
             const feeCycle = item.feeCycle || "";
             const [year, month] = feeCycle.split("-");
@@ -8927,25 +10209,34 @@ if (uni.restoreGlobal) {
               period: feeCycle,
               deadline: item.deadline || "月底",
               remindCount: item.remindCount || 0,
-              // 新增：催缴次数
               status: item.status === "PAID" || item.status === "paid" || item.status === 1 ? "paid" : "unpaid"
             };
           });
-          const total = this.feeList.reduce((sum, item) => sum + Number(item.amount), 0);
-          const paid = this.feeList.filter((item) => item.status === "paid").reduce((sum, item) => sum + Number(item.amount), 0);
+          const totalAmount = this.feeList.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+          const paidAmount = this.feeList.filter((item) => item.status === "paid").reduce((sum, item) => sum + Number(item.amount || 0), 0);
           this.stats = {
-            totalAmount: total.toFixed(2),
-            paidAmount: paid.toFixed(2),
-            rate: total > 0 ? (paid / total * 100).toFixed(1) : 0
+            totalAmount: totalAmount.toFixed(2),
+            paidAmount: paidAmount.toFixed(2),
+            rate: totalAmount > 0 ? (paidAmount / totalAmount * 100).toFixed(1) : 0
           };
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/fee-manage.vue:367", e);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/fee-manage.vue:410", error);
+          this.feeList = [];
+          this.total = 0;
           uni.showToast({ title: "加载失败", icon: "none" });
         } finally {
           this.loading = false;
         }
       },
-      // 打开生成账单弹窗
+      formatHouse(item) {
+        const buildingNo = item.buildingNo || "-";
+        const houseNo = item.houseNo || "-";
+        return `${buildingNo}栋${houseNo}室`;
+      },
+      formatAmount(value) {
+        const num = Number(value || 0);
+        return num.toFixed(2);
+      },
       openGenerateModal() {
         this.showGenerateModal = true;
       },
@@ -8956,14 +10247,14 @@ if (uni.restoreGlobal) {
         this.generateForm.month = e.detail.value;
       },
       onFeeTypeChange(e) {
-        const index = e.detail.value;
+        var _a;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
         this.generateForm.feeType = this.feeTypes[index].value;
         this.generateForm.feeTypeLabel = this.feeTypes[index].label;
       },
       onDeadlineChange(e) {
         this.generateForm.deadline = e.detail.value;
       },
-      // 提交生成账单
       async submitGenerateBill() {
         if (!this.generateForm.month)
           return uni.showToast({ title: "请选择月份", icon: "none" });
@@ -8974,15 +10265,10 @@ if (uni.restoreGlobal) {
           const userInfo = uni.getStorageSync("userInfo") || {};
           const payload = {
             communityName: "",
-            // 默认全小区，或者从 userInfo.communityName 获取
             buildingNo: "",
-            // 默认全楼栋
             feeCycle: this.generateForm.month,
-            // 对应 feeCycle (2026-02)
             dueDate: this.generateForm.deadline,
-            // 对应 dueDate
             unitPrice: 2.5
-            // 暂时硬编码或从配置获取，或者在弹窗增加输入框
           };
           const adminId = userInfo.id || userInfo.userId || 1;
           const url = `/api/fee/generate?adminId=${adminId}`;
@@ -8991,30 +10277,30 @@ if (uni.restoreGlobal) {
           uni.showToast({ title: "生成成功", icon: "success" });
           this.closeGenerateModal();
           this.loadData();
-        } catch (e) {
+          this.loadCountStats();
+        } catch (error) {
           uni.hideLoading();
-          formatAppLog("error", "at admin/pages/admin/fee-manage.vue:431", "生成账单失败:", e);
-          uni.showToast({ title: "生成失败: " + (e.message || "接口错误"), icon: "none" });
+          formatAppLog("error", "at admin/pages/admin/fee-manage.vue:467", "生成账单失败:", error);
+          uni.showToast({ title: "生成失败: " + (error.message || "接口错误"), icon: "none" });
         }
       },
       async handleBatchRemind() {
         try {
           uni.showLoading({ title: "发送中..." });
-          const unpaidIds = this.feeList.filter((i) => i.status === "unpaid").map((i) => i.id);
-          if (unpaidIds.length === 0) {
+          const unpaidIds = this.feeList.filter((item) => item.status === "unpaid").map((item) => item.id);
+          if (!unpaidIds.length) {
             uni.hideLoading();
             return uni.showToast({ title: "无待缴账单", icon: "none" });
           }
           await request("/api/fee/remind/batch", { ids: unpaidIds }, "POST");
           uni.hideLoading();
-          this.feeList = this.feeList.map((i) => {
-            if (i.status !== "unpaid")
-              return i;
-            const nextCount = (Number(i.remindCount) || 0) + 1;
-            return { ...i, remindCount: nextCount };
+          this.feeList = this.feeList.map((item) => {
+            if (item.status !== "unpaid")
+              return item;
+            return { ...item, remindCount: (Number(item.remindCount) || 0) + 1 };
           });
           uni.showToast({ title: "催缴发送成功", icon: "success" });
-        } catch (e) {
+        } catch (error) {
           uni.hideLoading();
         }
       },
@@ -9023,20 +10309,20 @@ if (uni.restoreGlobal) {
           title: "催缴通知",
           content: `确认向 ${item.ownerName} 发送 ${item.feeName} 的催缴通知吗？`,
           success: async (res) => {
-            if (res.confirm) {
-              try {
-                await request(`/api/fee/remind/${item.id}`, null, "POST");
-                const index = this.feeList.findIndex((v) => v.id === item.id);
-                if (index !== -1) {
-                  const current = this.feeList[index];
-                  const nextCount = (Number(current.remindCount) || 0) + 1;
-                  this.feeList.splice(index, 1, { ...current, remindCount: nextCount });
-                }
-                uni.showToast({ title: "发送成功", icon: "success" });
-              } catch (e) {
-                formatAppLog("error", "at admin/pages/admin/fee-manage.vue:477", "催缴失败", e);
-                uni.showToast({ title: e.msg || "发送失败，请检查后端日志", icon: "none" });
+            if (!res.confirm)
+              return;
+            try {
+              await request(`/api/fee/remind/${item.id}`, null, "POST");
+              const index = this.feeList.findIndex((current) => current.id === item.id);
+              if (index !== -1) {
+                const current = this.feeList[index];
+                const nextCount = (Number(current.remindCount) || 0) + 1;
+                this.feeList.splice(index, 1, { ...current, remindCount: nextCount });
               }
+              uni.showToast({ title: "发送成功", icon: "success" });
+            } catch (error) {
+              formatAppLog("error", "at admin/pages/admin/fee-manage.vue:506", "催缴失败", error);
+              uni.showToast({ title: error.msg || "发送失败，请检查后端日志", icon: "none" });
             }
           }
         });
@@ -9047,378 +10333,471 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[18] || (_cache[18] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[21] || (_cache[21] = ($event) => $data.showSidebar = $event),
       pageTitle: "费用管理",
-      currentPage: "/admin/pages/admin/fee-manage"
+      currentPage: "/admin/pages/admin/fee-manage",
+      pageBreadcrumb: "管理后台 / 费用管理",
+      showPageBanner: false
     }, {
       default: vue.withCtx(() => [
-        vue.createElementVNode("view", { class: "container" }, [
-          vue.createCommentVNode(" 顶部搜索栏 "),
-          vue.createElementVNode("view", { class: "header" }, [
-            vue.createElementVNode("view", { class: "search-box" }, [
-              vue.withDirectives(vue.createElementVNode(
-                "input",
-                {
-                  class: "search-input",
-                  type: "text",
-                  "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.searchQuery = $event),
-                  placeholder: "搜索房号、业主姓名",
-                  "confirm-type": "search",
-                  onConfirm: _cache[1] || (_cache[1] = (...args) => $options.onSearch && $options.onSearch(...args))
-                },
-                null,
-                544
-                /* NEED_HYDRATION, NEED_PATCH */
-              ), [
-                [vue.vModelText, $data.searchQuery]
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "费用账单列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一成后台数据表格页，保留生成账单、单条催缴、批量催缴与金额统计。")
+            ]),
+            vue.createElementVNode("view", { class: "overview-actions" }, [
+              vue.createElementVNode("button", {
+                class: "ghost-action-btn",
+                onClick: _cache[0] || (_cache[0] = (...args) => $options.handleBatchRemind && $options.handleBatchRemind(...args))
+              }, "一键催缴"),
+              vue.createElementVNode("button", {
+                class: "primary-action-btn",
+                onClick: _cache[1] || (_cache[1] = (...args) => $options.openGenerateModal && $options.openGenerateModal(...args))
+              }, "生成账单")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.typeFilter === "all" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("all"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "总账单数"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.countStats.total),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card unpaid", { active: $data.typeFilter === "unpaid" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.handleStatsClick("unpaid"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "待缴费"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.countStats.unpaid),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card paid", { active: $data.typeFilter === "paid" }]),
+                onClick: _cache[4] || (_cache[4] = ($event) => $options.handleStatsClick("paid"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已缴费"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.countStats.paid),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => $data.searchQuery = $event),
+                    class: "query-input",
+                    type: "text",
+                    placeholder: "搜索房号、业主姓名",
+                    "confirm-type": "search",
+                    onConfirm: _cache[6] || (_cache[6] = (...args) => $options.onSearch && $options.onSearch(...args))
+                  },
+                  null,
+                  544
+                  /* NEED_HYDRATION, NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.searchQuery]
+                ])
               ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "费用状态"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.filterTabs,
+                  "range-key": "label",
+                  value: $options.tabPickerIndex,
+                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleTabPickerChange && $options.handleTabPickerChange(...args))
+                }, [
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentTabLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
+              ])
+            ]),
+            vue.createElementVNode("view", { class: "query-actions" }, [
               vue.createElementVNode("button", {
-                class: "search-btn",
-                onClick: _cache[2] || (_cache[2] = (...args) => $options.onSearch && $options.onSearch(...args))
-              }, "搜索")
+                class: "query-btn primary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.onSearch && $options.onSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
             ])
           ]),
-          vue.createCommentVNode(" 统计卡片 "),
-          vue.createElementVNode("view", { class: "stats-card-container" }, [
-            vue.createElementVNode("view", {
-              class: "stats-card",
-              onClick: _cache[3] || (_cache[3] = ($event) => $options.handleStatsClick("all"))
-            }, [
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
               vue.createElementVNode(
                 "text",
-                { class: "stats-number" },
-                vue.toDisplayString($data.countStats.total),
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
                 1
                 /* TEXT */
               ),
-              vue.createElementVNode("text", { class: "stats-label" }, "总账单数")
-            ]),
-            vue.createElementVNode("view", {
-              class: "stats-card status-unpaid",
-              onClick: _cache[4] || (_cache[4] = ($event) => $options.handleStatsClick("unpaid"))
-            }, [
               vue.createElementVNode(
                 "text",
-                { class: "stats-number" },
-                vue.toDisplayString($data.countStats.unpaid),
+                { class: "toolbar-meta" },
+                "本月应收 ¥" + vue.toDisplayString($data.stats.totalAmount),
                 1
                 /* TEXT */
               ),
-              vue.createElementVNode("text", { class: "stats-label" }, "待缴费")
-            ]),
-            vue.createElementVNode("view", {
-              class: "stats-card status-paid",
-              onClick: _cache[5] || (_cache[5] = ($event) => $options.handleStatsClick("paid"))
-            }, [
               vue.createElementVNode(
                 "text",
-                { class: "stats-number" },
-                vue.toDisplayString($data.countStats.paid),
+                { class: "toolbar-meta active" },
+                "已收 ¥" + vue.toDisplayString($data.stats.paidAmount),
                 1
                 /* TEXT */
-              ),
-              vue.createElementVNode("text", { class: "stats-label" }, "已缴费")
-            ])
-          ]),
-          vue.createCommentVNode(" 筛选栏 "),
-          vue.createElementVNode("view", { class: "filter-bar" }, [
-            vue.createElementVNode("view", { class: "filter-tabs" }, [
-              (vue.openBlock(true), vue.createElementBlock(
-                vue.Fragment,
-                null,
-                vue.renderList($data.filterTabs, (tab) => {
-                  return vue.openBlock(), vue.createElementBlock("view", {
-                    key: tab.value,
-                    class: vue.normalizeClass(["filter-tab", { active: $data.typeFilter === tab.value }]),
-                    onClick: ($event) => $options.switchTab(tab.value)
-                  }, vue.toDisplayString(tab.label), 11, ["onClick"]);
-                }),
-                128
-                /* KEYED_FRAGMENT */
-              ))
+              )
             ]),
-            vue.createCommentVNode(" 修改为打开弹窗 "),
-            vue.createElementVNode("view", { class: "action-buttons" }, [
-              vue.createElementVNode("button", {
-                class: "action-btn generate",
-                onClick: _cache[6] || (_cache[6] = (...args) => $options.openGenerateModal && $options.openGenerateModal(...args))
-              }, "生成账单"),
-              vue.createElementVNode("button", {
-                class: "action-btn remind",
-                onClick: _cache[7] || (_cache[7] = (...args) => $options.handleBatchRemind && $options.handleBatchRemind(...args))
-              }, "一键催缴")
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "缴费率 " + vue.toDisplayString($data.stats.rate) + "%",
+                1
+                /* TEXT */
+              )
             ])
           ]),
-          vue.createCommentVNode(" 账单列表 "),
-          vue.createElementVNode("view", { class: "list-container" }, [
-            $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 0,
-              class: "loading-state"
-            }, [
-              vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-            ])) : $data.feeList.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 1,
-              class: "fee-list"
-            }, [
-              (vue.openBlock(true), vue.createElementBlock(
-                vue.Fragment,
-                null,
-                vue.renderList($data.feeList, (item) => {
-                  return vue.openBlock(), vue.createElementBlock("view", {
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "table-head" }, [
+              vue.createElementVNode("text", { class: "table-col col-name" }, "账单名称"),
+              vue.createElementVNode("text", { class: "table-col col-owner" }, "业主"),
+              vue.createElementVNode("text", { class: "table-col col-house" }, "房号"),
+              vue.createElementVNode("text", { class: "table-col col-period" }, "账单周期"),
+              vue.createElementVNode("text", { class: "table-col col-deadline" }, "截止日期"),
+              vue.createElementVNode("text", { class: "table-col col-amount" }, "金额"),
+              vue.createElementVNode("text", { class: "table-col col-remind" }, "催缴次数"),
+              vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+              vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+            ]),
+            (vue.openBlock(true), vue.createElementBlock(
+              vue.Fragment,
+              null,
+              vue.renderList($data.feeList, (item, index) => {
+                return vue.openBlock(), vue.createElementBlock(
+                  "view",
+                  {
                     key: item.id,
-                    class: "fee-item"
-                  }, [
-                    vue.createElementVNode("view", { class: "item-header" }, [
+                    class: "table-row",
+                    style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                  },
+                  [
+                    vue.createElementVNode("view", { class: "table-col col-name" }, [
                       vue.createElementVNode(
                         "text",
-                        { class: "item-title" },
+                        { class: "primary-text" },
                         vue.toDisplayString(item.feeName),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "amount" },
-                        "¥" + vue.toDisplayString(item.amount),
                         1
                         /* TEXT */
                       )
                     ]),
-                    vue.createElementVNode("view", { class: "item-info" }, [
-                      vue.createElementVNode("view", { class: "info-row" }, [
-                        vue.createElementVNode("text", { class: "label" }, "业主："),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "value" },
-                          vue.toDisplayString(item.ownerName),
-                          1
-                          /* TEXT */
-                        )
-                      ]),
-                      vue.createElementVNode("view", { class: "info-row" }, [
-                        vue.createElementVNode("text", { class: "label" }, "房号："),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "value" },
-                          vue.toDisplayString(item.buildingNo) + "栋" + vue.toDisplayString(item.houseNo) + "室",
-                          1
-                          /* TEXT */
-                        )
-                      ]),
-                      vue.createElementVNode("view", { class: "info-row" }, [
-                        vue.createElementVNode("text", { class: "label" }, "账单周期："),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "value" },
-                          vue.toDisplayString(item.period),
-                          1
-                          /* TEXT */
-                        )
-                      ]),
-                      vue.createElementVNode("view", { class: "info-row" }, [
-                        vue.createElementVNode("text", { class: "label" }, "截止日期："),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "value" },
-                          vue.toDisplayString(item.deadline),
-                          1
-                          /* TEXT */
-                        )
-                      ]),
-                      item.status === "unpaid" ? (vue.openBlock(), vue.createElementBlock("view", {
-                        key: 0,
-                        class: "info-row"
-                      }, [
-                        vue.createElementVNode("text", { class: "label" }, "催缴次数："),
-                        vue.createElementVNode(
-                          "text",
-                          {
-                            class: "value",
-                            style: { "color": "#ff9f43" }
-                          },
-                          vue.toDisplayString(item.remindCount || 0) + "次",
-                          1
-                          /* TEXT */
-                        )
-                      ])) : vue.createCommentVNode("v-if", true)
+                    vue.createElementVNode("view", { class: "table-col col-owner" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString(item.ownerName || "-"),
+                        1
+                        /* TEXT */
+                      )
                     ]),
-                    vue.createElementVNode("view", { class: "item-footer" }, [
+                    vue.createElementVNode("view", { class: "table-col col-house" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString($options.formatHouse(item)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-period" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString(item.period || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-deadline" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString(item.deadline || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-amount" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "amount-text" },
+                        "¥" + vue.toDisplayString($options.formatAmount(item.amount)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-remind" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString(item.remindCount || 0) + " 次",
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-status" }, [
                       vue.createElementVNode(
                         "text",
                         {
-                          class: vue.normalizeClass(["status-tag", item.status])
+                          class: vue.normalizeClass(["status-pill", item.status])
                         },
                         vue.toDisplayString(item.status === "paid" ? "已缴费" : "待缴费"),
                         3
                         /* TEXT, CLASS */
-                      ),
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
                       item.status === "unpaid" ? (vue.openBlock(), vue.createElementBlock("button", {
                         key: 0,
-                        class: "remind-btn",
+                        class: "row-btn danger",
                         onClick: ($event) => $options.handleRemind(item)
-                      }, " 催缴 ", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
+                      }, "催缴", 8, ["onClick"])) : (vue.openBlock(), vue.createElementBlock("text", {
+                        key: 1,
+                        class: "row-note"
+                      }, "无需催缴"))
                     ])
-                  ]);
-                }),
-                128
-                /* KEYED_FRAGMENT */
-              ))
-            ])) : (vue.openBlock(), vue.createElementBlock("view", {
-              key: 2,
+                  ],
+                  4
+                  /* STYLE */
+                );
+              }),
+              128
+              /* KEYED_FRAGMENT */
+            )),
+            $data.feeList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
               class: "empty-state"
             }, [
-              vue.createElementVNode("image", {
-                src: _imports_0,
-                mode: "aspectFit",
-                class: "empty-img"
-              }),
-              vue.createElementVNode("text", { class: "empty-text" }, "暂无账单记录")
-            ])),
-            vue.createCommentVNode(" 分页组件 "),
-            $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 3,
-              class: "pagination"
-            }, [
+              vue.createElementVNode("text", null, "暂无账单记录")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === 1,
-                onClick: _cache[8] || (_cache[8] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
-              }, " 上一页 ", 8, ["disabled"]),
-              vue.createElementVNode("view", { class: "page-info" }, [
-                vue.createElementVNode(
-                  "text",
-                  null,
-                  vue.toDisplayString($data.currentPage),
-                  1
-                  /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "page-separator" }, "/"),
-                vue.createElementVNode(
-                  "text",
-                  null,
-                  vue.toDisplayString($options.totalPages),
-                  1
-                  /* TEXT */
-                )
-              ]),
+                onClick: _cache[10] || (_cache[10] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
+              }, "上一页", 8, ["disabled"]),
               vue.createElementVNode("button", {
                 class: "page-btn",
                 disabled: $data.currentPage === $options.totalPages,
-                onClick: _cache[9] || (_cache[9] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
-              }, " 下一页 ", 8, ["disabled"])
-            ])) : vue.createCommentVNode("v-if", true)
-          ]),
-          vue.createCommentVNode(" 底部统计 "),
-          vue.createElementVNode("view", { class: "stats-bar" }, [
-            vue.createElementVNode("view", { class: "stat-item" }, [
-              vue.createElementVNode("text", { class: "label" }, "本月应收"),
+                onClick: _cache[11] || (_cache[11] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: [10, 20, 50, 100],
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[12] || (_cache[12] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
+                  vue.createElementVNode(
+                    "text",
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.pageSize) + " 条",
+                    1
+                    /* TEXT */
+                  )
+                ], 40, ["value"])
+              ])
+            ])
+          ])) : vue.createCommentVNode("v-if", true),
+          vue.createElementVNode("view", { class: "stats-footer" }, [
+            vue.createElementVNode("view", { class: "footer-stat-item" }, [
+              vue.createElementVNode("text", { class: "footer-label" }, "本月应收"),
               vue.createElementVNode(
                 "text",
-                { class: "value" },
+                { class: "footer-value" },
                 "¥" + vue.toDisplayString($data.stats.totalAmount),
                 1
                 /* TEXT */
               )
             ]),
-            vue.createElementVNode("view", { class: "stat-item" }, [
-              vue.createElementVNode("text", { class: "label" }, "已收金额"),
+            vue.createElementVNode("view", { class: "footer-stat-item" }, [
+              vue.createElementVNode("text", { class: "footer-label" }, "已收金额"),
               vue.createElementVNode(
                 "text",
-                { class: "value highlight" },
+                { class: "footer-value highlight" },
                 "¥" + vue.toDisplayString($data.stats.paidAmount),
                 1
                 /* TEXT */
               )
             ]),
-            vue.createElementVNode("view", { class: "stat-item" }, [
-              vue.createElementVNode("text", { class: "label" }, "缴费率"),
+            vue.createElementVNode("view", { class: "footer-stat-item" }, [
+              vue.createElementVNode("text", { class: "footer-label" }, "缴费率"),
               vue.createElementVNode(
                 "text",
-                { class: "value" },
+                { class: "footer-value" },
                 vue.toDisplayString($data.stats.rate) + "%",
                 1
                 /* TEXT */
               )
             ])
           ]),
-          vue.createCommentVNode(" 生成账单弹窗 "),
           $data.showGenerateModal ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 0,
-            class: "modal-mask",
-            onClick: _cache[17] || (_cache[17] = (...args) => $options.closeGenerateModal && $options.closeGenerateModal(...args))
+            key: 3,
+            class: "detail-modal",
+            onClick: _cache[20] || (_cache[20] = (...args) => $options.closeGenerateModal && $options.closeGenerateModal(...args))
           }, [
             vue.createElementVNode("view", {
-              class: "modal-content",
-              onClick: _cache[16] || (_cache[16] = vue.withModifiers(() => {
+              class: "detail-content",
+              onClick: _cache[19] || (_cache[19] = vue.withModifiers(() => {
               }, ["stop"]))
             }, [
-              vue.createElementVNode("view", { class: "modal-header" }, [
-                vue.createElementVNode("text", { class: "modal-title" }, "生成本期账单"),
-                vue.createElementVNode("text", {
-                  class: "close-icon",
-                  onClick: _cache[10] || (_cache[10] = (...args) => $options.closeGenerateModal && $options.closeGenerateModal(...args))
-                }, "×")
+              vue.createElementVNode("view", { class: "detail-header" }, [
+                vue.createElementVNode("text", { class: "detail-title" }, "生成本期账单"),
+                vue.createElementVNode("button", {
+                  class: "close-btn",
+                  onClick: _cache[13] || (_cache[13] = (...args) => $options.closeGenerateModal && $options.closeGenerateModal(...args))
+                }, "关闭")
               ]),
-              vue.createElementVNode("view", { class: "modal-body" }, [
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "label" }, "账单月份"),
-                  vue.createElementVNode("picker", {
-                    mode: "date",
-                    fields: "month",
-                    value: $data.generateForm.month,
-                    onChange: _cache[11] || (_cache[11] = (...args) => $options.onMonthChange && $options.onMonthChange(...args))
-                  }, [
-                    vue.createElementVNode(
-                      "view",
-                      { class: "picker-value" },
-                      vue.toDisplayString($data.generateForm.month || "请选择月份"),
-                      1
-                      /* TEXT */
-                    )
-                  ], 40, ["value"])
+              vue.createElementVNode("view", { class: "detail-body" }, [
+                vue.createElementVNode("view", { class: "detail-item" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "账单月份:"),
+                  vue.createElementVNode("view", { class: "detail-picker-wrap" }, [
+                    vue.createElementVNode("picker", {
+                      mode: "date",
+                      fields: "month",
+                      value: $data.generateForm.month,
+                      onChange: _cache[14] || (_cache[14] = (...args) => $options.onMonthChange && $options.onMonthChange(...args))
+                    }, [
+                      vue.createElementVNode("view", { class: "detail-picker" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "detail-picker-text" },
+                          vue.toDisplayString($data.generateForm.month || "请选择月份"),
+                          1
+                          /* TEXT */
+                        )
+                      ])
+                    ], 40, ["value"])
+                  ])
                 ]),
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "label" }, "费用类型"),
-                  vue.createElementVNode("picker", {
-                    range: $data.feeTypes,
-                    "range-key": "label",
-                    onChange: _cache[12] || (_cache[12] = (...args) => $options.onFeeTypeChange && $options.onFeeTypeChange(...args))
-                  }, [
-                    vue.createElementVNode(
-                      "view",
-                      { class: "picker-value" },
-                      vue.toDisplayString($data.generateForm.feeTypeLabel || "请选择类型"),
-                      1
-                      /* TEXT */
-                    )
-                  ], 40, ["range"])
+                vue.createElementVNode("view", { class: "detail-item" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "费用类型:"),
+                  vue.createElementVNode("view", { class: "detail-picker-wrap" }, [
+                    vue.createElementVNode("picker", {
+                      range: $data.feeTypes,
+                      "range-key": "label",
+                      onChange: _cache[15] || (_cache[15] = (...args) => $options.onFeeTypeChange && $options.onFeeTypeChange(...args))
+                    }, [
+                      vue.createElementVNode("view", { class: "detail-picker" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "detail-picker-text" },
+                          vue.toDisplayString($data.generateForm.feeTypeLabel || "请选择类型"),
+                          1
+                          /* TEXT */
+                        )
+                      ])
+                    ], 40, ["range"])
+                  ])
                 ]),
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "label" }, "截止日期"),
-                  vue.createElementVNode("picker", {
-                    mode: "date",
-                    value: $data.generateForm.deadline,
-                    onChange: _cache[13] || (_cache[13] = (...args) => $options.onDeadlineChange && $options.onDeadlineChange(...args))
-                  }, [
-                    vue.createElementVNode(
-                      "view",
-                      { class: "picker-value" },
-                      vue.toDisplayString($data.generateForm.deadline || "请选择日期"),
-                      1
-                      /* TEXT */
-                    )
-                  ], 40, ["value"])
+                vue.createElementVNode("view", { class: "detail-item" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "截止日期:"),
+                  vue.createElementVNode("view", { class: "detail-picker-wrap" }, [
+                    vue.createElementVNode("picker", {
+                      mode: "date",
+                      value: $data.generateForm.deadline,
+                      onChange: _cache[16] || (_cache[16] = (...args) => $options.onDeadlineChange && $options.onDeadlineChange(...args))
+                    }, [
+                      vue.createElementVNode("view", { class: "detail-picker" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "detail-picker-text" },
+                          vue.toDisplayString($data.generateForm.deadline || "请选择日期"),
+                          1
+                          /* TEXT */
+                        )
+                      ])
+                    ], 40, ["value"])
+                  ])
+                ]),
+                vue.createElementVNode("view", { class: "detail-actions" }, [
+                  vue.createElementVNode("button", {
+                    class: "detail-btn secondary",
+                    onClick: _cache[17] || (_cache[17] = (...args) => $options.closeGenerateModal && $options.closeGenerateModal(...args))
+                  }, "取消"),
+                  vue.createElementVNode("button", {
+                    class: "detail-btn primary",
+                    onClick: _cache[18] || (_cache[18] = (...args) => $options.submitGenerateBill && $options.submitGenerateBill(...args))
+                  }, "确认生成")
                 ])
-              ]),
-              vue.createElementVNode("view", { class: "modal-footer" }, [
-                vue.createElementVNode("button", {
-                  class: "modal-btn cancel",
-                  onClick: _cache[14] || (_cache[14] = (...args) => $options.closeGenerateModal && $options.closeGenerateModal(...args))
-                }, "取消"),
-                vue.createElementVNode("button", {
-                  class: "modal-btn confirm",
-                  onClick: _cache[15] || (_cache[15] = (...args) => $options.submitGenerateBill && $options.submitGenerateBill(...args))
-                }, "确认生成")
               ])
             ])
           ])) : vue.createCommentVNode("v-if", true)
@@ -9445,17 +10824,14 @@ if (uni.restoreGlobal) {
           { value: "DONE", label: "已处理" }
         ],
         complaintList: [],
-        // 分页相关
         currentPage: 1,
         pageSize: 10,
         total: 0,
-        // 统计数据
         stats: {
           total: 0,
           pending: 0,
           processed: 0
         },
-        // 处理弹窗
         showHandleModal: false,
         currentComplaint: null,
         handleResult: "",
@@ -9466,11 +10842,22 @@ if (uni.restoreGlobal) {
     },
     computed: {
       totalPages() {
-        return Math.ceil(this.total / this.pageSize) || 1;
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50, 100];
+        return Math.max(0, options.indexOf(this.pageSize));
       },
       currentMonthLabel() {
-        const opt = this.monthOptions && this.monthOptions[this.monthIndex];
-        return opt && opt.label || this.monthValue || "选择月份";
+        const option = this.monthOptions[this.monthIndex];
+        return option ? option.label : this.monthValue || "选择月份";
+      },
+      statusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.statusFilter));
+      },
+      currentStatusLabel() {
+        const current = this.statusOptions.find((item) => item.value === this.statusFilter);
+        return current ? current.label : "全部状态";
       }
     },
     onLoad() {
@@ -9481,34 +10868,55 @@ if (uni.restoreGlobal) {
     methods: {
       initMonthOptions() {
         const now = /* @__PURE__ */ new Date();
-        const y = now.getFullYear();
-        const m = now.getMonth() + 1;
-        const current = `${y}-${String(m).padStart(2, "0")}`;
-        const opts = [];
+        const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const options = [];
         for (let i = 0; i < 12; i++) {
-          const d = new Date(y, m - 1 - i, 1);
-          const yy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, "0");
-          const value = `${yy}-${mm}`;
-          opts.push({ label: value, value });
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          options.push({ label: value, value });
         }
-        this.monthOptions = opts;
+        this.monthOptions = options;
         this.monthValue = current;
-        this.monthIndex = Math.max(0, opts.findIndex((o) => o.value === current));
+        this.monthIndex = Math.max(0, options.findIndex((item) => item.value === current));
+      },
+      normalizeComplaintResponse(data) {
+        if (Array.isArray(data))
+          return { records: data, total: data.length };
+        if (Array.isArray(data.records))
+          return { records: data.records, total: data.total || data.records.length };
+        if (data.data && Array.isArray(data.data.records))
+          return { records: data.data.records, total: data.data.total || data.data.records.length };
+        if (Array.isArray(data.rows))
+          return { records: data.rows, total: data.total || data.rows.length };
+        return { records: [], total: 0 };
+      },
+      extractTotal(data) {
+        var _a, _b;
+        if (typeof (data == null ? void 0 : data.total) === "number")
+          return data.total;
+        if (typeof ((_a = data == null ? void 0 : data.data) == null ? void 0 : _a.total) === "number")
+          return data.data.total;
+        if (Array.isArray(data == null ? void 0 : data.records))
+          return data.records.length;
+        if (Array.isArray((_b = data == null ? void 0 : data.data) == null ? void 0 : _b.records))
+          return data.data.records.length;
+        if (Array.isArray(data))
+          return data.length;
+        return 0;
       },
       handleMonthChange(e) {
-        const idx = Number(e && e.detail ? e.detail.value : 0);
-        const option = this.monthOptions && this.monthOptions[idx];
+        var _a;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        const option = this.monthOptions[index];
         if (!option)
           return;
-        this.monthIndex = idx;
+        this.monthIndex = index;
         this.monthValue = option.value;
         this.currentPage = 1;
         this.loadData();
         this.loadStats();
       },
       async loadData() {
-        var _a, _b;
         this.loading = true;
         try {
           const params = {
@@ -9519,9 +10927,9 @@ if (uni.restoreGlobal) {
             pageSize: this.pageSize
           };
           const data = await request("/api/complaint/list", { params }, "GET");
-          const records = Array.isArray(data) ? data : data.records || ((_a = data.data) == null ? void 0 : _a.records) || data.rows || [];
-          this.total = typeof data.total === "number" ? data.total : ((_b = data.data) == null ? void 0 : _b.total) || records.length || 0;
-          this.complaintList = records.map((item) => ({
+          const normalized = this.normalizeComplaintResponse(data);
+          this.total = Number(normalized.total || 0);
+          this.complaintList = normalized.records.map((item) => ({
             id: item.id,
             type: item.type,
             content: item.content,
@@ -9533,34 +10941,32 @@ if (uni.restoreGlobal) {
             houseNo: item.houseNo,
             createTime: item.createTime,
             status: item.status,
-            // PENDING/DONE
             result: item.result
           }));
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/complaint-manage.vue:299", "加载投诉列表失败", e);
-          uni.showToast({ title: "加载失败", icon: "none" });
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/complaint-manage.vue:341", "加载投诉列表失败", error);
           this.complaintList = [];
           this.total = 0;
+          uni.showToast({ title: "加载失败", icon: "none" });
         } finally {
           this.loading = false;
         }
       },
-      // 加载统计数据
       async loadStats() {
         try {
           const month = this.monthValue || void 0;
-          const totalReq = request("/api/complaint/list", { params: { pageNum: 1, pageSize: 1, month } }, "GET");
-          const pendingReq = request("/api/complaint/list", { params: { pageNum: 1, pageSize: 1, status: "PENDING", month } }, "GET");
-          const processedReq = request("/api/complaint/list", { params: { pageNum: 1, pageSize: 1, status: "DONE", month } }, "GET");
-          const [totalRes, pendingRes, processedRes] = await Promise.all([totalReq, pendingReq, processedReq]);
-          formatAppLog("log", "at admin/pages/admin/complaint-manage.vue:322", "Stats Response Data:", { totalRes, pendingRes, processedRes });
+          const [totalRes, pendingRes, processedRes] = await Promise.all([
+            request("/api/complaint/list", { params: { pageNum: 1, pageSize: 1, month } }, "GET"),
+            request("/api/complaint/list", { params: { pageNum: 1, pageSize: 1, status: "PENDING", month } }, "GET"),
+            request("/api/complaint/list", { params: { pageNum: 1, pageSize: 1, status: "DONE", month } }, "GET")
+          ]);
           this.stats = {
-            total: (totalRes == null ? void 0 : totalRes.total) || 0,
-            pending: (pendingRes == null ? void 0 : pendingRes.total) || 0,
-            processed: (processedRes == null ? void 0 : processedRes.total) || 0
+            total: this.extractTotal(totalRes),
+            pending: this.extractTotal(pendingRes),
+            processed: this.extractTotal(processedRes)
           };
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/complaint-manage.vue:330", "加载统计数据失败", e);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/complaint-manage.vue:363", "加载统计数据失败", error);
         }
       },
       handleStatsClick(status) {
@@ -9572,34 +10978,51 @@ if (uni.restoreGlobal) {
         this.currentPage = 1;
         this.loadData();
       },
+      handleResetFilters() {
+        this.searchQuery = "";
+        this.statusFilter = "";
+        this.currentPage = 1;
+        this.loadData();
+      },
       handleStatusChange(e) {
-        this.statusFilter = this.statusOptions[e.detail.value].value;
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.statusFilter = ((_b = this.statusOptions[index]) == null ? void 0 : _b.value) || "";
         this.currentPage = 1;
         this.loadData();
       },
       handlePrevPage() {
-        if (this.currentPage > 1) {
-          this.currentPage--;
-          this.loadData();
-        }
+        if (this.currentPage <= 1)
+          return;
+        this.currentPage -= 1;
+        this.loadData();
       },
       handleNextPage() {
-        if (this.currentPage < this.totalPages) {
-          this.currentPage++;
-          this.loadData();
-        }
+        if (this.currentPage >= this.totalPages)
+          return;
+        this.currentPage += 1;
+        this.loadData();
+      },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50, 100];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 10;
+        this.currentPage = 1;
+        this.loadData();
       },
       openHandleModal(item) {
         this.currentComplaint = item;
-        this.handleResult = "";
+        this.handleResult = (item == null ? void 0 : item.result) || "";
         this.showHandleModal = true;
       },
       closeHandleModal() {
         this.showHandleModal = false;
         this.currentComplaint = null;
+        this.handleResult = "";
       },
       async submitHandle() {
-        if (!this.handleResult) {
+        if (!this.handleResult.trim()) {
           uni.showToast({ title: "请输入处理结果", icon: "none" });
           return;
         }
@@ -9607,16 +11030,12 @@ if (uni.restoreGlobal) {
         try {
           const url = `/api/complaint/handle?id=${this.currentComplaint.id}&result=${encodeURIComponent(this.handleResult)}`;
           await request(url, {}, "PUT");
-          const item = this.complaintList.find((i) => i.id === this.currentComplaint.id);
-          if (item) {
-            item.status = "DONE";
-            item.result = this.handleResult;
-          }
           uni.showToast({ title: "处理成功", icon: "success" });
           this.closeHandleModal();
+          this.loadData();
           this.loadStats();
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/complaint-manage.vue:403", "处理投诉失败", e);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/complaint-manage.vue:428", "处理投诉失败", error);
           uni.showToast({ title: "提交失败", icon: "none" });
         } finally {
           uni.hideLoading();
@@ -9630,29 +11049,45 @@ if (uni.restoreGlobal) {
       previewImage(images, index) {
         if (!images)
           return;
-        const urls = images.split(",");
+        const urls = String(images).split(",").filter(Boolean);
+        if (!urls.length)
+          return;
         uni.previewImage({
-          current: urls[index],
+          current: urls[index] || urls[0],
           urls
         });
       },
+      getImageCount(images) {
+        if (!images)
+          return 0;
+        return String(images).split(",").filter(Boolean).length;
+      },
+      getOwnerText(item) {
+        return item.ownerName || item.userName || "匿名";
+      },
       getStatusClass(status) {
-        return {
-          "status-pending": status === "PENDING",
-          "status-processed": status === "DONE"
-        };
+        return status === "DONE" ? "status-processed" : "status-pending";
       },
       getStatusText(status) {
         const map = {
-          "PENDING": "待处理",
-          "DONE": "已处理"
+          PENDING: "待处理",
+          DONE: "已处理"
         };
-        return map[status] || status;
+        return map[status] || status || "-";
+      },
+      formatHouse(item) {
+        if (item.buildingNo && item.houseNo) {
+          return `${item.buildingNo}栋${item.houseNo}室`;
+        }
+        return "未绑定房屋";
       },
       formatTime(time) {
         if (!time)
-          return "";
-        return new Date(time).toLocaleString();
+          return "-";
+        const date = new Date(String(time).replace(" ", "T"));
+        if (Number.isNaN(date.getTime()))
+          return String(time);
+        return date.toLocaleString();
       }
     }
   };
@@ -9660,318 +11095,404 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[16] || (_cache[16] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[18] || (_cache[18] = ($event) => $data.showSidebar = $event),
       pageTitle: "投诉处理",
-      currentPage: "/admin/pages/admin/complaint-manage"
+      currentPage: "/admin/pages/admin/complaint-manage",
+      pageBreadcrumb: "管理后台 / 投诉处理",
+      showPageBanner: false
     }, {
-      default: vue.withCtx(() => {
-        var _a;
-        return [
-          vue.createElementVNode("view", { class: "manage-container" }, [
-            vue.createCommentVNode(" 统计卡片 "),
-            vue.createElementVNode("view", { class: "stats-card-container" }, [
-              vue.createElementVNode("view", {
-                class: "stats-card",
-                onClick: _cache[0] || (_cache[0] = ($event) => $options.handleStatsClick(""))
-              }, [
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "投诉工单列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一按后台表格页方式呈现，保留回复处理、联系业主和图片查看。")
+            ]),
+            vue.createElementVNode("picker", {
+              mode: "selector",
+              range: $data.monthOptions,
+              "range-key": "label",
+              onChange: _cache[0] || (_cache[0] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
+            }, [
+              vue.createElementVNode("view", { class: "month-filter-chip" }, [
+                vue.createElementVNode("text", { class: "month-filter-label" }, "统计月份"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "month-filter-value" },
+                  vue.toDisplayString($options.currentMonthLabel),
+                  1
+                  /* TEXT */
+                )
+              ])
+            ], 40, ["range"])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.statusFilter === "" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick(""))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "总投诉数"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.total),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "总投诉数")
-              ]),
-              vue.createElementVNode("view", {
-                class: "stats-card status-pending",
-                onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick("pending"))
-              }, [
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card pending", { active: $data.statusFilter === "PENDING" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("PENDING"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "待处理"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.pending),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "待处理")
-              ]),
-              vue.createElementVNode("view", {
-                class: "stats-card status-processed",
-                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("processed"))
-              }, [
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card processed", { active: $data.statusFilter === "DONE" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.handleStatsClick("DONE"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已处理"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.processed),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "已处理")
-              ])
-            ]),
-            vue.createElementVNode("view", { class: "stats-filter" }, [
-              vue.createElementVNode("picker", {
-                mode: "selector",
-                range: $data.monthOptions,
-                "range-key": "label",
-                onChange: _cache[3] || (_cache[3] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
-              }, [
-                vue.createElementVNode("view", { class: "stats-filter-btn" }, [
-                  vue.createElementVNode(
-                    "text",
-                    { class: "stats-filter-text" },
-                    vue.toDisplayString($options.currentMonthLabel),
-                    1
-                    /* TEXT */
-                  ),
-                  vue.createElementVNode("text", { class: "stats-filter-arrow" }, "▼")
-                ])
-              ], 40, ["range"])
-            ]),
-            vue.createCommentVNode(" 搜索和筛选栏 "),
-            vue.createElementVNode("view", { class: "search-filter-bar" }, [
-              vue.createElementVNode("view", { class: "search-box" }, [
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
                 vue.withDirectives(vue.createElementVNode(
                   "input",
                   {
+                    "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchQuery = $event),
+                    class: "query-input",
                     type: "text",
                     placeholder: "搜索投诉内容、业主姓名",
-                    "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchQuery = $event),
-                    onConfirm: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args)),
-                    class: "search-input"
+                    onConfirm: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args))
                   },
                   null,
                   544
                   /* NEED_HYDRATION, NEED_PATCH */
                 ), [
                   [vue.vModelText, $data.searchQuery]
-                ]),
-                vue.createElementVNode("button", {
-                  class: "search-btn",
-                  onClick: _cache[6] || (_cache[6] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-                }, "搜索")
+                ])
               ]),
-              vue.createElementVNode("view", { class: "filter-row" }, [
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "处理状态"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: $data.statusOptions,
                   "range-key": "label",
-                  value: $data.statusOptions.findIndex((opt) => opt.value === $data.statusFilter),
-                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args)),
-                  class: "filter-picker"
+                  value: $options.statusPickerIndex,
+                  onChange: _cache[6] || (_cache[6] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
                 }, [
-                  vue.createElementVNode(
-                    "view",
-                    { class: "filter-picker-text" },
-                    vue.toDisplayString(((_a = $data.statusOptions.find((opt) => opt.value === $data.statusFilter)) == null ? void 0 : _a.label) || "全部状态"),
-                    1
-                    /* TEXT */
-                  )
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
                 ], 40, ["range", "value"])
               ])
             ]),
-            vue.createCommentVNode(" 投诉列表 "),
-            vue.createElementVNode("view", { class: "list-container" }, [
-              $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 0,
-                class: "loading-state"
-              }, [
-                vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-              ])) : $data.complaintList.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 1,
-                class: "complaint-list"
-              }, [
-                (vue.openBlock(true), vue.createElementBlock(
-                  vue.Fragment,
-                  null,
-                  vue.renderList($data.complaintList, (item) => {
-                    return vue.openBlock(), vue.createElementBlock("view", {
-                      key: item.id,
-                      class: "complaint-item"
-                    }, [
-                      vue.createElementVNode("view", { class: "item-header" }, [
-                        vue.createElementVNode("view", { class: "title-row" }, [
-                          vue.createElementVNode(
-                            "text",
-                            { class: "item-title" },
-                            vue.toDisplayString(item.type),
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode(
-                            "text",
-                            { class: "time-text" },
-                            vue.toDisplayString($options.formatTime(item.createTime)),
-                            1
-                            /* TEXT */
-                          )
-                        ]),
-                        vue.createElementVNode(
-                          "text",
-                          {
-                            class: vue.normalizeClass(["status-tag", $options.getStatusClass(item.status)])
-                          },
-                          vue.toDisplayString($options.getStatusText(item.status)),
-                          3
-                          /* TEXT, CLASS */
-                        )
-                      ]),
-                      vue.createElementVNode("view", { class: "item-content" }, [
-                        vue.createElementVNode(
-                          "text",
-                          { class: "content-text" },
-                          vue.toDisplayString(item.content),
-                          1
-                          /* TEXT */
-                        ),
-                        item.images ? (vue.openBlock(), vue.createElementBlock("view", {
-                          key: 0,
-                          class: "image-preview"
-                        }, [
-                          vue.createCommentVNode(" 假设 images 是逗号分隔的字符串 "),
-                          (vue.openBlock(true), vue.createElementBlock(
-                            vue.Fragment,
-                            null,
-                            vue.renderList(item.images.split(","), (img, index) => {
-                              return vue.openBlock(), vue.createElementBlock("image", {
-                                key: index,
-                                src: img,
-                                mode: "aspectFill",
-                                class: "complain-img",
-                                onClick: ($event) => $options.previewImage(item.images, index)
-                              }, null, 8, ["src", "onClick"]);
-                            }),
-                            128
-                            /* KEYED_FRAGMENT */
-                          ))
-                        ])) : vue.createCommentVNode("v-if", true)
-                      ]),
-                      vue.createElementVNode("view", { class: "item-info" }, [
-                        vue.createElementVNode("view", { class: "info-row" }, [
-                          vue.createElementVNode("text", { class: "label" }, "投诉人："),
-                          vue.createElementVNode("text", { class: "value" }, [
-                            vue.createTextVNode(
-                              vue.toDisplayString(item.ownerName || item.userName || "匿名") + " ",
-                              1
-                              /* TEXT */
-                            ),
-                            item.phone ? (vue.openBlock(), vue.createElementBlock("text", {
-                              key: 0,
-                              class: "phone",
-                              onClick: ($event) => $options.makeCall(item.phone)
-                            }, vue.toDisplayString(item.phone), 9, ["onClick"])) : vue.createCommentVNode("v-if", true)
-                          ])
-                        ]),
-                        vue.createElementVNode("view", { class: "info-row" }, [
-                          vue.createElementVNode("text", { class: "label" }, "房号："),
-                          item.buildingNo && item.houseNo ? (vue.openBlock(), vue.createElementBlock(
-                            "text",
-                            {
-                              key: 0,
-                              class: "value"
-                            },
-                            vue.toDisplayString(item.buildingNo) + "栋" + vue.toDisplayString(item.houseNo) + "室",
-                            1
-                            /* TEXT */
-                          )) : (vue.openBlock(), vue.createElementBlock("text", {
-                            key: 1,
-                            class: "value"
-                          }, "未绑定房屋"))
-                        ]),
-                        item.status === "DONE" ? (vue.openBlock(), vue.createElementBlock("view", {
-                          key: 0,
-                          class: "result-box"
-                        }, [
-                          vue.createElementVNode("text", { class: "label" }, "处理结果："),
-                          vue.createElementVNode(
-                            "text",
-                            { class: "value" },
-                            vue.toDisplayString(item.result),
-                            1
-                            /* TEXT */
-                          )
-                        ])) : vue.createCommentVNode("v-if", true)
-                      ]),
-                      vue.createElementVNode("view", { class: "item-footer" }, [
-                        vue.createElementVNode("button", {
-                          class: "action-btn handle",
-                          onClick: ($event) => $options.openHandleModal(item)
-                        }, vue.toDisplayString(String(item.status) === "PENDING" ? "立即处理" : "重新处理"), 9, ["onClick"]),
-                        item.phone ? (vue.openBlock(), vue.createElementBlock("button", {
-                          key: 0,
-                          class: "action-btn call",
-                          onClick: ($event) => $options.makeCall(item.phone)
-                        }, " 联系业主 ", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
-                      ])
-                    ]);
-                  }),
-                  128
-                  /* KEYED_FRAGMENT */
-                ))
-              ])) : (vue.openBlock(), vue.createElementBlock("view", {
-                key: 2,
-                class: "empty-state"
-              }, [
-                vue.createElementVNode("text", null, "暂无投诉记录")
-              ])),
-              vue.createCommentVNode(" 分页组件 "),
-              $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 3,
-                class: "pagination"
-              }, [
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.currentPage === 1,
-                  onClick: _cache[8] || (_cache[8] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
-                }, " 上一页 ", 8, ["disabled"]),
-                vue.createElementVNode("view", { class: "page-info" }, [
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[7] || (_cache[7] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                "待处理 " + vue.toDisplayString($data.stats.pending) + " 条",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "已处理 " + vue.toDisplayString($data.stats.processed) + " 条",
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "table-head" }, [
+              vue.createElementVNode("text", { class: "table-col col-type" }, "投诉类型"),
+              vue.createElementVNode("text", { class: "table-col col-content" }, "投诉内容"),
+              vue.createElementVNode("text", { class: "table-col col-owner" }, "投诉人"),
+              vue.createElementVNode("text", { class: "table-col col-house" }, "房号"),
+              vue.createElementVNode("text", { class: "table-col col-time" }, "提交时间"),
+              vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+              vue.createElementVNode("text", { class: "table-col col-image" }, "图片"),
+              vue.createElementVNode("text", { class: "table-col col-result" }, "处理结果"),
+              vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+            ]),
+            (vue.openBlock(true), vue.createElementBlock(
+              vue.Fragment,
+              null,
+              vue.renderList($data.complaintList, (item, index) => {
+                return vue.openBlock(), vue.createElementBlock(
+                  "view",
+                  {
+                    key: item.id,
+                    class: "table-row",
+                    style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                  },
+                  [
+                    vue.createElementVNode("view", { class: "table-col col-type" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "primary-text" },
+                        vue.toDisplayString(item.type || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-content" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "desc-text" },
+                        vue.toDisplayString(item.content || "暂无内容"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-owner" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString($options.getOwnerText(item)),
+                        1
+                        /* TEXT */
+                      ),
+                      item.phone ? (vue.openBlock(), vue.createElementBlock("text", {
+                        key: 0,
+                        class: "minor-link",
+                        onClick: ($event) => $options.makeCall(item.phone)
+                      }, vue.toDisplayString(item.phone), 9, ["onClick"])) : vue.createCommentVNode("v-if", true)
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-house" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString($options.formatHouse(item)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-time" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString($options.formatTime(item.createTime)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-status" }, [
+                      vue.createElementVNode(
+                        "text",
+                        {
+                          class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
+                        },
+                        vue.toDisplayString($options.getStatusText(item.status)),
+                        3
+                        /* TEXT, CLASS */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-image" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString($options.getImageCount(item.images)) + " 张",
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-result" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "desc-text" },
+                        vue.toDisplayString(item.result || "待回复"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                      $options.getImageCount(item.images) > 0 ? (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 0,
+                        class: "row-btn ghost",
+                        onClick: ($event) => $options.previewImage(item.images, 0)
+                      }, "图片", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
+                      vue.createElementVNode("button", {
+                        class: "row-btn primary",
+                        onClick: ($event) => $options.openHandleModal(item)
+                      }, vue.toDisplayString(String(item.status) === "PENDING" ? "处理" : "重处理"), 9, ["onClick"]),
+                      item.phone ? (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 1,
+                        class: "row-btn ghost",
+                        onClick: ($event) => $options.makeCall(item.phone)
+                      }, "联系", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
+                    ])
+                  ],
+                  4
+                  /* STYLE */
+                );
+              }),
+              128
+              /* KEYED_FRAGMENT */
+            )),
+            $data.complaintList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", null, "暂无投诉记录")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.currentPage === 1,
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
+              }, "上一页", 8, ["disabled"]),
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.currentPage === $options.totalPages,
+                onClick: _cache[10] || (_cache[10] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: [10, 20, 50, 100],
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[11] || (_cache[11] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
                   vue.createElementVNode(
                     "text",
-                    null,
-                    vue.toDisplayString($data.currentPage),
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.pageSize) + " 条",
                     1
                     /* TEXT */
-                  ),
-                  vue.createElementVNode("text", { class: "page-separator" }, "/"),
+                  )
+                ], 40, ["value"])
+              ])
+            ])
+          ])) : vue.createCommentVNode("v-if", true),
+          $data.showHandleModal ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 3,
+            class: "detail-modal",
+            onClick: _cache[17] || (_cache[17] = (...args) => $options.closeHandleModal && $options.closeHandleModal(...args))
+          }, [
+            vue.createElementVNode("view", {
+              class: "detail-content",
+              onClick: _cache[16] || (_cache[16] = vue.withModifiers(() => {
+              }, ["stop"]))
+            }, [
+              vue.createElementVNode("view", { class: "detail-header" }, [
+                vue.createElementVNode("text", { class: "detail-title" }, "处理投诉"),
+                vue.createElementVNode("button", {
+                  class: "close-btn",
+                  onClick: _cache[12] || (_cache[12] = (...args) => $options.closeHandleModal && $options.closeHandleModal(...args))
+                }, "关闭")
+              ]),
+              vue.createElementVNode("view", { class: "detail-body" }, [
+                vue.createElementVNode("view", { class: "detail-item" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "投诉类型:"),
                   vue.createElementVNode(
                     "text",
-                    null,
-                    vue.toDisplayString($options.totalPages),
+                    { class: "detail-value" },
+                    vue.toDisplayString($data.currentComplaint ? $data.currentComplaint.type : "-"),
                     1
                     /* TEXT */
                   )
                 ]),
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.currentPage === $options.totalPages,
-                  onClick: _cache[9] || (_cache[9] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
-                }, " 下一页 ", 8, ["disabled"])
-              ])) : vue.createCommentVNode("v-if", true)
-            ]),
-            vue.createCommentVNode(" 处理弹窗 "),
-            $data.showHandleModal ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 0,
-              class: "modal-mask",
-              onClick: _cache[15] || (_cache[15] = (...args) => $options.closeHandleModal && $options.closeHandleModal(...args))
-            }, [
-              vue.createElementVNode("view", {
-                class: "modal-content",
-                onClick: _cache[14] || (_cache[14] = vue.withModifiers(() => {
-                }, ["stop"]))
-              }, [
-                vue.createElementVNode("view", { class: "modal-header" }, [
-                  vue.createElementVNode("text", { class: "modal-title" }, "处理投诉"),
-                  vue.createElementVNode("text", {
-                    class: "close-icon",
-                    onClick: _cache[10] || (_cache[10] = (...args) => $options.closeHandleModal && $options.closeHandleModal(...args))
-                  }, "×")
+                vue.createElementVNode("view", { class: "detail-item" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "投诉人:"),
+                  vue.createElementVNode(
+                    "text",
+                    { class: "detail-value" },
+                    vue.toDisplayString($data.currentComplaint ? $options.getOwnerText($data.currentComplaint) : "-"),
+                    1
+                    /* TEXT */
+                  )
                 ]),
-                vue.createElementVNode("view", { class: "modal-body" }, [
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "回复内容:"),
                   vue.withDirectives(vue.createElementVNode(
                     "textarea",
                     {
-                      "onUpdate:modelValue": _cache[11] || (_cache[11] = ($event) => $data.handleResult = $event),
+                      "onUpdate:modelValue": _cache[13] || (_cache[13] = ($event) => $data.handleResult = $event),
                       placeholder: "请输入处理结果/回复内容",
                       class: "handle-textarea"
                     },
@@ -9982,21 +11503,21 @@ if (uni.restoreGlobal) {
                     [vue.vModelText, $data.handleResult]
                   ])
                 ]),
-                vue.createElementVNode("view", { class: "modal-footer" }, [
+                vue.createElementVNode("view", { class: "detail-actions" }, [
                   vue.createElementVNode("button", {
-                    class: "cancel-btn",
-                    onClick: _cache[12] || (_cache[12] = (...args) => $options.closeHandleModal && $options.closeHandleModal(...args))
+                    class: "detail-btn secondary",
+                    onClick: _cache[14] || (_cache[14] = (...args) => $options.closeHandleModal && $options.closeHandleModal(...args))
                   }, "取消"),
                   vue.createElementVNode("button", {
-                    class: "confirm-btn",
-                    onClick: _cache[13] || (_cache[13] = (...args) => $options.submitHandle && $options.submitHandle(...args))
+                    class: "detail-btn primary",
+                    onClick: _cache[15] || (_cache[15] = (...args) => $options.submitHandle && $options.submitHandle(...args))
                   }, "确认回复")
                 ])
               ])
-            ])) : vue.createCommentVNode("v-if", true)
-          ])
-        ];
-      }),
+            ])
+          ])) : vue.createCommentVNode("v-if", true)
+        ])
+      ]),
       _: 1
       /* STABLE */
     }, 8, ["showSidebar"]);
@@ -10020,11 +11541,9 @@ if (uni.restoreGlobal) {
           { value: "EXPIRED", label: "已过期" }
         ],
         visitorList: [],
-        // 分页相关
         currentPage: 1,
         pageSize: 10,
         total: 0,
-        // 统计数据
         stats: {
           total: 0,
           pending: 0,
@@ -10037,11 +11556,22 @@ if (uni.restoreGlobal) {
     },
     computed: {
       totalPages() {
-        return Math.ceil(this.total / this.pageSize) || 1;
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50, 100];
+        return Math.max(0, options.indexOf(this.pageSize));
       },
       currentMonthLabel() {
-        const opt = this.monthOptions && this.monthOptions[this.monthIndex];
-        return opt && opt.label || this.monthValue || "选择月份";
+        const option = this.monthOptions[this.monthIndex];
+        return option ? option.label : this.monthValue || "选择月份";
+      },
+      statusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.statusFilter));
+      },
+      currentStatusLabel() {
+        const current = this.statusOptions.find((item) => item.value === this.statusFilter);
+        return current ? current.label : "全部状态";
       }
     },
     onLoad() {
@@ -10052,34 +11582,53 @@ if (uni.restoreGlobal) {
     methods: {
       initMonthOptions() {
         const now = /* @__PURE__ */ new Date();
-        const y = now.getFullYear();
-        const m = now.getMonth() + 1;
-        const current = `${y}-${String(m).padStart(2, "0")}`;
-        const opts = [];
+        const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const options = [];
         for (let i = 0; i < 12; i++) {
-          const d = new Date(y, m - 1 - i, 1);
-          const yy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, "0");
-          const value = `${yy}-${mm}`;
-          opts.push({ label: value, value });
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          options.push({ label: value, value });
         }
-        this.monthOptions = opts;
+        this.monthOptions = options;
         this.monthValue = current;
-        this.monthIndex = Math.max(0, opts.findIndex((o) => o.value === current));
+        this.monthIndex = Math.max(0, options.findIndex((item) => item.value === current));
+      },
+      normalizeVisitorResponse(data) {
+        if (Array.isArray(data))
+          return { records: data, total: data.length };
+        if (Array.isArray(data.records))
+          return { records: data.records, total: data.total || data.records.length };
+        if (data.data && Array.isArray(data.data.records))
+          return { records: data.data.records, total: data.data.total || data.data.records.length };
+        return { records: [], total: 0 };
+      },
+      extractTotal(data) {
+        var _a, _b;
+        if (typeof (data == null ? void 0 : data.total) === "number")
+          return data.total;
+        if (typeof ((_a = data == null ? void 0 : data.data) == null ? void 0 : _a.total) === "number")
+          return data.data.total;
+        if (Array.isArray(data == null ? void 0 : data.records))
+          return data.records.length;
+        if (Array.isArray((_b = data == null ? void 0 : data.data) == null ? void 0 : _b.records))
+          return data.data.records.length;
+        if (Array.isArray(data))
+          return data.length;
+        return 0;
       },
       handleMonthChange(e) {
-        const idx = Number(e && e.detail ? e.detail.value : 0);
-        const option = this.monthOptions && this.monthOptions[idx];
+        var _a;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        const option = this.monthOptions[index];
         if (!option)
           return;
-        this.monthIndex = idx;
+        this.monthIndex = index;
         this.monthValue = option.value;
         this.currentPage = 1;
         this.loadData();
         this.loadStats();
       },
       async loadData() {
-        var _a, _b;
         this.loading = true;
         try {
           const params = {
@@ -10090,9 +11639,9 @@ if (uni.restoreGlobal) {
             pageSize: this.pageSize
           };
           const data = await request("/api/visitor/list", { params }, "GET");
-          const records = data.records || ((_a = data.data) == null ? void 0 : _a.records) || [];
-          this.total = data.total || ((_b = data.data) == null ? void 0 : _b.total) || 0;
-          this.visitorList = records.map((item) => ({
+          const normalized = this.normalizeVisitorResponse(data);
+          this.total = Number(normalized.total || 0);
+          this.visitorList = normalized.records.map((item) => ({
             id: item.id,
             visitorName: item.visitorName,
             visitorPhone: item.visitorPhone,
@@ -10103,38 +11652,35 @@ if (uni.restoreGlobal) {
             reason: item.reason,
             carNo: item.carNo,
             status: item.status
-            // PENDING/APPROVED/REJECTED/EXPIRED
           }));
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/visitor-manage.vue:258", "加载访客列表失败", e);
-          uni.showToast({ title: "加载失败", icon: "none" });
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/visitor-manage.vue:299", "加载访客列表失败", error);
           this.visitorList = [];
           this.total = 0;
+          uni.showToast({ title: "加载失败", icon: "none" });
         } finally {
           this.loading = false;
         }
       },
-      // 加载统计数据
       async loadStats() {
-        var _a, _b, _c;
         try {
           const month = this.monthValue || void 0;
-          const totalReq = request("/api/visitor/list", { params: { pageSize: 1, month } }, "GET");
-          const pendingReq = request("/api/visitor/list", { params: { pageSize: 1, status: "PENDING", month } }, "GET");
-          const approvedReq = request("/api/visitor/list", { params: { pageSize: 1, status: "APPROVED", month } }, "GET");
-          const [totalRes, pendingRes, approvedRes] = await Promise.all([totalReq, pendingReq, approvedReq]);
+          const [totalRes, pendingRes, approvedRes] = await Promise.all([
+            request("/api/visitor/list", { params: { pageSize: 1, month } }, "GET"),
+            request("/api/visitor/list", { params: { pageSize: 1, status: "PENDING", month } }, "GET"),
+            request("/api/visitor/list", { params: { pageSize: 1, status: "APPROVED", month } }, "GET")
+          ]);
           this.stats = {
-            total: totalRes.total || ((_a = totalRes.data) == null ? void 0 : _a.total) || 0,
-            pending: pendingRes.total || ((_b = pendingRes.data) == null ? void 0 : _b.total) || 0,
-            approved: approvedRes.total || ((_c = approvedRes.data) == null ? void 0 : _c.total) || 0
+            total: this.extractTotal(totalRes),
+            pending: this.extractTotal(pendingRes),
+            approved: this.extractTotal(approvedRes)
           };
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/visitor-manage.vue:283", "加载统计数据失败", e);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/visitor-manage.vue:321", "加载统计数据失败", error);
         }
       },
       handleStatsClick(status) {
         this.statusFilter = status;
-        this.searchQuery = "";
         this.currentPage = 1;
         this.loadData();
       },
@@ -10142,38 +11688,54 @@ if (uni.restoreGlobal) {
         this.currentPage = 1;
         this.loadData();
       },
+      handleResetFilters() {
+        this.searchQuery = "";
+        this.statusFilter = "";
+        this.currentPage = 1;
+        this.loadData();
+      },
       handleStatusChange(e) {
-        this.statusFilter = this.statusOptions[e.detail.value].value;
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.statusFilter = ((_b = this.statusOptions[index]) == null ? void 0 : _b.value) || "";
         this.currentPage = 1;
         this.loadData();
       },
       handlePrevPage() {
-        if (this.currentPage > 1) {
-          this.currentPage--;
-          this.loadData();
-        }
+        if (this.currentPage <= 1)
+          return;
+        this.currentPage -= 1;
+        this.loadData();
       },
       handleNextPage() {
-        if (this.currentPage < this.totalPages) {
-          this.currentPage++;
-          this.loadData();
-        }
+        if (this.currentPage >= this.totalPages)
+          return;
+        this.currentPage += 1;
+        this.loadData();
+      },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50, 100];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 10;
+        this.currentPage = 1;
+        this.loadData();
       },
       handleApprove(item) {
         uni.showModal({
           title: "通过审核",
           content: `确认允许 ${item.visitorName} 访问吗？`,
           success: async (res) => {
-            if (res.confirm) {
-              try {
-                const url = `/api/visitor/audit?id=${item.id}&status=APPROVED`;
-                await request(url, {}, "PUT");
-                item.status = "APPROVED";
-                uni.showToast({ title: "审核通过", icon: "success" });
-                this.loadStats();
-              } catch (e) {
-                uni.showToast({ title: "操作失败", icon: "none" });
-              }
+            if (!res.confirm)
+              return;
+            try {
+              const url = `/api/visitor/audit?id=${item.id}&status=APPROVED`;
+              await request(url, {}, "PUT");
+              uni.showToast({ title: "审核通过", icon: "success" });
+              this.loadData();
+              this.loadStats();
+            } catch (error) {
+              uni.showToast({ title: "操作失败", icon: "none" });
             }
           }
         });
@@ -10183,16 +11745,16 @@ if (uni.restoreGlobal) {
           title: "拒绝申请",
           content: `确认拒绝 ${item.visitorName} 的访问申请吗？`,
           success: async (res) => {
-            if (res.confirm) {
-              try {
-                const url = `/api/visitor/audit?id=${item.id}&status=REJECTED`;
-                await request(url, {}, "PUT");
-                item.status = "REJECTED";
-                uni.showToast({ title: "已拒绝", icon: "none" });
-                this.loadStats();
-              } catch (e) {
-                uni.showToast({ title: "操作失败", icon: "none" });
-              }
+            if (!res.confirm)
+              return;
+            try {
+              const url = `/api/visitor/audit?id=${item.id}&status=REJECTED`;
+              await request(url, {}, "PUT");
+              uni.showToast({ title: "已拒绝", icon: "none" });
+              this.loadData();
+              this.loadStats();
+            } catch (error) {
+              uni.showToast({ title: "操作失败", icon: "none" });
             }
           }
         });
@@ -10203,24 +11765,36 @@ if (uni.restoreGlobal) {
         uni.makePhoneCall({ phoneNumber: phone });
       },
       getStatusClass(status) {
-        return {
-          "status-pending": status === "PENDING",
-          "status-approved": status === "APPROVED",
-          "status-rejected": status === "REJECTED",
-          "status-expired": status === "EXPIRED"
+        const map = {
+          PENDING: "status-pending",
+          APPROVED: "status-approved",
+          REJECTED: "status-rejected",
+          EXPIRED: "status-expired"
         };
+        return map[status] || "status-expired";
       },
       getStatusText(status) {
         const map = {
-          "PENDING": "待审核",
-          "APPROVED": "已通过",
-          "REJECTED": "已拒绝",
-          "EXPIRED": "已过期"
+          PENDING: "待审核",
+          APPROVED: "已通过",
+          REJECTED: "已拒绝",
+          EXPIRED: "已过期"
         };
-        return map[status] || status;
+        return map[status] || status || "-";
+      },
+      formatHouse(item) {
+        if (item.buildingNo && item.houseNo) {
+          return `${item.buildingNo}栋${item.houseNo}室`;
+        }
+        return "-";
       },
       formatTime(time) {
-        return time;
+        if (!time)
+          return "-";
+        const date = new Date(String(time).replace(" ", "T"));
+        if (Number.isNaN(date.getTime()))
+          return String(time);
+        return date.toLocaleString();
       }
     }
   };
@@ -10228,288 +11802,363 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[10] || (_cache[10] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[12] || (_cache[12] = ($event) => $data.showSidebar = $event),
       pageTitle: "访客审核",
-      currentPage: "/admin/pages/admin/visitor-manage"
+      currentPage: "/admin/pages/admin/visitor-manage",
+      pageBreadcrumb: "管理后台 / 访客审核",
+      showPageBanner: false
     }, {
-      default: vue.withCtx(() => {
-        var _a;
-        return [
-          vue.createElementVNode("view", { class: "manage-container" }, [
-            vue.createCommentVNode(" 统计卡片 "),
-            vue.createElementVNode("view", { class: "stats-card-container" }, [
-              vue.createElementVNode("view", {
-                class: "stats-card",
-                onClick: _cache[0] || (_cache[0] = ($event) => $options.handleStatsClick(""))
-              }, [
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "访客申请列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一为后台审核列表页，保留通过、拒绝和联系访客三类操作。")
+            ]),
+            vue.createElementVNode("picker", {
+              mode: "selector",
+              range: $data.monthOptions,
+              "range-key": "label",
+              onChange: _cache[0] || (_cache[0] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
+            }, [
+              vue.createElementVNode("view", { class: "month-filter-chip" }, [
+                vue.createElementVNode("text", { class: "month-filter-label" }, "统计月份"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "month-filter-value" },
+                  vue.toDisplayString($options.currentMonthLabel),
+                  1
+                  /* TEXT */
+                )
+              ])
+            ], 40, ["range"])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.statusFilter === "" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick(""))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "总访问数"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.total),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "总访问数")
-              ]),
-              vue.createElementVNode("view", {
-                class: "stats-card status-pending",
-                onClick: _cache[1] || (_cache[1] = ($event) => $options.handleStatsClick("PENDING"))
-              }, [
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card pending", { active: $data.statusFilter === "PENDING" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("PENDING"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "待审核"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.pending),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "待审核")
-              ]),
-              vue.createElementVNode("view", {
-                class: "stats-card status-approved",
-                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleStatsClick("APPROVED"))
-              }, [
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card approved", { active: $data.statusFilter === "APPROVED" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.handleStatsClick("APPROVED"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已通过"),
                 vue.createElementVNode(
                   "text",
-                  { class: "stats-number" },
+                  { class: "summary-value" },
                   vue.toDisplayString($data.stats.approved),
                   1
                   /* TEXT */
-                ),
-                vue.createElementVNode("text", { class: "stats-label" }, "已通过")
-              ])
-            ]),
-            vue.createElementVNode("view", { class: "stats-filter" }, [
-              vue.createElementVNode("picker", {
-                mode: "selector",
-                range: $data.monthOptions,
-                "range-key": "label",
-                onChange: _cache[3] || (_cache[3] = (...args) => $options.handleMonthChange && $options.handleMonthChange(...args))
-              }, [
-                vue.createElementVNode("view", { class: "stats-filter-btn" }, [
-                  vue.createElementVNode(
-                    "text",
-                    { class: "stats-filter-text" },
-                    vue.toDisplayString($options.currentMonthLabel),
-                    1
-                    /* TEXT */
-                  ),
-                  vue.createElementVNode("text", { class: "stats-filter-arrow" }, "▼")
-                ])
-              ], 40, ["range"])
-            ]),
-            vue.createCommentVNode(" 搜索和筛选栏 "),
-            vue.createElementVNode("view", { class: "search-filter-bar" }, [
-              vue.createElementVNode("view", { class: "search-box" }, [
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
                 vue.withDirectives(vue.createElementVNode(
                   "input",
                   {
+                    "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchQuery = $event),
+                    class: "query-input",
                     type: "text",
                     placeholder: "搜索访客姓名、业主姓名",
-                    "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchQuery = $event),
-                    onConfirm: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args)),
-                    class: "search-input"
+                    onConfirm: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args))
                   },
                   null,
                   544
                   /* NEED_HYDRATION, NEED_PATCH */
                 ), [
                   [vue.vModelText, $data.searchQuery]
-                ]),
-                vue.createElementVNode("button", {
-                  class: "search-btn",
-                  onClick: _cache[6] || (_cache[6] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-                }, "搜索")
+                ])
               ]),
-              vue.createElementVNode("view", { class: "filter-row" }, [
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "审核状态"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: $data.statusOptions,
                   "range-key": "label",
-                  value: $data.statusOptions.findIndex((opt) => opt.value === $data.statusFilter),
-                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args)),
-                  class: "filter-picker"
+                  value: $options.statusPickerIndex,
+                  onChange: _cache[6] || (_cache[6] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
                 }, [
-                  vue.createElementVNode(
-                    "view",
-                    { class: "filter-picker-text" },
-                    vue.toDisplayString(((_a = $data.statusOptions.find((opt) => opt.value === $data.statusFilter)) == null ? void 0 : _a.label) || "全部状态"),
-                    1
-                    /* TEXT */
-                  )
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
                 ], 40, ["range", "value"])
               ])
             ]),
-            vue.createCommentVNode(" 访客列表 "),
-            vue.createElementVNode("view", { class: "list-container" }, [
-              $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 0,
-                class: "loading-state"
-              }, [
-                vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-              ])) : $data.visitorList.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 1,
-                class: "visitor-list"
-              }, [
-                (vue.openBlock(true), vue.createElementBlock(
-                  vue.Fragment,
-                  null,
-                  vue.renderList($data.visitorList, (item) => {
-                    return vue.openBlock(), vue.createElementBlock("view", {
-                      key: item.id,
-                      class: "visitor-item"
-                    }, [
-                      vue.createElementVNode("view", { class: "item-header" }, [
-                        vue.createElementVNode("view", { class: "header-left" }, [
-                          vue.createElementVNode(
-                            "text",
-                            { class: "item-title" },
-                            vue.toDisplayString(item.visitorName),
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode("text", {
-                            class: "phone-text",
-                            onClick: ($event) => $options.makeCall(item.visitorPhone)
-                          }, vue.toDisplayString(item.visitorPhone), 9, ["onClick"])
-                        ]),
-                        vue.createElementVNode(
-                          "text",
-                          {
-                            class: vue.normalizeClass(["status-tag", $options.getStatusClass(item.status)])
-                          },
-                          vue.toDisplayString($options.getStatusText(item.status)),
-                          3
-                          /* TEXT, CLASS */
-                        )
-                      ]),
-                      vue.createElementVNode("view", { class: "item-body" }, [
-                        vue.createElementVNode("view", { class: "info-grid" }, [
-                          vue.createElementVNode("view", { class: "info-item" }, [
-                            vue.createElementVNode("text", { class: "label" }, "访问对象"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString(item.ownerName),
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          vue.createElementVNode("view", { class: "info-item" }, [
-                            vue.createElementVNode("text", { class: "label" }, "房号"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString(item.buildingNo) + "栋" + vue.toDisplayString(item.houseNo) + "室",
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          vue.createElementVNode("view", { class: "info-item full" }, [
-                            vue.createElementVNode("text", { class: "label" }, "访问时间"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value highlight" },
-                              vue.toDisplayString($options.formatTime(item.visitTime)),
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          vue.createElementVNode("view", { class: "info-item" }, [
-                            vue.createElementVNode("text", { class: "label" }, "访问事由"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString(item.reason),
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          vue.createElementVNode("view", { class: "info-item" }, [
-                            vue.createElementVNode("text", { class: "label" }, "车牌号"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString(item.carNo || "无"),
-                              1
-                              /* TEXT */
-                            )
-                          ])
-                        ])
-                      ]),
-                      vue.createElementVNode("view", { class: "item-footer" }, [
-                        vue.createElementVNode("button", {
-                          class: "action-btn call",
-                          onClick: ($event) => $options.makeCall(item.visitorPhone)
-                        }, "联系访客", 8, ["onClick"]),
-                        item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("view", {
-                          key: 0,
-                          class: "audit-btns"
-                        }, [
-                          vue.createElementVNode("button", {
-                            class: "action-btn reject",
-                            onClick: ($event) => $options.handleReject(item)
-                          }, "拒绝", 8, ["onClick"]),
-                          vue.createElementVNode("button", {
-                            class: "action-btn approve",
-                            onClick: ($event) => $options.handleApprove(item)
-                          }, "通过", 8, ["onClick"])
-                        ])) : vue.createCommentVNode("v-if", true)
-                      ])
-                    ]);
-                  }),
-                  128
-                  /* KEYED_FRAGMENT */
-                ))
-              ])) : (vue.openBlock(), vue.createElementBlock("view", {
-                key: 2,
-                class: "empty-state"
-              }, [
-                vue.createElementVNode("text", null, "暂无访客申请记录")
-              ])),
-              vue.createCommentVNode(" 分页组件 "),
-              $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 3,
-                class: "pagination"
-              }, [
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.currentPage === 1,
-                  onClick: _cache[8] || (_cache[8] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
-                }, " 上一页 ", 8, ["disabled"]),
-                vue.createElementVNode("view", { class: "page-info" }, [
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[7] || (_cache[7] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                "待审核 " + vue.toDisplayString($data.stats.pending) + " 条",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "已通过 " + vue.toDisplayString($data.stats.approved) + " 条",
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "table-head" }, [
+              vue.createElementVNode("text", { class: "table-col col-visitor" }, "访客"),
+              vue.createElementVNode("text", { class: "table-col col-phone" }, "联系电话"),
+              vue.createElementVNode("text", { class: "table-col col-owner" }, "访问对象"),
+              vue.createElementVNode("text", { class: "table-col col-house" }, "房号"),
+              vue.createElementVNode("text", { class: "table-col col-time" }, "访问时间"),
+              vue.createElementVNode("text", { class: "table-col col-reason" }, "访问事由"),
+              vue.createElementVNode("text", { class: "table-col col-car" }, "车牌号"),
+              vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+              vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+            ]),
+            (vue.openBlock(true), vue.createElementBlock(
+              vue.Fragment,
+              null,
+              vue.renderList($data.visitorList, (item, index) => {
+                return vue.openBlock(), vue.createElementBlock(
+                  "view",
+                  {
+                    key: item.id,
+                    class: "table-row",
+                    style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                  },
+                  [
+                    vue.createElementVNode("view", { class: "table-col col-visitor" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "primary-text" },
+                        vue.toDisplayString(item.visitorName || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-phone" }, [
+                      vue.createElementVNode("text", {
+                        class: "minor-link",
+                        onClick: ($event) => $options.makeCall(item.visitorPhone)
+                      }, vue.toDisplayString(item.visitorPhone || "-"), 9, ["onClick"])
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-owner" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString(item.ownerName || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-house" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString($options.formatHouse(item)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-time" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString($options.formatTime(item.visitTime)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-reason" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "desc-text" },
+                        vue.toDisplayString(item.reason || "暂无说明"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-car" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString(item.carNo || "无"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-status" }, [
+                      vue.createElementVNode(
+                        "text",
+                        {
+                          class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
+                        },
+                        vue.toDisplayString($options.getStatusText(item.status)),
+                        3
+                        /* TEXT, CLASS */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                      vue.createElementVNode("button", {
+                        class: "row-btn ghost",
+                        onClick: ($event) => $options.makeCall(item.visitorPhone)
+                      }, "联系访客", 8, ["onClick"]),
+                      item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 0,
+                        class: "row-btn secondary-warn",
+                        onClick: ($event) => $options.handleReject(item)
+                      }, "拒绝", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
+                      item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 1,
+                        class: "row-btn primary",
+                        onClick: ($event) => $options.handleApprove(item)
+                      }, "通过", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
+                    ])
+                  ],
+                  4
+                  /* STYLE */
+                );
+              }),
+              128
+              /* KEYED_FRAGMENT */
+            )),
+            $data.visitorList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", null, "暂无访客申请记录")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.currentPage === 1,
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
+              }, "上一页", 8, ["disabled"]),
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.currentPage === $options.totalPages,
+                onClick: _cache[10] || (_cache[10] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: [10, 20, 50, 100],
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[11] || (_cache[11] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
                   vue.createElementVNode(
                     "text",
-                    null,
-                    vue.toDisplayString($data.currentPage),
-                    1
-                    /* TEXT */
-                  ),
-                  vue.createElementVNode("text", { class: "page-separator" }, "/"),
-                  vue.createElementVNode(
-                    "text",
-                    null,
-                    vue.toDisplayString($options.totalPages),
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.pageSize) + " 条",
                     1
                     /* TEXT */
                   )
-                ]),
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.currentPage === $options.totalPages,
-                  onClick: _cache[9] || (_cache[9] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
-                }, " 下一页 ", 8, ["disabled"])
-              ])) : vue.createCommentVNode("v-if", true)
+                ], 40, ["value"])
+              ])
             ])
-          ])
-        ];
-      }),
+          ])) : vue.createCommentVNode("v-if", true)
+        ])
+      ]),
       _: 1
       /* STABLE */
     }, 8, ["showSidebar"]);
   }
   const AdminPagesAdminVisitorManage = /* @__PURE__ */ _export_sfc(_sfc_main$h, [["render", _sfc_render$g], ["__scopeId", "data-v-20feed08"], ["__file", "D:/HBuilderProjects/smart-community/admin/pages/admin/visitor-manage.vue"]]);
   const _sfc_main$g = {
-    components: { adminSidebar },
+    components: {
+      adminSidebar
+    },
     data() {
       return {
         showSidebar: false,
@@ -10535,11 +12184,21 @@ if (uni.restoreGlobal) {
         currentPage: 1,
         pageSize: 10,
         total: 0,
+        stats: {
+          total: 0,
+          pending: 0,
+          approved: 0,
+          rejected: 0
+        },
         showRejectModal: false,
         rejectReason: "",
         currentItem: null,
         showApproveModal: false,
+        communityList: [],
+        communityListLoading: false,
+        communityLoadError: "",
         approveRole: "owner",
+        approveCommunityId: "",
         approveRoleOptions: [
           { value: "owner", label: "业主(owner)" },
           { value: "worker", label: "工作人员(worker)" },
@@ -10550,33 +12209,104 @@ if (uni.restoreGlobal) {
     },
     computed: {
       totalPages() {
-        return Math.ceil(this.total / this.pageSize) || 1;
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50, 100];
+        return Math.max(0, options.indexOf(this.pageSize));
+      },
+      statusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.statusFilter));
+      },
+      rolePickerIndex() {
+        return Math.max(0, this.roleOptions.findIndex((item) => item.value === this.roleFilter));
+      },
+      currentStatusLabel() {
+        const current = this.statusOptions.find((item) => item.value === this.statusFilter);
+        return current ? current.label : "全部状态";
+      },
+      currentRoleLabel() {
+        const current = this.roleOptions.find((item) => item.value === this.roleFilter);
+        return current ? current.label : "全部角色";
+      },
+      approveRoleIndex() {
+        return Math.max(0, this.approveRoleOptions.findIndex((item) => item.value === this.approveRole));
+      },
+      approveRoleLabel() {
+        const current = this.approveRoleOptions.find((item) => item.value === this.approveRole);
+        return current ? current.label : "业主(owner)";
+      },
+      needsCommunityAssignment() {
+        return this.approveRole === "admin" || this.approveRole === "worker";
+      },
+      approveCommunityIndex() {
+        const index = this.communityList.findIndex((item) => String(item.id) === String(this.approveCommunityId));
+        return index >= 0 ? index : 0;
+      },
+      approveCommunityLabel() {
+        const current = this.communityList.find((item) => String(item.id) === String(this.approveCommunityId));
+        return current ? current.name : "";
+      },
+      approveCommunityDisplayText() {
+        if (this.communityListLoading)
+          return "社区列表加载中...";
+        if (this.approveCommunityLabel)
+          return this.approveCommunityLabel;
+        if (this.communityLoadError)
+          return "社区列表加载失败";
+        if (!this.communityList.length)
+          return "暂无可选社区";
+        return this.approveRole === "admin" ? "请选择负责社区" : "请选择所属社区";
+      },
+      approveCommunityTip() {
+        if (this.communityListLoading)
+          return "正在加载社区列表，请稍候。";
+        if (this.communityLoadError)
+          return this.communityLoadError;
+        if (!this.communityList.length)
+          return "当前未获取到社区数据，无法完成该角色审批。";
+        return this.approveRole === "admin" ? "管理员账号通过后将绑定到所选社区，便于后续按社区管理数据。" : "工作人员账号通过后将绑定到所选社区，便于后续按社区接收任务。";
       }
     },
     onShow() {
       this.loadData();
+      this.loadStats();
     },
     methods: {
-      handleSearch() {
-        this.currentPage = 1;
-        this.loadData();
+      extractTotal(data) {
+        var _a, _b;
+        if (typeof (data == null ? void 0 : data.total) === "number")
+          return data.total;
+        if (typeof ((_a = data == null ? void 0 : data.data) == null ? void 0 : _a.total) === "number")
+          return data.data.total;
+        if (Array.isArray(data == null ? void 0 : data.records))
+          return data.records.length;
+        if (Array.isArray((_b = data == null ? void 0 : data.data) == null ? void 0 : _b.records))
+          return data.data.records.length;
+        if (Array.isArray(data))
+          return data.length;
+        return 0;
       },
-      handleStatusChange(e) {
-        const idx = Number(e && e.detail ? e.detail.value : 0);
-        const option = this.statusOptions[idx];
-        this.statusFilter = option ? option.value : "";
-        this.currentPage = 1;
-        this.loadData();
-      },
-      handleRoleChange(e) {
-        const idx = Number(e && e.detail ? e.detail.value : 0);
-        const option = this.roleOptions[idx];
-        this.roleFilter = option ? option.value : "";
-        this.currentPage = 1;
-        this.loadData();
+      async loadStats() {
+        try {
+          const [totalRes, pendingRes, approvedRes, rejectedRes] = await Promise.all([
+            request("/api/admin/user/register-requests", { params: { pageNum: 1, pageSize: 1, role: this.roleFilter || void 0 } }, "GET"),
+            request("/api/admin/user/register-requests", { params: { pageNum: 1, pageSize: 1, role: this.roleFilter || void 0, status: "PENDING" } }, "GET"),
+            request("/api/admin/user/register-requests", { params: { pageNum: 1, pageSize: 1, role: this.roleFilter || void 0, status: "ACTIVE" } }, "GET"),
+            request("/api/admin/user/register-requests", { params: { pageNum: 1, pageSize: 1, role: this.roleFilter || void 0, status: "REJECTED" } }, "GET")
+          ]);
+          this.stats = {
+            total: this.extractTotal(totalRes),
+            pending: this.extractTotal(pendingRes),
+            approved: this.extractTotal(approvedRes),
+            rejected: this.extractTotal(rejectedRes)
+          };
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/register-review.vue:414", "加载注册审核统计失败", error);
+        }
       },
       async loadData() {
-        var _a;
+        var _a, _b;
         this.loading = true;
         try {
           const params = {
@@ -10587,7 +12317,7 @@ if (uni.restoreGlobal) {
             role: this.roleFilter || void 0
           };
           const res = await request("/api/admin/user/register-requests", { params }, "GET");
-          const page = (res == null ? void 0 : res.records) || ((_a = res == null ? void 0 : res.data) == null ? void 0 : _a.records) ? res : (res == null ? void 0 : res.data) || res;
+          const page = Array.isArray(res == null ? void 0 : res.records) || Array.isArray((_a = res == null ? void 0 : res.data) == null ? void 0 : _a.records) ? ((_b = res == null ? void 0 : res.data) == null ? void 0 : _b.records) ? res.data : res : (res == null ? void 0 : res.data) || res;
           const records = Array.isArray(page == null ? void 0 : page.records) ? page.records : Array.isArray(res) ? res : [];
           const total = (page == null ? void 0 : page.total) ?? (res == null ? void 0 : res.total) ?? records.length ?? 0;
           this.requestList = records.map((item) => ({
@@ -10601,13 +12331,47 @@ if (uni.restoreGlobal) {
             rejectReason: item == null ? void 0 : item.rejectReason
           }));
           this.total = Number(total) || 0;
-        } catch (e) {
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/register-review.vue:444", "加载注册申请失败", error);
           uni.showToast({ title: "加载失败", icon: "none" });
           this.requestList = [];
           this.total = 0;
         } finally {
           this.loading = false;
         }
+      },
+      handleSearch() {
+        this.currentPage = 1;
+        this.loadData();
+        this.loadStats();
+      },
+      handleResetFilters() {
+        this.searchQuery = "";
+        this.statusFilter = "";
+        this.roleFilter = "";
+        this.currentPage = 1;
+        this.loadData();
+        this.loadStats();
+      },
+      applyQuickStatus(status) {
+        this.statusFilter = status;
+        this.currentPage = 1;
+        this.loadData();
+      },
+      handleStatusChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.statusFilter = ((_b = this.statusOptions[index]) == null ? void 0 : _b.value) || "";
+        this.currentPage = 1;
+        this.loadData();
+      },
+      handleRoleChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.roleFilter = ((_b = this.roleOptions[index]) == null ? void 0 : _b.value) || "";
+        this.currentPage = 1;
+        this.loadData();
+        this.loadStats();
       },
       handlePrevPage() {
         if (this.currentPage <= 1)
@@ -10619,6 +12383,14 @@ if (uni.restoreGlobal) {
         if (this.currentPage >= this.totalPages)
           return;
         this.currentPage += 1;
+        this.loadData();
+      },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50, 100];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 10;
+        this.currentPage = 1;
         this.loadData();
       },
       openReject(item) {
@@ -10645,41 +12417,98 @@ if (uni.restoreGlobal) {
           uni.showToast({ title: "已驳回", icon: "success" });
           this.closeReject();
           this.loadData();
-        } catch (e) {
+          this.loadStats();
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/register-review.vue:524", "驳回注册申请失败", error);
           uni.showToast({ title: "操作失败", icon: "none" });
         } finally {
           uni.hideLoading();
         }
       },
-      openApprove(item) {
+      async ensureCommunityList() {
+        if (this.communityListLoading || this.communityList.length > 0)
+          return;
+        this.communityListLoading = true;
+        this.communityLoadError = "";
+        try {
+          const data = await request("/api/house/community/list", {}, "GET");
+          const list = Array.isArray(data) ? data : Array.isArray(data == null ? void 0 : data.records) ? data.records : [];
+          this.communityList = list.map((item) => ({
+            id: item == null ? void 0 : item.id,
+            name: (item == null ? void 0 : item.name) || (item == null ? void 0 : item.communityName) || `社区${(item == null ? void 0 : item.id) || ""}`
+          })).filter((item) => item.id != null);
+          if (!this.communityList.length) {
+            this.communityLoadError = "社区列表为空，请先确认社区数据是否已配置。";
+          }
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/register-review.vue:547", "加载社区列表失败", error);
+          this.communityList = [];
+          this.communityLoadError = (error == null ? void 0 : error.message) || "社区列表加载失败，请检查社区查询接口。";
+        } finally {
+          this.communityListLoading = false;
+        }
+      },
+      async openApprove(item) {
         this.currentItem = item;
         this.approveRole = (item == null ? void 0 : item.role) || "owner";
+        this.approveCommunityId = (item == null ? void 0 : item.communityId) ? String(item.communityId) : "";
         this.showApproveModal = true;
+        if (this.needsCommunityAssignment) {
+          await this.ensureCommunityList();
+        }
       },
       closeApprove() {
         this.showApproveModal = false;
         this.currentItem = null;
+        this.approveRole = "owner";
+        this.approveCommunityId = "";
       },
       handleApproveRoleChange(e) {
-        const idx = Number(e && e.detail ? e.detail.value : 0);
-        const opt = this.approveRoleOptions[idx];
-        this.approveRole = opt ? opt.value : "owner";
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.approveRole = ((_b = this.approveRoleOptions[index]) == null ? void 0 : _b.value) || "owner";
+        if (!this.needsCommunityAssignment) {
+          this.approveCommunityId = "";
+          return;
+        }
+        this.ensureCommunityList();
+      },
+      handleApproveCommunityChange(e) {
+        var _a;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        const selected = this.communityList[index];
+        this.approveCommunityId = (selected == null ? void 0 : selected.id) != null ? String(selected.id) : "";
       },
       async confirmApprove() {
         var _a;
         if (!((_a = this.currentItem) == null ? void 0 : _a.id))
           return;
+        if (this.needsCommunityAssignment && !this.approveCommunityId) {
+          uni.showToast({
+            title: this.approveRole === "admin" ? "请选择负责社区" : "请选择所属社区",
+            icon: "none"
+          });
+          return;
+        }
         uni.showLoading({ title: "提交中..." });
         try {
+          const payload = {
+            role: this.approveRole
+          };
+          if (this.needsCommunityAssignment) {
+            payload.communityId = Number(this.approveCommunityId);
+          }
           await request(
             `/api/admin/user/register-requests/${this.currentItem.id}/approve`,
-            { data: { role: this.approveRole } },
+            { data: payload },
             "PUT"
           );
           uni.showToast({ title: "已通过", icon: "success" });
           this.closeApprove();
           this.loadData();
-        } catch (e) {
+          this.loadStats();
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/register-review.vue:610", "通过注册申请失败", error);
           uni.showToast({ title: "操作失败", icon: "none" });
         } finally {
           uni.hideLoading();
@@ -10710,24 +12539,24 @@ if (uni.restoreGlobal) {
           case "DISABLED":
             return "status-disabled";
           default:
-            return "";
+            return "status-disabled";
         }
       },
       getRoleText(role) {
-        const found = this.roleOptions.find((v) => v.value === role);
+        const found = this.roleOptions.find((item) => item.value === role);
         return found ? found.label : role || "-";
       },
       formatTime(str) {
         if (!str)
           return "-";
-        const d = new Date(String(str).replace(" ", "T"));
-        if (isNaN(d.getTime()))
+        const date = new Date(String(str).replace(" ", "T"));
+        if (Number.isNaN(date.getTime()))
           return String(str);
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        const hh = String(d.getHours()).padStart(2, "0");
-        const mi = String(d.getMinutes()).padStart(2, "0");
-        return `${mm}-${dd} ${hh}:${mi}`;
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hour = String(date.getHours()).padStart(2, "0");
+        const minute = String(date.getMinutes()).padStart(2, "0");
+        return `${month}-${day} ${hour}:${minute}`;
       }
     }
   };
@@ -10735,313 +12564,531 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[15] || (_cache[15] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[26] || (_cache[26] = ($event) => $data.showSidebar = $event),
       pageTitle: "注册审核",
-      currentPage: "/admin/pages/admin/register-review"
+      currentPage: "/admin/pages/admin/register-review",
+      pageBreadcrumb: "管理后台 / 注册审核",
+      showPageBanner: false
     }, {
-      default: vue.withCtx(() => {
-        var _a, _b, _c;
-        return [
-          vue.createElementVNode("view", { class: "manage-container" }, [
-            vue.createElementVNode("view", { class: "search-filter-bar" }, [
-              vue.createElementVNode("view", { class: "search-box" }, [
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "注册申请列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一为后台审核表格页，保留通过、驳回和角色确认流程。")
+            ]),
+            vue.createElementVNode("view", { class: "overview-chip" }, [
+              vue.createElementVNode("text", { class: "overview-chip-label" }, "审批动作"),
+              vue.createElementVNode("text", { class: "overview-chip-value" }, "用户开通")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar register-status-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.statusFilter === "" }]),
+                onClick: _cache[0] || (_cache[0] = ($event) => $options.applyQuickStatus(""))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "全部申请"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.total),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card pending", { active: $data.statusFilter === "PENDING" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.applyQuickStatus("PENDING"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "待审核"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.pending),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card approved", { active: $data.statusFilter === "ACTIVE" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.applyQuickStatus("ACTIVE"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已通过"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.approved),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card rejected", { active: $data.statusFilter === "REJECTED" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.applyQuickStatus("REJECTED"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已驳回"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.rejected),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid register-query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
                 vue.withDirectives(vue.createElementVNode(
                   "input",
                   {
+                    "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchQuery = $event),
+                    class: "query-input",
                     type: "text",
-                    placeholder: "搜索用户名/姓名/手机号",
-                    "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.searchQuery = $event),
-                    onConfirm: _cache[1] || (_cache[1] = (...args) => $options.handleSearch && $options.handleSearch(...args)),
-                    class: "search-input"
+                    placeholder: "搜索用户名、姓名或手机号",
+                    onConfirm: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args))
                   },
                   null,
                   544
                   /* NEED_HYDRATION, NEED_PATCH */
                 ), [
                   [vue.vModelText, $data.searchQuery]
-                ]),
-                vue.createElementVNode("button", {
-                  class: "search-btn",
-                  onClick: _cache[2] || (_cache[2] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-                }, "搜索")
+                ])
               ]),
-              vue.createElementVNode("view", { class: "filter-row" }, [
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "审核状态"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: $data.statusOptions,
                   "range-key": "label",
-                  value: $data.statusOptions.findIndex((opt) => opt.value === $data.statusFilter),
-                  onChange: _cache[3] || (_cache[3] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args)),
-                  class: "filter-picker"
+                  value: $options.statusPickerIndex,
+                  onChange: _cache[6] || (_cache[6] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
                 }, [
-                  vue.createElementVNode(
-                    "view",
-                    { class: "filter-picker-text" },
-                    vue.toDisplayString(((_a = $data.statusOptions.find((opt) => opt.value === $data.statusFilter)) == null ? void 0 : _a.label) || "全部状态"),
-                    1
-                    /* TEXT */
-                  )
-                ], 40, ["range", "value"]),
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "申请角色"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: $data.roleOptions,
                   "range-key": "label",
-                  value: $data.roleOptions.findIndex((opt) => opt.value === $data.roleFilter),
-                  onChange: _cache[4] || (_cache[4] = (...args) => $options.handleRoleChange && $options.handleRoleChange(...args)),
-                  class: "filter-picker"
+                  value: $options.rolePickerIndex,
+                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleRoleChange && $options.handleRoleChange(...args))
                 }, [
-                  vue.createElementVNode(
-                    "view",
-                    { class: "filter-picker-text" },
-                    vue.toDisplayString(((_b = $data.roleOptions.find((opt) => opt.value === $data.roleFilter)) == null ? void 0 : _b.label) || "全部角色"),
-                    1
-                    /* TEXT */
-                  )
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentRoleLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
                 ], 40, ["range", "value"])
               ])
             ]),
-            vue.createElementVNode("view", { class: "list-container" }, [
-              $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 0,
-                class: "loading-state"
-              }, [
-                vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-              ])) : $data.requestList.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 1,
-                class: "request-list"
-              }, [
-                (vue.openBlock(true), vue.createElementBlock(
-                  vue.Fragment,
-                  null,
-                  vue.renderList($data.requestList, (item) => {
-                    return vue.openBlock(), vue.createElementBlock("view", {
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                "待审核 " + vue.toDisplayString($data.stats.pending) + " 条",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "当前角色筛选：" + vue.toDisplayString($options.currentRoleLabel),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "scroll-table" }, [
+              vue.createElementVNode("view", { class: "table-head register-table" }, [
+                vue.createElementVNode("text", { class: "table-col col-name" }, "申请人"),
+                vue.createElementVNode("text", { class: "table-col col-username" }, "用户名"),
+                vue.createElementVNode("text", { class: "table-col col-phone" }, "手机号"),
+                vue.createElementVNode("text", { class: "table-col col-role" }, "申请角色"),
+                vue.createElementVNode("text", { class: "table-col col-time" }, "申请时间"),
+                vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+                vue.createElementVNode("text", { class: "table-col col-reason" }, "驳回原因"),
+                vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+              ]),
+              (vue.openBlock(true), vue.createElementBlock(
+                vue.Fragment,
+                null,
+                vue.renderList($data.requestList, (item, index) => {
+                  return vue.openBlock(), vue.createElementBlock(
+                    "view",
+                    {
                       key: item.id,
-                      class: "request-item"
-                    }, [
-                      vue.createElementVNode("view", { class: "item-header" }, [
-                        vue.createElementVNode("view", { class: "header-left" }, [
-                          vue.createElementVNode(
-                            "text",
-                            { class: "item-title" },
-                            vue.toDisplayString(item.realName || "-"),
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode(
-                            "text",
-                            { class: "sub-title" },
-                            vue.toDisplayString(item.username),
-                            1
-                            /* TEXT */
-                          )
-                        ]),
+                      class: "table-row register-table",
+                      style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                    },
+                    [
+                      vue.createElementVNode("view", { class: "table-col col-name" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "primary-text" },
+                          vue.toDisplayString(item.realName || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-username" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString(item.username || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-phone" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString(item.phone || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-role" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString($options.getRoleText(item.role)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-time" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString($options.formatTime(item.applyTime)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-status" }, [
                         vue.createElementVNode(
                           "text",
                           {
-                            class: vue.normalizeClass(["status-tag", $options.getStatusClass(item.status)])
+                            class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
                           },
                           vue.toDisplayString($options.getStatusText(item.status)),
                           3
                           /* TEXT, CLASS */
                         )
                       ]),
-                      vue.createElementVNode("view", { class: "item-body" }, [
-                        vue.createElementVNode("view", { class: "info-grid" }, [
-                          vue.createElementVNode("view", { class: "info-item" }, [
-                            vue.createElementVNode("text", { class: "label" }, "手机号"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString(item.phone || "-"),
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          vue.createElementVNode("view", { class: "info-item" }, [
-                            vue.createElementVNode("text", { class: "label" }, "申请角色"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString($options.getRoleText(item.role)),
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          vue.createElementVNode("view", { class: "info-item full" }, [
-                            vue.createElementVNode("text", { class: "label" }, "申请时间"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value highlight" },
-                              vue.toDisplayString($options.formatTime(item.applyTime)),
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          item.status === "REJECTED" && item.rejectReason ? (vue.openBlock(), vue.createElementBlock("view", {
-                            key: 0,
-                            class: "info-item full"
-                          }, [
-                            vue.createElementVNode("text", { class: "label" }, "驳回原因"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString(item.rejectReason),
-                              1
-                              /* TEXT */
-                            )
-                          ])) : vue.createCommentVNode("v-if", true)
-                        ])
+                      vue.createElementVNode("view", { class: "table-col col-reason" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "desc-text" },
+                          vue.toDisplayString(item.rejectReason || "无"),
+                          1
+                          /* TEXT */
+                        )
                       ]),
-                      vue.createElementVNode("view", { class: "item-footer" }, [
-                        item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("view", {
+                      vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                        item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("button", {
                           key: 0,
-                          class: "btn-row"
-                        }, [
-                          vue.createElementVNode("button", {
-                            class: "action-btn reject",
-                            onClick: ($event) => $options.openReject(item)
-                          }, "驳回", 8, ["onClick"]),
-                          vue.createElementVNode("button", {
-                            class: "action-btn approve",
-                            onClick: ($event) => $options.openApprove(item)
-                          }, "通过", 8, ["onClick"])
-                        ])) : vue.createCommentVNode("v-if", true)
+                          class: "row-btn secondary-warn",
+                          onClick: ($event) => $options.openReject(item)
+                        }, "驳回", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
+                        item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("button", {
+                          key: 1,
+                          class: "row-btn primary",
+                          onClick: ($event) => $options.openApprove(item)
+                        }, "通过", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
                       ])
-                    ]);
-                  }),
-                  128
-                  /* KEYED_FRAGMENT */
-                ))
-              ])) : (vue.openBlock(), vue.createElementBlock("view", {
-                key: 2,
-                class: "empty-state"
-              }, [
-                vue.createElementVNode("text", null, "暂无注册申请")
-              ])),
-              $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 3,
-                class: "pagination"
-              }, [
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.currentPage === 1,
-                  onClick: _cache[5] || (_cache[5] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
-                }, "上一页", 8, ["disabled"]),
-                vue.createElementVNode("view", { class: "page-info" }, [
+                    ],
+                    4
+                    /* STYLE */
+                  );
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ]),
+            $data.requestList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", null, "暂无注册申请")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.currentPage === 1,
+                onClick: _cache[10] || (_cache[10] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
+              }, "上一页", 8, ["disabled"]),
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.currentPage === $options.totalPages,
+                onClick: _cache[11] || (_cache[11] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: [10, 20, 50, 100],
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[12] || (_cache[12] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
                   vue.createElementVNode(
                     "text",
-                    null,
-                    vue.toDisplayString($data.currentPage),
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.pageSize) + " 条",
                     1
                     /* TEXT */
-                  ),
-                  vue.createElementVNode("text", { class: "page-separator" }, "/"),
+                  )
+                ], 40, ["value"])
+              ])
+            ])
+          ])) : vue.createCommentVNode("v-if", true),
+          $data.showRejectModal ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 3,
+            class: "detail-modal",
+            onClick: _cache[18] || (_cache[18] = (...args) => $options.closeReject && $options.closeReject(...args))
+          }, [
+            vue.createElementVNode("view", {
+              class: "detail-content",
+              onClick: _cache[17] || (_cache[17] = vue.withModifiers(() => {
+              }, ["stop"]))
+            }, [
+              vue.createElementVNode("view", { class: "detail-header" }, [
+                vue.createElementVNode("text", { class: "detail-title" }, "驳回申请"),
+                vue.createElementVNode("button", {
+                  class: "close-btn",
+                  onClick: _cache[13] || (_cache[13] = (...args) => $options.closeReject && $options.closeReject(...args))
+                }, "关闭")
+              ]),
+              vue.createElementVNode("view", { class: "detail-body" }, [
+                vue.createElementVNode("view", { class: "detail-item" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "申请人:"),
                   vue.createElementVNode(
                     "text",
-                    null,
-                    vue.toDisplayString($options.totalPages),
+                    { class: "detail-value" },
+                    vue.toDisplayString($data.currentItem ? $data.currentItem.realName : "-"),
                     1
                     /* TEXT */
                   )
                 ]),
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.currentPage === $options.totalPages,
-                  onClick: _cache[6] || (_cache[6] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
-                }, "下一页", 8, ["disabled"])
-              ])) : vue.createCommentVNode("v-if", true)
-            ])
-          ]),
-          $data.showRejectModal ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 0,
-            class: "modal-mask",
-            onClick: _cache[7] || (_cache[7] = (...args) => $options.closeReject && $options.closeReject(...args))
-          })) : vue.createCommentVNode("v-if", true),
-          $data.showRejectModal ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 1,
-            class: "modal-container"
-          }, [
-            vue.createElementVNode("view", { class: "modal" }, [
-              vue.createElementVNode("view", { class: "modal-header" }, [
-                vue.createElementVNode("text", { class: "modal-title" }, "驳回申请")
-              ]),
-              vue.createElementVNode("view", { class: "modal-body" }, [
-                vue.withDirectives(vue.createElementVNode(
-                  "textarea",
-                  {
-                    class: "modal-textarea",
-                    "onUpdate:modelValue": _cache[8] || (_cache[8] = ($event) => $data.rejectReason = $event),
-                    placeholder: "请输入驳回原因",
-                    maxlength: "200"
-                  },
-                  null,
-                  512
-                  /* NEED_PATCH */
-                ), [
-                  [vue.vModelText, $data.rejectReason]
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "驳回原因:"),
+                  vue.withDirectives(vue.createElementVNode(
+                    "textarea",
+                    {
+                      class: "modal-textarea",
+                      "onUpdate:modelValue": _cache[14] || (_cache[14] = ($event) => $data.rejectReason = $event),
+                      placeholder: "请输入驳回原因",
+                      maxlength: "200"
+                    },
+                    null,
+                    512
+                    /* NEED_PATCH */
+                  ), [
+                    [vue.vModelText, $data.rejectReason]
+                  ])
+                ]),
+                vue.createElementVNode("view", { class: "detail-actions" }, [
+                  vue.createElementVNode("button", {
+                    class: "detail-btn secondary",
+                    onClick: _cache[15] || (_cache[15] = (...args) => $options.closeReject && $options.closeReject(...args))
+                  }, "取消"),
+                  vue.createElementVNode("button", {
+                    class: "detail-btn primary",
+                    onClick: _cache[16] || (_cache[16] = (...args) => $options.confirmReject && $options.confirmReject(...args))
+                  }, "确定")
                 ])
-              ]),
-              vue.createElementVNode("view", { class: "modal-footer" }, [
-                vue.createElementVNode("button", {
-                  class: "modal-btn cancel-btn",
-                  onClick: _cache[9] || (_cache[9] = (...args) => $options.closeReject && $options.closeReject(...args))
-                }, "取消"),
-                vue.createElementVNode("button", {
-                  class: "modal-btn confirm-btn",
-                  onClick: _cache[10] || (_cache[10] = (...args) => $options.confirmReject && $options.confirmReject(...args))
-                }, "确定")
               ])
             ])
           ])) : vue.createCommentVNode("v-if", true),
           $data.showApproveModal ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 2,
-            class: "modal-mask",
-            onClick: _cache[11] || (_cache[11] = (...args) => $options.closeApprove && $options.closeApprove(...args))
-          })) : vue.createCommentVNode("v-if", true),
-          $data.showApproveModal ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 3,
-            class: "modal-container"
+            key: 4,
+            class: "detail-modal",
+            onClick: _cache[25] || (_cache[25] = (...args) => $options.closeApprove && $options.closeApprove(...args))
           }, [
-            vue.createElementVNode("view", { class: "modal" }, [
-              vue.createElementVNode("view", { class: "modal-header" }, [
-                vue.createElementVNode("text", { class: "modal-title" }, "通过申请")
+            vue.createElementVNode("view", {
+              class: "detail-content",
+              onClick: _cache[24] || (_cache[24] = vue.withModifiers(() => {
+              }, ["stop"]))
+            }, [
+              vue.createElementVNode("view", { class: "detail-header" }, [
+                vue.createElementVNode("text", { class: "detail-title" }, "通过申请"),
+                vue.createElementVNode("button", {
+                  class: "close-btn",
+                  onClick: _cache[19] || (_cache[19] = (...args) => $options.closeApprove && $options.closeApprove(...args))
+                }, "关闭")
               ]),
-              vue.createElementVNode("view", { class: "modal-body" }, [
-                vue.createElementVNode("view", { class: "modal-row" }, [
-                  vue.createElementVNode("text", { class: "modal-label" }, "确认角色"),
+              vue.createElementVNode("view", { class: "detail-body" }, [
+                vue.createElementVNode("view", { class: "detail-item" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "申请人:"),
+                  vue.createElementVNode(
+                    "text",
+                    { class: "detail-value" },
+                    vue.toDisplayString($data.currentItem ? $data.currentItem.realName : "-"),
+                    1
+                    /* TEXT */
+                  )
+                ]),
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "确认角色:"),
                   vue.createElementVNode("picker", {
                     mode: "selector",
                     range: $data.approveRoleOptions,
                     "range-key": "label",
-                    value: $data.approveRoleOptions.findIndex((opt) => opt.value === $data.approveRole),
-                    onChange: _cache[12] || (_cache[12] = (...args) => $options.handleApproveRoleChange && $options.handleApproveRoleChange(...args))
+                    value: $options.approveRoleIndex,
+                    onChange: _cache[20] || (_cache[20] = (...args) => $options.handleApproveRoleChange && $options.handleApproveRoleChange(...args))
                   }, [
                     vue.createElementVNode("view", { class: "modal-picker" }, [
                       vue.createElementVNode(
                         "text",
                         { class: "modal-picker-text" },
-                        vue.toDisplayString((_c = $data.approveRoleOptions.find((opt) => opt.value === $data.approveRole)) == null ? void 0 : _c.label),
+                        vue.toDisplayString($options.approveRoleLabel),
                         1
                         /* TEXT */
-                      )
+                      ),
+                      vue.createElementVNode("text", { class: "modal-picker-arrow" }, ">")
                     ])
                   ], 40, ["range", "value"])
+                ]),
+                $options.needsCommunityAssignment ? (vue.openBlock(), vue.createElementBlock("view", {
+                  key: 0,
+                  class: "detail-item detail-item-block"
+                }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "负责社区:"),
+                  vue.createElementVNode("picker", {
+                    mode: "selector",
+                    range: $data.communityList,
+                    "range-key": "name",
+                    value: $options.approveCommunityIndex,
+                    disabled: $data.communityListLoading || $data.communityList.length === 0,
+                    onChange: _cache[21] || (_cache[21] = (...args) => $options.handleApproveCommunityChange && $options.handleApproveCommunityChange(...args))
+                  }, [
+                    vue.createElementVNode(
+                      "view",
+                      {
+                        class: vue.normalizeClass(["modal-picker", { placeholder: !$options.approveCommunityLabel }])
+                      },
+                      [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "modal-picker-text" },
+                          vue.toDisplayString($options.approveCommunityDisplayText),
+                          1
+                          /* TEXT */
+                        ),
+                        vue.createElementVNode("text", { class: "modal-picker-arrow" }, ">")
+                      ],
+                      2
+                      /* CLASS */
+                    )
+                  ], 40, ["range", "value", "disabled"]),
+                  vue.createElementVNode(
+                    "text",
+                    { class: "detail-tip" },
+                    vue.toDisplayString($options.approveCommunityTip),
+                    1
+                    /* TEXT */
+                  )
+                ])) : vue.createCommentVNode("v-if", true),
+                vue.createElementVNode("view", { class: "detail-actions" }, [
+                  vue.createElementVNode("button", {
+                    class: "detail-btn secondary",
+                    onClick: _cache[22] || (_cache[22] = (...args) => $options.closeApprove && $options.closeApprove(...args))
+                  }, "取消"),
+                  vue.createElementVNode("button", {
+                    class: "detail-btn primary",
+                    onClick: _cache[23] || (_cache[23] = (...args) => $options.confirmApprove && $options.confirmApprove(...args))
+                  }, "确定")
                 ])
-              ]),
-              vue.createElementVNode("view", { class: "modal-footer" }, [
-                vue.createElementVNode("button", {
-                  class: "modal-btn cancel-btn",
-                  onClick: _cache[13] || (_cache[13] = (...args) => $options.closeApprove && $options.closeApprove(...args))
-                }, "取消"),
-                vue.createElementVNode("button", {
-                  class: "modal-btn confirm-btn",
-                  onClick: _cache[14] || (_cache[14] = (...args) => $options.confirmApprove && $options.confirmApprove(...args))
-                }, "确定")
               ])
             ])
           ])) : vue.createCommentVNode("v-if", true)
-        ];
-      }),
+        ])
+      ]),
       _: 1
       /* STABLE */
     }, 8, ["showSidebar"]);
@@ -11065,6 +13112,12 @@ if (uni.restoreGlobal) {
         currentPage: 1,
         pageSize: 10,
         total: 0,
+        stats: {
+          total: 0,
+          pending: 0,
+          approved: 0,
+          rejected: 0
+        },
         showRejectModal: false,
         rejectReason: "",
         currentItem: null
@@ -11072,26 +13125,63 @@ if (uni.restoreGlobal) {
     },
     computed: {
       totalPages() {
-        return Math.ceil(this.total / this.pageSize) || 1;
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50, 100];
+        return Math.max(0, options.indexOf(this.pageSize));
+      },
+      statusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.statusFilter));
+      },
+      currentStatusLabel() {
+        const current = this.statusOptions.find((item) => item.value === this.statusFilter);
+        return current ? current.label : "全部状态";
       }
     },
     onShow() {
       this.loadData();
+      this.loadStats();
     },
     methods: {
       handleSearch() {
         this.currentPage = 1;
         this.loadData();
       },
-      handleStatusChange(e) {
-        const idx = Number(e && e.detail ? e.detail.value : 0);
-        const option = this.statusOptions[idx];
-        this.statusFilter = option ? option.value : "";
+      handleResetFilters() {
+        this.searchQuery = "";
+        this.statusFilter = "PENDING";
         this.currentPage = 1;
         this.loadData();
       },
+      applyQuickStatus(status) {
+        this.statusFilter = status;
+        this.currentPage = 1;
+        this.loadData();
+      },
+      handleStatusChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.statusFilter = ((_b = this.statusOptions[index]) == null ? void 0 : _b.value) || "";
+        this.currentPage = 1;
+        this.loadData();
+      },
+      extractTotal(data) {
+        var _a, _b;
+        if (typeof (data == null ? void 0 : data.total) === "number")
+          return data.total;
+        if (typeof ((_a = data == null ? void 0 : data.data) == null ? void 0 : _a.total) === "number")
+          return data.data.total;
+        if (Array.isArray(data == null ? void 0 : data.records))
+          return data.records.length;
+        if (Array.isArray((_b = data == null ? void 0 : data.data) == null ? void 0 : _b.records))
+          return data.data.records.length;
+        if (Array.isArray(data))
+          return data.length;
+        return 0;
+      },
       async loadData() {
-        var _a;
+        var _a, _b;
         this.loading = true;
         try {
           const params = {
@@ -11101,7 +13191,7 @@ if (uni.restoreGlobal) {
             status: this.statusFilter || void 0
           };
           const res = await request("/api/admin/house/bind-requests", { params }, "GET");
-          const page = (res == null ? void 0 : res.records) || ((_a = res == null ? void 0 : res.data) == null ? void 0 : _a.records) ? res : (res == null ? void 0 : res.data) || res;
+          const page = Array.isArray(res == null ? void 0 : res.records) || Array.isArray((_a = res == null ? void 0 : res.data) == null ? void 0 : _a.records) ? ((_b = res == null ? void 0 : res.data) == null ? void 0 : _b.records) ? res.data : res : (res == null ? void 0 : res.data) || res;
           const records = Array.isArray(page == null ? void 0 : page.records) ? page.records : Array.isArray(res) ? res : [];
           const total = (page == null ? void 0 : page.total) ?? (res == null ? void 0 : res.total) ?? records.length ?? 0;
           this.requestList = records.map((item) => ({
@@ -11119,12 +13209,31 @@ if (uni.restoreGlobal) {
             rejectReason: item == null ? void 0 : item.rejectReason
           }));
           this.total = Number(total) || 0;
-        } catch (e) {
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/house-bind-review.vue:310", "加载绑定申请失败", error);
           uni.showToast({ title: "加载失败", icon: "none" });
           this.requestList = [];
           this.total = 0;
         } finally {
           this.loading = false;
+        }
+      },
+      async loadStats() {
+        try {
+          const [totalRes, pendingRes, approvedRes, rejectedRes] = await Promise.all([
+            request("/api/admin/house/bind-requests", { params: { pageNum: 1, pageSize: 1 } }, "GET"),
+            request("/api/admin/house/bind-requests", { params: { pageNum: 1, pageSize: 1, status: "PENDING" } }, "GET"),
+            request("/api/admin/house/bind-requests", { params: { pageNum: 1, pageSize: 1, status: "APPROVED" } }, "GET"),
+            request("/api/admin/house/bind-requests", { params: { pageNum: 1, pageSize: 1, status: "REJECTED" } }, "GET")
+          ]);
+          this.stats = {
+            total: this.extractTotal(totalRes),
+            pending: this.extractTotal(pendingRes),
+            approved: this.extractTotal(approvedRes),
+            rejected: this.extractTotal(rejectedRes)
+          };
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/house-bind-review.vue:333", "加载绑定统计失败", error);
         }
       },
       handlePrevPage() {
@@ -11137,6 +13246,14 @@ if (uni.restoreGlobal) {
         if (this.currentPage >= this.totalPages)
           return;
         this.currentPage += 1;
+        this.loadData();
+      },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50, 100];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 10;
+        this.currentPage = 1;
         this.loadData();
       },
       confirmApprove(item) {
@@ -11153,7 +13270,8 @@ if (uni.restoreGlobal) {
               await request(`/api/admin/house/bind-requests/${item.id}/approve`, {}, "PUT");
               uni.showToast({ title: "已通过", icon: "success" });
               this.loadData();
-            } catch (e) {
+              this.loadStats();
+            } catch (error) {
               uni.showToast({ title: "操作失败", icon: "none" });
             } finally {
               uni.hideLoading();
@@ -11189,7 +13307,8 @@ if (uni.restoreGlobal) {
           uni.showToast({ title: "已驳回", icon: "success" });
           this.closeReject();
           this.loadData();
-        } catch (e) {
+          this.loadStats();
+        } catch (error) {
           uni.showToast({ title: "操作失败", icon: "none" });
         } finally {
           uni.hideLoading();
@@ -11216,7 +13335,7 @@ if (uni.restoreGlobal) {
           case "REJECTED":
             return "status-rejected";
           default:
-            return "";
+            return "status-rejected";
         }
       },
       getIdentityText(type) {
@@ -11232,22 +13351,22 @@ if (uni.restoreGlobal) {
         }
       },
       formatHouse(item) {
-        const c = (item == null ? void 0 : item.communityName) ? `${item.communityName} ` : "";
-        const b = (item == null ? void 0 : item.buildingNo) ? `${item.buildingNo}` : "";
-        const h = (item == null ? void 0 : item.houseNo) ? `${item.houseNo}` : "";
-        return `${c}${b}${h}`.trim() || "-";
+        const community = (item == null ? void 0 : item.communityName) ? `${item.communityName} ` : "";
+        const building = (item == null ? void 0 : item.buildingNo) ? `${item.buildingNo}` : "";
+        const house = (item == null ? void 0 : item.houseNo) ? `${item.houseNo}` : "";
+        return `${community}${building}${house}`.trim() || "-";
       },
       formatTime(str) {
         if (!str)
           return "-";
-        const d = new Date(String(str).replace(" ", "T"));
-        if (isNaN(d.getTime()))
+        const date = new Date(String(str).replace(" ", "T"));
+        if (Number.isNaN(date.getTime()))
           return String(str);
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        const hh = String(d.getHours()).padStart(2, "0");
-        const mi = String(d.getMinutes()).padStart(2, "0");
-        return `${mm}-${dd} ${hh}:${mi}`;
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hour = String(date.getHours()).padStart(2, "0");
+        const minute = String(date.getMinutes()).padStart(2, "0");
+        return `${month}-${day} ${hour}:${minute}`;
       }
     }
   };
@@ -11255,250 +13374,403 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[10] || (_cache[10] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[18] || (_cache[18] = ($event) => $data.showSidebar = $event),
       pageTitle: "房屋绑定审核",
-      currentPage: "/admin/pages/admin/house-bind-review"
+      currentPage: "/admin/pages/admin/house-bind-review",
+      pageBreadcrumb: "管理后台 / 房屋绑定审核",
+      showPageBanner: false
     }, {
-      default: vue.withCtx(() => {
-        var _a;
-        return [
-          vue.createElementVNode("view", { class: "manage-container" }, [
-            vue.createElementVNode("view", { class: "search-filter-bar" }, [
-              vue.createElementVNode("view", { class: "search-box" }, [
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "房屋绑定申请列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一为后台审核表格页，保留通过、驳回和驳回原因记录。")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.statusFilter === "" }]),
+                onClick: _cache[0] || (_cache[0] = ($event) => $options.applyQuickStatus(""))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "全部申请"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.total),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card pending", { active: $data.statusFilter === "PENDING" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.applyQuickStatus("PENDING"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "待审核"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.pending),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card approved", { active: $data.statusFilter === "APPROVED" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.applyQuickStatus("APPROVED"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已通过"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.approved),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card rejected", { active: $data.statusFilter === "REJECTED" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.applyQuickStatus("REJECTED"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已驳回"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.rejected),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
                 vue.withDirectives(vue.createElementVNode(
                   "input",
                   {
+                    "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchQuery = $event),
+                    class: "query-input",
                     type: "text",
                     placeholder: "搜索姓名/手机号/房号",
-                    "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.searchQuery = $event),
-                    onConfirm: _cache[1] || (_cache[1] = (...args) => $options.handleSearch && $options.handleSearch(...args)),
-                    class: "search-input"
+                    onConfirm: _cache[5] || (_cache[5] = (...args) => $options.handleSearch && $options.handleSearch(...args))
                   },
                   null,
                   544
                   /* NEED_HYDRATION, NEED_PATCH */
                 ), [
                   [vue.vModelText, $data.searchQuery]
-                ]),
-                vue.createElementVNode("button", {
-                  class: "search-btn",
-                  onClick: _cache[2] || (_cache[2] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-                }, "搜索")
+                ])
               ]),
-              vue.createElementVNode("view", { class: "filter-row" }, [
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "审核状态"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: $data.statusOptions,
                   "range-key": "label",
-                  value: $data.statusOptions.findIndex((opt) => opt.value === $data.statusFilter),
-                  onChange: _cache[3] || (_cache[3] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args)),
-                  class: "filter-picker"
+                  value: $options.statusPickerIndex,
+                  onChange: _cache[6] || (_cache[6] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
                 }, [
-                  vue.createElementVNode(
-                    "view",
-                    { class: "filter-picker-text" },
-                    vue.toDisplayString(((_a = $data.statusOptions.find((opt) => opt.value === $data.statusFilter)) == null ? void 0 : _a.label) || "全部状态"),
-                    1
-                    /* TEXT */
-                  )
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
                 ], 40, ["range", "value"])
               ])
             ]),
-            vue.createElementVNode("view", { class: "list-container" }, [
-              $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 0,
-                class: "loading-state"
-              }, [
-                vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-              ])) : $data.requestList.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 1,
-                class: "request-list"
-              }, [
-                (vue.openBlock(true), vue.createElementBlock(
-                  vue.Fragment,
-                  null,
-                  vue.renderList($data.requestList, (item) => {
-                    return vue.openBlock(), vue.createElementBlock("view", {
-                      key: item.id,
-                      class: "request-item"
-                    }, [
-                      vue.createElementVNode("view", { class: "item-header" }, [
-                        vue.createElementVNode("view", { class: "header-left" }, [
-                          vue.createElementVNode(
-                            "text",
-                            { class: "item-title" },
-                            vue.toDisplayString(item.realName || "-"),
-                            1
-                            /* TEXT */
-                          ),
-                          vue.createElementVNode(
-                            "text",
-                            { class: "sub-title" },
-                            vue.toDisplayString(item.phone || "-"),
-                            1
-                            /* TEXT */
-                          )
-                        ]),
-                        vue.createElementVNode(
-                          "text",
-                          {
-                            class: vue.normalizeClass(["status-tag", $options.getStatusClass(item.status)])
-                          },
-                          vue.toDisplayString($options.getStatusText(item.status)),
-                          3
-                          /* TEXT, CLASS */
-                        )
-                      ]),
-                      vue.createElementVNode("view", { class: "item-body" }, [
-                        vue.createElementVNode("view", { class: "info-grid" }, [
-                          vue.createElementVNode("view", { class: "info-item" }, [
-                            vue.createElementVNode("text", { class: "label" }, "房屋"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString($options.formatHouse(item)),
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          vue.createElementVNode("view", { class: "info-item" }, [
-                            vue.createElementVNode("text", { class: "label" }, "身份"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString($options.getIdentityText(item.identityType)),
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          vue.createElementVNode("view", { class: "info-item full" }, [
-                            vue.createElementVNode("text", { class: "label" }, "申请时间"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value highlight" },
-                              vue.toDisplayString($options.formatTime(item.applyTime)),
-                              1
-                              /* TEXT */
-                            )
-                          ]),
-                          item.status === "REJECTED" && item.rejectReason ? (vue.openBlock(), vue.createElementBlock("view", {
-                            key: 0,
-                            class: "info-item full"
-                          }, [
-                            vue.createElementVNode("text", { class: "label" }, "驳回原因"),
-                            vue.createElementVNode(
-                              "text",
-                              { class: "value" },
-                              vue.toDisplayString(item.rejectReason),
-                              1
-                              /* TEXT */
-                            )
-                          ])) : vue.createCommentVNode("v-if", true)
-                        ])
-                      ]),
-                      vue.createElementVNode("view", { class: "item-footer" }, [
-                        item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("view", {
-                          key: 0,
-                          class: "btn-row"
-                        }, [
-                          vue.createElementVNode("button", {
-                            class: "action-btn reject",
-                            onClick: ($event) => $options.openReject(item)
-                          }, "驳回", 8, ["onClick"]),
-                          vue.createElementVNode("button", {
-                            class: "action-btn approve",
-                            onClick: ($event) => $options.confirmApprove(item)
-                          }, "通过", 8, ["onClick"])
-                        ])) : vue.createCommentVNode("v-if", true)
-                      ])
-                    ]);
-                  }),
-                  128
-                  /* KEYED_FRAGMENT */
-                ))
-              ])) : (vue.openBlock(), vue.createElementBlock("view", {
-                key: 2,
-                class: "empty-state"
-              }, [
-                vue.createElementVNode("text", null, "暂无绑定申请")
-              ])),
-              $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 3,
-                class: "pagination"
-              }, [
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.currentPage === 1,
-                  onClick: _cache[4] || (_cache[4] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
-                }, "上一页", 8, ["disabled"]),
-                vue.createElementVNode("view", { class: "page-info" }, [
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[7] || (_cache[7] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                "待审核 " + vue.toDisplayString($data.stats.pending) + " 条",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "已驳回 " + vue.toDisplayString($data.stats.rejected) + " 条",
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "table-head" }, [
+              vue.createElementVNode("text", { class: "table-col col-name" }, "申请人"),
+              vue.createElementVNode("text", { class: "table-col col-phone" }, "手机号"),
+              vue.createElementVNode("text", { class: "table-col col-house" }, "房屋"),
+              vue.createElementVNode("text", { class: "table-col col-identity" }, "身份"),
+              vue.createElementVNode("text", { class: "table-col col-time" }, "申请时间"),
+              vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+              vue.createElementVNode("text", { class: "table-col col-reason" }, "驳回原因"),
+              vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+            ]),
+            (vue.openBlock(true), vue.createElementBlock(
+              vue.Fragment,
+              null,
+              vue.renderList($data.requestList, (item, index) => {
+                return vue.openBlock(), vue.createElementBlock(
+                  "view",
+                  {
+                    key: item.id,
+                    class: "table-row",
+                    style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                  },
+                  [
+                    vue.createElementVNode("view", { class: "table-col col-name" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "primary-text" },
+                        vue.toDisplayString(item.realName || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-phone" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString(item.phone || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-house" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString($options.formatHouse(item)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-identity" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString($options.getIdentityText(item.identityType)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-time" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString($options.formatTime(item.applyTime)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-status" }, [
+                      vue.createElementVNode(
+                        "text",
+                        {
+                          class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
+                        },
+                        vue.toDisplayString($options.getStatusText(item.status)),
+                        3
+                        /* TEXT, CLASS */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-reason" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "desc-text" },
+                        vue.toDisplayString(item.rejectReason || "无"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                      item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 0,
+                        class: "row-btn secondary-warn",
+                        onClick: ($event) => $options.openReject(item)
+                      }, "驳回", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
+                      item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("button", {
+                        key: 1,
+                        class: "row-btn primary",
+                        onClick: ($event) => $options.confirmApprove(item)
+                      }, "通过", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
+                    ])
+                  ],
+                  4
+                  /* STYLE */
+                );
+              }),
+              128
+              /* KEYED_FRAGMENT */
+            )),
+            $data.requestList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", null, "暂无绑定申请")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.currentPage) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.currentPage === 1,
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
+              }, "上一页", 8, ["disabled"]),
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.currentPage === $options.totalPages,
+                onClick: _cache[10] || (_cache[10] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: [10, 20, 50, 100],
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[11] || (_cache[11] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
                   vue.createElementVNode(
                     "text",
-                    null,
-                    vue.toDisplayString($data.currentPage),
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.pageSize) + " 条",
                     1
                     /* TEXT */
-                  ),
-                  vue.createElementVNode("text", { class: "page-separator" }, "/"),
+                  )
+                ], 40, ["value"])
+              ])
+            ])
+          ])) : vue.createCommentVNode("v-if", true),
+          $data.showRejectModal ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 3,
+            class: "detail-modal",
+            onClick: _cache[17] || (_cache[17] = (...args) => $options.closeReject && $options.closeReject(...args))
+          }, [
+            vue.createElementVNode("view", {
+              class: "detail-content",
+              onClick: _cache[16] || (_cache[16] = vue.withModifiers(() => {
+              }, ["stop"]))
+            }, [
+              vue.createElementVNode("view", { class: "detail-header" }, [
+                vue.createElementVNode("text", { class: "detail-title" }, "驳回申请"),
+                vue.createElementVNode("button", {
+                  class: "close-btn",
+                  onClick: _cache[12] || (_cache[12] = (...args) => $options.closeReject && $options.closeReject(...args))
+                }, "关闭")
+              ]),
+              vue.createElementVNode("view", { class: "detail-body" }, [
+                vue.createElementVNode("view", { class: "detail-item" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "申请人:"),
                   vue.createElementVNode(
                     "text",
-                    null,
-                    vue.toDisplayString($options.totalPages),
+                    { class: "detail-value" },
+                    vue.toDisplayString($data.currentItem ? $data.currentItem.realName : "-"),
                     1
                     /* TEXT */
                   )
                 ]),
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.currentPage === $options.totalPages,
-                  onClick: _cache[5] || (_cache[5] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
-                }, "下一页", 8, ["disabled"])
-              ])) : vue.createCommentVNode("v-if", true)
-            ])
-          ]),
-          $data.showRejectModal ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 0,
-            class: "modal-mask",
-            onClick: _cache[6] || (_cache[6] = (...args) => $options.closeReject && $options.closeReject(...args))
-          })) : vue.createCommentVNode("v-if", true),
-          $data.showRejectModal ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 1,
-            class: "modal-container"
-          }, [
-            vue.createElementVNode("view", { class: "modal" }, [
-              vue.createElementVNode("view", { class: "modal-header" }, [
-                vue.createElementVNode("text", { class: "modal-title" }, "驳回申请")
-              ]),
-              vue.createElementVNode("view", { class: "modal-body" }, [
-                vue.withDirectives(vue.createElementVNode(
-                  "textarea",
-                  {
-                    class: "modal-textarea",
-                    "onUpdate:modelValue": _cache[7] || (_cache[7] = ($event) => $data.rejectReason = $event),
-                    placeholder: "请输入驳回原因",
-                    maxlength: "200"
-                  },
-                  null,
-                  512
-                  /* NEED_PATCH */
-                ), [
-                  [vue.vModelText, $data.rejectReason]
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "驳回原因:"),
+                  vue.withDirectives(vue.createElementVNode(
+                    "textarea",
+                    {
+                      class: "modal-textarea",
+                      "onUpdate:modelValue": _cache[13] || (_cache[13] = ($event) => $data.rejectReason = $event),
+                      placeholder: "请输入驳回原因",
+                      maxlength: "200"
+                    },
+                    null,
+                    512
+                    /* NEED_PATCH */
+                  ), [
+                    [vue.vModelText, $data.rejectReason]
+                  ])
+                ]),
+                vue.createElementVNode("view", { class: "detail-actions" }, [
+                  vue.createElementVNode("button", {
+                    class: "detail-btn secondary",
+                    onClick: _cache[14] || (_cache[14] = (...args) => $options.closeReject && $options.closeReject(...args))
+                  }, "取消"),
+                  vue.createElementVNode("button", {
+                    class: "detail-btn primary",
+                    onClick: _cache[15] || (_cache[15] = (...args) => $options.submitReject && $options.submitReject(...args))
+                  }, "确定")
                 ])
-              ]),
-              vue.createElementVNode("view", { class: "modal-footer" }, [
-                vue.createElementVNode("button", {
-                  class: "modal-btn cancel-btn",
-                  onClick: _cache[8] || (_cache[8] = (...args) => $options.closeReject && $options.closeReject(...args))
-                }, "取消"),
-                vue.createElementVNode("button", {
-                  class: "modal-btn confirm-btn",
-                  onClick: _cache[9] || (_cache[9] = (...args) => $options.submitReject && $options.submitReject(...args))
-                }, "确定")
               ])
             ])
           ])) : vue.createCommentVNode("v-if", true)
-        ];
-      }),
+        ])
+      ]),
       _: 1
       /* STABLE */
     }, 8, ["showSidebar"]);
@@ -11512,13 +13784,72 @@ if (uni.restoreGlobal) {
       return {
         showSidebar: false,
         loading: false,
-        activityList: []
+        searchQuery: "",
+        statusFilter: "",
+        rawActivityList: [],
+        activityList: [],
+        total: 0,
+        stats: {
+          total: 0,
+          published: 0,
+          online: 0,
+          draft: 0
+        },
+        statusOptions: [
+          { value: "", label: "全部状态" },
+          { value: "PUBLISHED", label: "已发布" },
+          { value: "ONLINE", label: "报名中" },
+          { value: "DRAFT", label: "草稿" },
+          { value: "ENDED", label: "已结束" }
+        ]
       };
+    },
+    computed: {
+      statusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.statusFilter));
+      },
+      currentStatusLabel() {
+        const current = this.statusOptions.find((item) => item.value === this.statusFilter);
+        return current ? current.label : "全部状态";
+      }
     },
     onShow() {
       this.loadData();
     },
     methods: {
+      normalizeActivityResponse(data) {
+        if (Array.isArray(data))
+          return data;
+        if (Array.isArray(data.records))
+          return data.records;
+        if (data.data && Array.isArray(data.data.records))
+          return data.data.records;
+        if (data.data && Array.isArray(data.data))
+          return data.data;
+        return [];
+      },
+      calculateStats(list = this.rawActivityList) {
+        const stats = {
+          total: list.length,
+          published: 0,
+          online: 0,
+          draft: 0
+        };
+        list.forEach((item) => {
+          if (item.status === "PUBLISHED")
+            stats.published += 1;
+          if (item.status === "ONLINE")
+            stats.online += 1;
+          if (item.status === "DRAFT")
+            stats.draft += 1;
+        });
+        this.stats = stats;
+      },
+      applyStatusFilter() {
+        const filtered = this.statusFilter ? this.rawActivityList.filter((item) => item.status === this.statusFilter) : this.rawActivityList.slice();
+        this.activityList = filtered;
+        this.total = filtered.length;
+      },
       async loadData() {
         this.loading = true;
         try {
@@ -11526,8 +13857,8 @@ if (uni.restoreGlobal) {
             keyword: this.searchQuery || void 0
           };
           const data = await request("/api/activity/list", { params }, "GET");
-          const list = data.records || data || [];
-          this.activityList = list.map((item) => ({
+          const list = this.normalizeActivityResponse(data);
+          this.rawActivityList = list.map((item) => ({
             id: item.id,
             title: item.title,
             startTime: item.startTime,
@@ -11535,17 +13866,39 @@ if (uni.restoreGlobal) {
             signupCount: item.signupCount || 0,
             maxCount: item.maxCount,
             status: item.status,
-            // 直接使用后端返回的 status (PUBLISHED/DRAFT/ONLINE等)
             cover: item.cover || "/static/default-cover.png"
           }));
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/activity-manage.vue:93", "加载活动列表失败", e);
+          this.calculateStats();
+          this.applyStatusFilter();
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/activity-manage.vue:241", "加载活动列表失败", error);
+          this.rawActivityList = [];
+          this.activityList = [];
+          this.total = 0;
+          this.calculateStats();
           uni.showToast({ title: "加载失败", icon: "none" });
         } finally {
           this.loading = false;
         }
       },
-      // 移除 getStatus 方法，直接使用后端 status 字段映射样式和文本
+      handleSearch() {
+        this.loadData();
+      },
+      handleResetFilters() {
+        this.searchQuery = "";
+        this.statusFilter = "";
+        this.loadData();
+      },
+      applyQuickStatus(status) {
+        this.statusFilter = status;
+        this.applyStatusFilter();
+      },
+      handleStatusChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.statusFilter = ((_b = this.statusOptions[index]) == null ? void 0 : _b.value) || "";
+        this.applyStatusFilter();
+      },
       handleCreate() {
         uni.navigateTo({ url: "/admin/pages/admin/activity-edit" });
       },
@@ -11560,39 +13913,43 @@ if (uni.restoreGlobal) {
           title: "确认删除",
           content: "确定要删除该活动吗？",
           success: async (res) => {
-            if (res.confirm) {
-              try {
-                await request(`/api/activity/${item.id}`, {}, "DELETE");
-                this.activityList = this.activityList.filter((i) => i.id !== item.id);
-                uni.showToast({ title: "删除成功", icon: "success" });
-              } catch (e) {
-                uni.showToast({ title: "删除失败", icon: "none" });
-              }
+            if (!res.confirm)
+              return;
+            try {
+              await request(`/api/activity/${item.id}`, {}, "DELETE");
+              uni.showToast({ title: "删除成功", icon: "success" });
+              this.loadData();
+            } catch (error) {
+              uni.showToast({ title: "删除失败", icon: "none" });
             }
           }
         });
       },
       getStatusClass(status) {
         const map = {
-          "PUBLISHED": "status-published",
-          "DRAFT": "status-draft",
-          "ONLINE": "status-online",
-          "ENDED": "status-ended"
+          PUBLISHED: "status-published",
+          DRAFT: "status-draft",
+          ONLINE: "status-online",
+          ENDED: "status-ended"
         };
         return map[status] || "status-default";
       },
       getStatusText(status) {
         const map = {
-          "PUBLISHED": "已发布",
-          "DRAFT": "草稿",
-          "ONLINE": "报名中",
-          // 或进行中
-          "ENDED": "已结束"
+          PUBLISHED: "已发布",
+          DRAFT: "草稿",
+          ONLINE: "报名中",
+          ENDED: "已结束"
         };
-        return map[status] || status;
+        return map[status] || status || "-";
       },
       formatTime(time) {
-        return time;
+        if (!time)
+          return "-";
+        const date = new Date(String(time).replace(" ", "T"));
+        if (Number.isNaN(date.getTime()))
+          return String(time);
+        return date.toLocaleString();
       }
     }
   };
@@ -11600,112 +13957,294 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[1] || (_cache[1] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[10] || (_cache[10] = ($event) => $data.showSidebar = $event),
       pageTitle: "社区活动",
-      currentPage: "/admin/pages/admin/activity-manage"
+      currentPage: "/admin/pages/admin/activity-manage",
+      pageBreadcrumb: "管理后台 / 社区活动",
+      showPageBanner: false
     }, {
       default: vue.withCtx(() => [
         vue.createElementVNode("view", { class: "manage-container" }, [
-          vue.createCommentVNode(" 操作栏 "),
-          vue.createElementVNode("view", { class: "action-bar" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "社区活动列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一为后台活动管理表格页，保留发布、编辑、报名管理与删除操作。")
+            ]),
             vue.createElementVNode("button", {
-              class: "create-btn",
+              class: "primary-action-btn",
               onClick: _cache[0] || (_cache[0] = (...args) => $options.handleCreate && $options.handleCreate(...args))
             }, "发布新活动")
           ]),
-          vue.createCommentVNode(" 活动列表 "),
-          vue.createElementVNode("view", { class: "list-container" }, [
-            $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 0,
-              class: "loading-state"
-            }, [
-              vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-            ])) : $data.activityList.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 1,
-              class: "activity-list"
-            }, [
-              (vue.openBlock(true), vue.createElementBlock(
-                vue.Fragment,
-                null,
-                vue.renderList($data.activityList, (item) => {
-                  return vue.openBlock(), vue.createElementBlock("view", {
+          vue.createElementVNode("view", { class: "status-summary-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.statusFilter === "" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.applyQuickStatus(""))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "全部活动"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.total),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card published", { active: $data.statusFilter === "PUBLISHED" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.applyQuickStatus("PUBLISHED"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已发布"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.published),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card online", { active: $data.statusFilter === "ONLINE" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.applyQuickStatus("ONLINE"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "报名中"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.online),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card draft", { active: $data.statusFilter === "DRAFT" }]),
+                onClick: _cache[4] || (_cache[4] = ($event) => $options.applyQuickStatus("DRAFT"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "草稿"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.stats.draft),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => $data.searchQuery = $event),
+                    class: "query-input",
+                    type: "text",
+                    placeholder: "搜索活动标题、地点",
+                    onConfirm: _cache[6] || (_cache[6] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+                  },
+                  null,
+                  544
+                  /* NEED_HYDRATION, NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.searchQuery]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "活动状态"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.statusOptions,
+                  "range-key": "label",
+                  value: $options.statusPickerIndex,
+                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
+                }, [
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
+              ])
+            ]),
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "共 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                "报名中 " + vue.toDisplayString($data.stats.online) + " 条",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "草稿 " + vue.toDisplayString($data.stats.draft) + " 条",
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "table-head" }, [
+              vue.createElementVNode("text", { class: "table-col col-title" }, "活动标题"),
+              vue.createElementVNode("text", { class: "table-col col-cover" }, "封面"),
+              vue.createElementVNode("text", { class: "table-col col-time" }, "开始时间"),
+              vue.createElementVNode("text", { class: "table-col col-location" }, "地点"),
+              vue.createElementVNode("text", { class: "table-col col-signup" }, "报名人数"),
+              vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+              vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+            ]),
+            (vue.openBlock(true), vue.createElementBlock(
+              vue.Fragment,
+              null,
+              vue.renderList($data.activityList, (item, index) => {
+                return vue.openBlock(), vue.createElementBlock(
+                  "view",
+                  {
                     key: item.id,
-                    class: "activity-item"
-                  }, [
-                    vue.createElementVNode("image", {
-                      src: item.cover || "/static/default-cover.png",
-                      mode: "aspectFill",
-                      class: "cover-img"
-                    }, null, 8, ["src"]),
-                    vue.createElementVNode("view", { class: "item-content" }, [
-                      vue.createElementVNode("view", { class: "item-header" }, [
-                        vue.createElementVNode(
-                          "text",
-                          { class: "item-title" },
-                          vue.toDisplayString(item.title),
-                          1
-                          /* TEXT */
-                        ),
-                        vue.createElementVNode(
-                          "text",
-                          {
-                            class: vue.normalizeClass(["status-tag", $options.getStatusClass(item.status)])
-                          },
-                          vue.toDisplayString($options.getStatusText(item.status)),
-                          3
-                          /* TEXT, CLASS */
-                        )
-                      ]),
-                      vue.createElementVNode("view", { class: "item-info" }, [
-                        vue.createElementVNode(
-                          "text",
-                          { class: "time" },
-                          "时间：" + vue.toDisplayString($options.formatTime(item.startTime)),
-                          1
-                          /* TEXT */
-                        ),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "location" },
-                          "地点：" + vue.toDisplayString(item.location),
-                          1
-                          /* TEXT */
-                        ),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "signup-count" },
-                          "报名人数：" + vue.toDisplayString(item.signupCount) + "/" + vue.toDisplayString(item.maxCount || "不限"),
-                          1
-                          /* TEXT */
-                        )
-                      ]),
-                      vue.createElementVNode("view", { class: "item-footer" }, [
-                        vue.createElementVNode("button", {
-                          class: "mini-btn",
-                          onClick: ($event) => $options.handleEdit(item)
-                        }, "编辑", 8, ["onClick"]),
-                        vue.createElementVNode("button", {
-                          class: "mini-btn",
-                          onClick: ($event) => $options.handleViewSignups(item)
-                        }, "报名管理", 8, ["onClick"]),
-                        vue.createElementVNode("button", {
-                          class: "mini-btn delete",
-                          onClick: ($event) => $options.handleDelete(item)
-                        }, "删除", 8, ["onClick"])
-                      ])
+                    class: "table-row",
+                    style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                  },
+                  [
+                    vue.createElementVNode("view", { class: "table-col col-title" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "primary-text" },
+                        vue.toDisplayString(item.title || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-cover" }, [
+                      vue.createElementVNode("image", {
+                        src: item.cover || "/static/default-cover.png",
+                        mode: "aspectFill",
+                        class: "cover-thumb"
+                      }, null, 8, ["src"])
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-time" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "minor-text" },
+                        vue.toDisplayString($options.formatTime(item.startTime)),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-location" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString(item.location || "-"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-signup" }, [
+                      vue.createElementVNode(
+                        "text",
+                        { class: "plain-text" },
+                        vue.toDisplayString(item.signupCount) + "/" + vue.toDisplayString(item.maxCount || "不限"),
+                        1
+                        /* TEXT */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-status" }, [
+                      vue.createElementVNode(
+                        "text",
+                        {
+                          class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
+                        },
+                        vue.toDisplayString($options.getStatusText(item.status)),
+                        3
+                        /* TEXT, CLASS */
+                      )
+                    ]),
+                    vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                      vue.createElementVNode("button", {
+                        class: "row-btn ghost",
+                        onClick: ($event) => $options.handleEdit(item)
+                      }, "编辑", 8, ["onClick"]),
+                      vue.createElementVNode("button", {
+                        class: "row-btn primary",
+                        onClick: ($event) => $options.handleViewSignups(item)
+                      }, "报名管理", 8, ["onClick"]),
+                      vue.createElementVNode("button", {
+                        class: "row-btn danger",
+                        onClick: ($event) => $options.handleDelete(item)
+                      }, "删除", 8, ["onClick"])
                     ])
-                  ]);
-                }),
-                128
-                /* KEYED_FRAGMENT */
-              ))
-            ])) : (vue.openBlock(), vue.createElementBlock("view", {
-              key: 2,
+                  ],
+                  4
+                  /* STYLE */
+                );
+              }),
+              128
+              /* KEYED_FRAGMENT */
+            )),
+            $data.activityList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
               class: "empty-state"
             }, [
               vue.createElementVNode("text", null, "暂无活动")
-            ]))
-          ])
+            ])) : vue.createCommentVNode("v-if", true)
+          ]))
         ])
       ]),
       _: 1
@@ -11714,8 +14253,12 @@ if (uni.restoreGlobal) {
   }
   const AdminPagesAdminActivityManage = /* @__PURE__ */ _export_sfc(_sfc_main$e, [["render", _sfc_render$d], ["__scopeId", "data-v-de138e10"], ["__file", "D:/HBuilderProjects/smart-community/admin/pages/admin/activity-manage.vue"]]);
   const _sfc_main$d = {
+    components: {
+      adminSidebar
+    },
     data() {
       return {
+        showSidebar: false,
         activityId: null,
         form: {
           title: "",
@@ -11731,7 +14274,6 @@ if (uni.restoreGlobal) {
       if (options.id) {
         this.activityId = options.id;
         this.loadActivityData(options.id);
-        uni.setNavigationBarTitle({ title: "编辑活动" });
       }
     },
     methods: {
@@ -11740,21 +14282,22 @@ if (uni.restoreGlobal) {
           uni.showLoading({ title: "加载中..." });
           const res = await request(`/api/activity/${id}`, {}, "GET");
           if (res) {
-            const [date, time] = (res.startTime || "").split("T");
+            const source = String(res.startTime || "").replace(" ", "T");
+            const [date, time] = source.split("T");
             this.form = {
-              title: res.title,
-              content: res.content,
+              title: res.title || "",
+              content: res.content || "",
               date: date || "",
               time: (time || "").slice(0, 5),
-              // 强制截取前5位 HH:mm
-              location: res.location,
-              maxCount: res.maxCount
+              location: res.location || "",
+              maxCount: res.maxCount != null ? String(res.maxCount) : ""
             };
           }
-          uni.hideLoading();
-        } catch (e) {
-          uni.hideLoading();
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/activity-edit.vue:122", "加载活动失败", error);
           uni.showToast({ title: "加载失败", icon: "none" });
+        } finally {
+          uni.hideLoading();
         }
       },
       bindDateChange(e) {
@@ -11792,190 +14335,304 @@ if (uni.restoreGlobal) {
         }
         return true;
       },
+      buildStartTime() {
+        let rawTime = this.form.time || "00:00";
+        if (rawTime.length > 5) {
+          rawTime = rawTime.substring(0, 5);
+        }
+        const cleanTime = `${rawTime}:00`;
+        const cleanDate = this.form.date.includes(" ") ? this.form.date.split(" ")[0] : this.form.date;
+        return `${cleanDate} ${cleanTime}`;
+      },
       async submitData(status) {
         try {
           uni.showLoading({ title: "提交中..." });
-          let rawTime = this.form.time || "00:00";
-          if (rawTime.length > 5) {
-            rawTime = rawTime.substring(0, 5);
-          }
-          const cleanTime = rawTime + ":00";
-          const startTime = `${this.form.date} ${cleanTime}`;
-          formatAppLog("log", "at admin/pages/admin/activity-edit.vue:155", "清洗后的时间:", startTime);
           const data = {
-            id: this.activityId,
-            // 编辑时带上ID
+            id: this.activityId ? parseInt(this.activityId, 10) : void 0,
             title: this.form.title,
             content: this.form.content,
-            startTime,
-            // 移除冗余的下划线字段，避免 400 错误
+            startTime: this.buildStartTime(),
             location: this.form.location,
-            maxCount: this.form.maxCount ? parseInt(this.form.maxCount) : null,
+            maxCount: this.form.maxCount ? parseInt(this.form.maxCount, 10) : null,
             status,
             coverUrl: ""
           };
-          if (this.form.date.includes(" ")) {
-            formatAppLog("warn", "at admin/pages/admin/activity-edit.vue:173", "Date字段异常:", this.form.date);
-            const realDate = this.form.date.split(" ")[0];
-            data.startTime = `${realDate} ${cleanTime}`;
-          } else {
-            data.startTime = `${this.form.date} ${cleanTime}`;
-          }
-          formatAppLog("log", "at admin/pages/admin/activity-edit.vue:180", "最终提交数据:", JSON.stringify(data));
           if (this.activityId) {
-            formatAppLog("log", "at admin/pages/admin/activity-edit.vue:204", "正在更新活动, 数据:", JSON.stringify(data));
-            if (data.id)
-              data.id = parseInt(data.id);
             await request("/api/activity", data, "PUT");
           } else {
             await request("/api/activity/publish", data, "POST");
           }
-          uni.hideLoading();
           uni.showToast({
             title: status === "DRAFT" ? "已存草稿" : "发布成功",
             icon: "success"
           });
           setTimeout(() => {
             uni.navigateBack();
-          }, 1500);
-        } catch (e) {
-          uni.hideLoading();
+          }, 1200);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/activity-edit.vue:199", "活动提交失败", error);
           uni.showToast({ title: "提交失败", icon: "none" });
-          formatAppLog("error", "at admin/pages/admin/activity-edit.vue:235", "活动提交失败", e);
+        } finally {
+          uni.hideLoading();
         }
       }
     }
   };
   function _sfc_render$c(_ctx, _cache, $props, $setup, $data, $options) {
-    return vue.openBlock(), vue.createElementBlock("view", { class: "edit-container" }, [
-      vue.createElementVNode("view", { class: "form-item" }, [
-        vue.createElementVNode("text", { class: "label" }, "活动标题"),
-        vue.withDirectives(vue.createElementVNode(
-          "input",
-          {
-            class: "input",
-            "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.form.title = $event),
-            placeholder: "请输入活动标题"
-          },
-          null,
-          512
-          /* NEED_PATCH */
-        ), [
-          [vue.vModelText, $data.form.title]
-        ])
-      ]),
-      vue.createElementVNode("view", { class: "form-item" }, [
-        vue.createElementVNode("text", { class: "label" }, "活动时间"),
-        vue.createElementVNode(
-          "picker",
-          {
-            mode: "date",
-            onChange: _cache[1] || (_cache[1] = (...args) => $options.bindDateChange && $options.bindDateChange(...args))
-          },
-          [
+    const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
+    return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
+      showSidebar: $data.showSidebar,
+      "onUpdate:showSidebar": _cache[8] || (_cache[8] = ($event) => $data.showSidebar = $event),
+      pageTitle: $data.activityId ? "编辑活动" : "发布活动",
+      currentPage: "/admin/pages/admin/activity-manage",
+      pageBreadcrumb: $data.activityId ? "管理后台 / 社区活动 / 编辑活动" : "管理后台 / 社区活动 / 发布活动",
+      showPageBanner: false
+    }, {
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "edit-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "overview-title" },
+                vue.toDisplayString($data.activityId ? "活动编辑" : "活动发布"),
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一使用后台表单页结构，保留草稿保存和正式发布流程。")
+            ]),
+            vue.createElementVNode("view", { class: "overview-chip" }, [
+              vue.createElementVNode("text", { class: "overview-chip-label" }, "当前模式"),
+              vue.createElementVNode(
+                "text",
+                { class: "overview-chip-value" },
+                vue.toDisplayString($data.activityId ? "编辑中" : "新建中"),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "form-card" }, [
+            vue.createElementVNode("view", { class: "form-grid" }, [
+              vue.createElementVNode("view", { class: "form-field form-field-wide" }, [
+                vue.createElementVNode("text", { class: "form-label required" }, "活动标题"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    class: "form-input",
+                    "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.form.title = $event),
+                    placeholder: "请输入活动标题"
+                  },
+                  null,
+                  512
+                  /* NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.form.title]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "form-field" }, [
+                vue.createElementVNode("text", { class: "form-label required" }, "活动日期"),
+                vue.createElementVNode(
+                  "picker",
+                  {
+                    mode: "date",
+                    onChange: _cache[1] || (_cache[1] = (...args) => $options.bindDateChange && $options.bindDateChange(...args))
+                  },
+                  [
+                    vue.createElementVNode(
+                      "view",
+                      {
+                        class: vue.normalizeClass(["picker-box", { "has-val": !!$data.form.date }])
+                      },
+                      [
+                        vue.createElementVNode(
+                          "text",
+                          null,
+                          vue.toDisplayString($data.form.date || "请选择日期"),
+                          1
+                          /* TEXT */
+                        ),
+                        vue.createElementVNode("text", { class: "picker-icon" }, ">")
+                      ],
+                      2
+                      /* CLASS */
+                    )
+                  ],
+                  32
+                  /* NEED_HYDRATION */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "form-field" }, [
+                vue.createElementVNode("text", { class: "form-label" }, "活动时间"),
+                vue.createElementVNode(
+                  "picker",
+                  {
+                    mode: "time",
+                    onChange: _cache[2] || (_cache[2] = (...args) => $options.bindTimeChange && $options.bindTimeChange(...args))
+                  },
+                  [
+                    vue.createElementVNode(
+                      "view",
+                      {
+                        class: vue.normalizeClass(["picker-box", { "has-val": !!$data.form.time }])
+                      },
+                      [
+                        vue.createElementVNode(
+                          "text",
+                          null,
+                          vue.toDisplayString($data.form.time || "请选择时间"),
+                          1
+                          /* TEXT */
+                        ),
+                        vue.createElementVNode("text", { class: "picker-icon" }, ">")
+                      ],
+                      2
+                      /* CLASS */
+                    )
+                  ],
+                  32
+                  /* NEED_HYDRATION */
+                )
+              ]),
+              vue.createElementVNode("view", { class: "form-field" }, [
+                vue.createElementVNode("text", { class: "form-label required" }, "活动地点"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    class: "form-input",
+                    "onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => $data.form.location = $event),
+                    placeholder: "请输入活动地点"
+                  },
+                  null,
+                  512
+                  /* NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.form.location]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "form-field" }, [
+                vue.createElementVNode("text", { class: "form-label" }, "最大报名人数"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    class: "form-input",
+                    type: "number",
+                    "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.form.maxCount = $event),
+                    placeholder: "0 表示不限"
+                  },
+                  null,
+                  512
+                  /* NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.form.maxCount]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "form-field form-field-wide" }, [
+                vue.createElementVNode("text", { class: "form-label" }, "活动详情"),
+                vue.withDirectives(vue.createElementVNode(
+                  "textarea",
+                  {
+                    class: "form-textarea",
+                    "onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => $data.form.content = $event),
+                    placeholder: "请输入活动详情描述"
+                  },
+                  null,
+                  512
+                  /* NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.form.content]
+                ]),
+                vue.createElementVNode("text", { class: "field-tip" }, "发布时间将按后端返回状态进行管理，编辑时沿用当前活动 ID。")
+              ])
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "action-bar-card" }, [
+            vue.createElementVNode("button", {
+              class: "warn-btn",
+              onClick: _cache[6] || (_cache[6] = (...args) => $options.handleDraft && $options.handleDraft(...args))
+            }, "存为草稿"),
             vue.createElementVNode(
-              "view",
-              { class: "picker" },
-              vue.toDisplayString($data.form.date || "请选择日期"),
+              "button",
+              {
+                class: "primary-btn",
+                onClick: _cache[7] || (_cache[7] = (...args) => $options.handlePublishCheck && $options.handlePublishCheck(...args))
+              },
+              vue.toDisplayString($data.activityId ? "保存并发布" : "立即发布"),
               1
               /* TEXT */
             )
-          ],
-          32
-          /* NEED_HYDRATION */
-        ),
-        vue.createElementVNode(
-          "picker",
-          {
-            mode: "time",
-            onChange: _cache[2] || (_cache[2] = (...args) => $options.bindTimeChange && $options.bindTimeChange(...args))
-          },
-          [
-            vue.createElementVNode(
-              "view",
-              { class: "picker" },
-              vue.toDisplayString($data.form.time || "请选择时间"),
-              1
-              /* TEXT */
-            )
-          ],
-          32
-          /* NEED_HYDRATION */
-        )
-      ]),
-      vue.createElementVNode("view", { class: "form-item" }, [
-        vue.createElementVNode("text", { class: "label" }, "活动地点"),
-        vue.withDirectives(vue.createElementVNode(
-          "input",
-          {
-            class: "input",
-            "onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => $data.form.location = $event),
-            placeholder: "请输入活动地点"
-          },
-          null,
-          512
-          /* NEED_PATCH */
-        ), [
-          [vue.vModelText, $data.form.location]
+          ])
         ])
       ]),
-      vue.createElementVNode("view", { class: "form-item" }, [
-        vue.createElementVNode("text", { class: "label" }, "最大报名人数"),
-        vue.withDirectives(vue.createElementVNode(
-          "input",
-          {
-            class: "input",
-            type: "number",
-            "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.form.maxCount = $event),
-            placeholder: "0表示不限"
-          },
-          null,
-          512
-          /* NEED_PATCH */
-        ), [
-          [vue.vModelText, $data.form.maxCount]
-        ])
-      ]),
-      vue.createElementVNode("view", { class: "form-item" }, [
-        vue.createElementVNode("text", { class: "label" }, "活动详情"),
-        vue.withDirectives(vue.createElementVNode(
-          "textarea",
-          {
-            class: "textarea",
-            "onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => $data.form.content = $event),
-            placeholder: "请输入活动详情描述"
-          },
-          null,
-          512
-          /* NEED_PATCH */
-        ), [
-          [vue.vModelText, $data.form.content]
-        ])
-      ]),
-      vue.createElementVNode("view", { class: "btn-group" }, [
-        vue.createElementVNode("button", {
-          class: "submit-btn draft",
-          onClick: _cache[6] || (_cache[6] = (...args) => $options.handleDraft && $options.handleDraft(...args))
-        }, "存为草稿"),
-        vue.createElementVNode("button", {
-          class: "submit-btn publish",
-          onClick: _cache[7] || (_cache[7] = (...args) => $options.handlePublishCheck && $options.handlePublishCheck(...args))
-        }, "发布活动")
-      ])
-    ]);
+      _: 1
+      /* STABLE */
+    }, 8, ["showSidebar", "pageTitle", "pageBreadcrumb"]);
   }
   const AdminPagesAdminActivityEdit = /* @__PURE__ */ _export_sfc(_sfc_main$d, [["render", _sfc_render$c], ["__scopeId", "data-v-3b54f228"], ["__file", "D:/HBuilderProjects/smart-community/admin/pages/admin/activity-edit.vue"]]);
   const _sfc_main$c = {
+    components: {
+      adminSidebar
+    },
     data() {
       return {
+        showSidebar: false,
         activityId: null,
         list: [],
         total: 0,
         loading: false,
         pageNum: 1,
         pageSize: 20,
-        hasMore: true
+        searchQuery: "",
+        statusFilter: "",
+        statusOptions: [
+          { value: "", label: "全部状态" },
+          { value: "SIGNED", label: "已报名" },
+          { value: "CANCELLED", label: "已取消" }
+        ]
       };
+    },
+    computed: {
+      totalPages() {
+        return Math.max(1, Math.ceil(this.total / this.pageSize));
+      },
+      pageSizeIndex() {
+        const options = [10, 20, 50];
+        return Math.max(0, options.indexOf(this.pageSize));
+      },
+      statusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.statusFilter));
+      },
+      currentStatusLabel() {
+        const current = this.statusOptions.find((item) => item.value === this.statusFilter);
+        return current ? current.label : "全部状态";
+      },
+      pageStats() {
+        return this.list.reduce((stats, item) => {
+          stats.total += 1;
+          if (item.status === "CANCELLED") {
+            stats.cancelled += 1;
+          } else {
+            stats.signed += 1;
+          }
+          return stats;
+        }, {
+          total: 0,
+          signed: 0,
+          cancelled: 0
+        });
+      },
+      displayList() {
+        const keyword = this.searchQuery.trim().toLowerCase();
+        return this.list.filter((item) => {
+          const matchesStatus = !this.statusFilter || this.normalizeStatus(item.status) === this.statusFilter;
+          if (!matchesStatus)
+            return false;
+          if (!keyword)
+            return true;
+          const haystack = `${item.userName || ""} ${item.userPhone || ""}`.toLowerCase();
+          return haystack.includes(keyword);
+        });
+      }
     },
     onLoad(options) {
       if (options.id) {
@@ -11983,22 +14640,13 @@ if (uni.restoreGlobal) {
         this.loadData();
       }
     },
-    onPullDownRefresh() {
-      this.pageNum = 1;
-      this.hasMore = true;
-      this.loadData().then(() => {
-        uni.stopPullDownRefresh();
-      });
-    },
-    onReachBottom() {
-      if (this.hasMore && !this.loading) {
-        this.pageNum++;
-        this.loadData();
-      }
-    },
     methods: {
+      normalizeStatus(status) {
+        return status === "CANCELLED" ? "CANCELLED" : "SIGNED";
+      },
       async loadData() {
-        if (this.loading)
+        var _a, _b;
+        if (!this.activityId || this.loading)
           return;
         this.loading = true;
         try {
@@ -12009,122 +14657,423 @@ if (uni.restoreGlobal) {
               pageSize: this.pageSize
             }
           }, "GET");
-          const records = res.records || [];
-          this.total = res.total || 0;
-          if (this.pageNum === 1) {
-            this.list = records;
-          } else {
-            this.list = [...this.list, ...records];
-          }
-          this.hasMore = records.length === this.pageSize;
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/activity-signups.vue:95", "加载报名列表失败", e);
+          const records = res.records || ((_a = res.data) == null ? void 0 : _a.records) || res.data || [];
+          this.list = Array.isArray(records) ? records : [];
+          this.total = Number(res.total || ((_b = res.data) == null ? void 0 : _b.total) || this.list.length || 0);
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/activity-signups.vue:244", "加载报名列表失败", error);
           uni.showToast({ title: "加载失败", icon: "none" });
+          this.list = [];
+          this.total = 0;
         } finally {
           this.loading = false;
         }
       },
+      handleRefresh() {
+        this.loadData();
+      },
+      handleResetFilters() {
+        this.searchQuery = "";
+        this.statusFilter = "";
+      },
+      handleStatusChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.statusFilter = ((_b = this.statusOptions[index]) == null ? void 0 : _b.value) || "";
+      },
+      handlePrevPage() {
+        if (this.pageNum <= 1)
+          return;
+        this.pageNum -= 1;
+        this.loadData();
+      },
+      handleNextPage() {
+        if (this.pageNum >= this.totalPages)
+          return;
+        this.pageNum += 1;
+        this.loadData();
+      },
+      handlePageSizeChange(e) {
+        var _a;
+        const options = [10, 20, 50];
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.pageSize = options[index] || 20;
+        this.pageNum = 1;
+        this.loadData();
+      },
+      getStatusClass(status) {
+        return this.normalizeStatus(status) === "CANCELLED" ? "status-cancelled" : "status-signed";
+      },
+      getStatusText(status) {
+        return this.normalizeStatus(status) === "CANCELLED" ? "已取消" : "已报名";
+      },
       formatTime(time) {
         if (!time)
-          return "";
-        return time.replace("T", " ");
+          return "-";
+        return String(time).replace("T", " ");
       }
     }
   };
   function _sfc_render$b(_ctx, _cache, $props, $setup, $data, $options) {
-    return vue.openBlock(), vue.createElementBlock("view", { class: "container" }, [
-      vue.createElementVNode("view", { class: "header" }, [
-        vue.createElementVNode("view", { class: "title" }, "报名列表"),
-        vue.createElementVNode(
-          "view",
-          { class: "subtitle" },
-          "共 " + vue.toDisplayString($data.total) + " 人报名",
-          1
-          /* TEXT */
-        )
-      ]),
-      vue.createElementVNode("view", { class: "list-container" }, [
-        $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-          key: 0,
-          class: "loading-state"
-        }, [
-          vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-        ])) : $data.list.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-          key: 1,
-          class: "signup-list"
-        }, [
-          (vue.openBlock(true), vue.createElementBlock(
-            vue.Fragment,
-            null,
-            vue.renderList($data.list, (item, index) => {
-              return vue.openBlock(), vue.createElementBlock("view", {
-                key: item.id,
-                class: "signup-item"
-              }, [
-                vue.createElementVNode("view", { class: "item-left" }, [
-                  vue.createElementVNode(
-                    "text",
-                    { class: "index" },
-                    vue.toDisplayString(index + 1),
-                    1
-                    /* TEXT */
-                  ),
-                  vue.createElementVNode("view", { class: "user-info" }, [
+    const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
+    return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
+      showSidebar: $data.showSidebar,
+      "onUpdate:showSidebar": _cache[10] || (_cache[10] = ($event) => $data.showSidebar = $event),
+      pageTitle: "活动报名",
+      currentPage: "/admin/pages/admin/activity-manage",
+      pageBreadcrumb: "管理后台 / 社区活动 / 报名管理",
+      showPageBanner: false
+    }, {
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "活动报名列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一按后台表格页展示当前活动的报名记录，并支持当前页快速筛选。")
+            ]),
+            vue.createElementVNode("view", { class: "overview-chip" }, [
+              vue.createElementVNode("text", { class: "overview-chip-label" }, "活动 ID"),
+              vue.createElementVNode(
+                "text",
+                { class: "overview-chip-value" },
+                vue.toDisplayString($data.activityId || "-"),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar signup-status-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.statusFilter === "" }]),
+                onClick: _cache[0] || (_cache[0] = ($event) => $data.statusFilter = "")
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "当前页总数"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.pageStats.total),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card signed", { active: $data.statusFilter === "SIGNED" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $data.statusFilter = "SIGNED")
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已报名"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.pageStats.signed),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card cancelled", { active: $data.statusFilter === "CANCELLED" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $data.statusFilter = "CANCELLED")
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已取消"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.pageStats.cancelled),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid signup-query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => $data.searchQuery = $event),
+                    class: "query-input",
+                    type: "text",
+                    placeholder: "按姓名或手机号筛选当前页"
+                  },
+                  null,
+                  512
+                  /* NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.searchQuery]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "报名状态"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.statusOptions,
+                  "range-key": "label",
+                  value: $options.statusPickerIndex,
+                  onChange: _cache[4] || (_cache[4] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
+                }, [
+                  vue.createElementVNode("view", { class: "query-picker" }, [
                     vue.createElementVNode(
                       "text",
-                      { class: "name" },
-                      vue.toDisplayString(item.userName || "未知用户"),
-                      1
-                      /* TEXT */
-                    ),
-                    vue.createElementVNode(
-                      "text",
-                      { class: "phone" },
-                      vue.toDisplayString(item.userPhone || "暂无电话"),
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
                       1
                       /* TEXT */
                     )
                   ])
-                ]),
-                vue.createElementVNode("view", { class: "item-right" }, [
+                ], 40, ["range", "value"])
+              ])
+            ]),
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[5] || (_cache[5] = (...args) => $options.handleRefresh && $options.handleRefresh(...args))
+              }, "刷新"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[6] || (_cache[6] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "活动总报名 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                "当前页显示 " + vue.toDisplayString($options.displayList.length) + " 条",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "每页 " + vue.toDisplayString($data.pageSize) + " 条",
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "scroll-table" }, [
+              vue.createElementVNode("view", { class: "table-head signup-table" }, [
+                vue.createElementVNode("text", { class: "table-col col-index" }, "序号"),
+                vue.createElementVNode("text", { class: "table-col col-name" }, "报名人"),
+                vue.createElementVNode("text", { class: "table-col col-phone" }, "联系电话"),
+                vue.createElementVNode("text", { class: "table-col col-time" }, "报名时间"),
+                vue.createElementVNode("text", { class: "table-col col-status" }, "状态")
+              ]),
+              (vue.openBlock(true), vue.createElementBlock(
+                vue.Fragment,
+                null,
+                vue.renderList($options.displayList, (item, index) => {
+                  return vue.openBlock(), vue.createElementBlock(
+                    "view",
+                    {
+                      key: item.id || `${item.userName}-${index}`,
+                      class: "table-row signup-table",
+                      style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                    },
+                    [
+                      vue.createElementVNode("view", { class: "table-col col-index" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString(($data.pageNum - 1) * $data.pageSize + index + 1),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-name" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "primary-text" },
+                          vue.toDisplayString(item.userName || "未知用户"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-phone" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString(item.userPhone || "暂无电话"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-time" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString($options.formatTime(item.signupTime)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-status" }, [
+                        vue.createElementVNode(
+                          "text",
+                          {
+                            class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
+                          },
+                          vue.toDisplayString($options.getStatusText(item.status)),
+                          3
+                          /* TEXT, CLASS */
+                        )
+                      ])
+                    ],
+                    4
+                    /* STYLE */
+                  );
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ]),
+            $options.displayList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", null, "暂无报名记录")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.pageNum) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.pageNum <= 1,
+                onClick: _cache[7] || (_cache[7] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
+              }, "上一页", 8, ["disabled"]),
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.pageNum >= $options.totalPages,
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: [10, 20, 50],
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[9] || (_cache[9] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
                   vue.createElementVNode(
                     "text",
-                    { class: "time" },
-                    vue.toDisplayString($options.formatTime(item.signupTime)),
-                    1
-                    /* TEXT */
-                  ),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "status" },
-                    vue.toDisplayString(item.status === "CANCELLED" ? "已取消" : "已报名"),
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.pageSize) + " 条",
                     1
                     /* TEXT */
                   )
-                ])
-              ]);
-            }),
-            128
-            /* KEYED_FRAGMENT */
-          ))
-        ])) : (vue.openBlock(), vue.createElementBlock("view", {
-          key: 2,
-          class: "empty-state"
-        }, [
-          vue.createElementVNode("text", null, "暂无报名记录")
-        ]))
-      ])
-    ]);
+                ], 40, ["value"])
+              ])
+            ])
+          ])) : vue.createCommentVNode("v-if", true)
+        ])
+      ]),
+      _: 1
+      /* STABLE */
+    }, 8, ["showSidebar"]);
   }
   const AdminPagesAdminActivitySignups = /* @__PURE__ */ _export_sfc(_sfc_main$c, [["render", _sfc_render$b], ["__scopeId", "data-v-f56b704f"], ["__file", "D:/HBuilderProjects/smart-community/admin/pages/admin/activity-signups.vue"]]);
   const _sfc_main$b = {
+    components: {
+      adminSidebar
+    },
     data() {
       return {
+        showSidebar: false,
         currentTab: "PENDING",
         list: [],
-        tempItem: null
-        // 当前操作的项
+        searchQuery: "",
+        historyStatusFilter: "",
+        historyStatusOptions: [
+          { value: "", label: "全部记录" },
+          { value: "APPROVED", label: "已通过" },
+          { value: "REJECTED", label: "已拒绝" },
+          { value: "AWAITING_PAYMENT", label: "待缴费" }
+        ]
       };
+    },
+    computed: {
+      pendingCount() {
+        return this.currentTab === "PENDING" ? this.list.length : 0;
+      },
+      historyCount() {
+        if (this.currentTab !== "HISTORY")
+          return 0;
+        return this.list.length;
+      },
+      approvedCount() {
+        return this.list.filter((item) => item.status === "APPROVED").length;
+      },
+      rejectedCount() {
+        return this.list.filter((item) => item.status === "REJECTED").length;
+      },
+      historyStatusIndex() {
+        return Math.max(0, this.historyStatusOptions.findIndex((item) => item.value === this.historyStatusFilter));
+      },
+      currentHistoryStatusLabel() {
+        const current = this.historyStatusOptions.find((item) => item.value === this.historyStatusFilter);
+        return current ? current.label : "全部记录";
+      },
+      displayList() {
+        const keyword = this.searchQuery.trim().toLowerCase();
+        return this.list.filter((item) => {
+          if (this.currentTab === "HISTORY" && this.historyStatusFilter && item.status !== this.historyStatusFilter) {
+            return false;
+          }
+          if (!keyword)
+            return true;
+          const haystack = `${item.plateNo || ""} ${item.ownerName || ""} ${item.phone || ""} ${item.spaceNo || ""}`.toLowerCase();
+          return haystack.includes(keyword);
+        });
+      }
     },
     onShow() {
       this.loadData();
@@ -12132,39 +15081,65 @@ if (uni.restoreGlobal) {
     methods: {
       switchTab(tab) {
         this.currentTab = tab;
+        this.searchQuery = "";
+        if (tab === "PENDING") {
+          this.historyStatusFilter = "";
+        }
         this.loadData();
+      },
+      handleHistoryStatus(status) {
+        this.currentTab = "HISTORY";
+        this.historyStatusFilter = status;
+        this.loadData();
+      },
+      handleHistoryStatusChange(e) {
+        var _a, _b;
+        const index = Number(((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) || 0);
+        this.historyStatusFilter = ((_b = this.historyStatusOptions[index]) == null ? void 0 : _b.value) || "";
+      },
+      handleResetFilters() {
+        this.searchQuery = "";
+        this.historyStatusFilter = "";
       },
       statusText(status) {
         const map = {
-          "PENDING": "待审核",
-          "APPROVED": "已通过",
-          "REJECTED": "已拒绝",
-          "AWAITING_PAYMENT": "待缴费"
+          PENDING: "待审核",
+          APPROVED: "已通过",
+          REJECTED: "已拒绝",
+          AWAITING_PAYMENT: "待缴费"
         };
-        return map[status] || status;
+        return map[status] || status || "-";
+      },
+      getStatusClass(status) {
+        const map = {
+          PENDING: "status-pending",
+          APPROVED: "status-approved",
+          REJECTED: "status-rejected",
+          AWAITING_PAYMENT: "status-awaiting"
+        };
+        return map[status] || "status-awaiting";
       },
       async loadData() {
+        var _a;
         try {
           uni.showLoading({ title: "加载中..." });
           const status = this.currentTab === "PENDING" ? "PENDING" : "";
           const res = await request({
             url: "/api/vehicle/audit/list",
-            // 适配新路径
             method: "GET",
             params: { status }
           });
-          formatAppLog("log", "at admin/pages/admin/car-audit.vue:122", "【DEBUG】车辆审核列表数据:", JSON.stringify(res));
-          let rawList = Array.isArray(res) ? res : res.records || [];
-          this.list = rawList.map((item) => ({
+          const rawList = Array.isArray(res) ? res : res.records || ((_a = res.data) == null ? void 0 : _a.records) || [];
+          const normalized = rawList.map((item) => ({
             ...item,
-            // 尝试兼容常见的字段名
             ownerName: item.ownerName || item.userName || item.name || "未知用户",
             phone: item.phone || item.mobile || item.phoneNumber || "-",
             brand: item.brand || item.carBrand || "-",
             color: item.color || item.carColor || "-"
           }));
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/car-audit.vue:136", "加载失败", e);
+          this.list = this.currentTab === "HISTORY" ? normalized.filter((item) => item.status !== "PENDING") : normalized;
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/car-audit.vue:272", "加载车辆审核失败", error);
           this.mockData();
         } finally {
           uni.hideLoading();
@@ -12197,6 +15172,18 @@ if (uni.restoreGlobal) {
               color: "白色",
               spaceNo: "A-102",
               createTime: "2023-10-26 15:20:00"
+            },
+            {
+              id: 3,
+              plateNo: "沪C67890",
+              status: "REJECTED",
+              ownerName: "王五",
+              phone: "13700137000",
+              brand: "特斯拉",
+              color: "灰色",
+              spaceNo: "B-201",
+              createTime: "2023-10-25 09:10:00",
+              rejectReason: "资料不完整"
             }
           ];
         }
@@ -12207,9 +15194,9 @@ if (uni.restoreGlobal) {
           content: `确认通过车辆 ${item.plateNo} 的绑定申请吗？
 通过后业主将需要进行缴费。`,
           success: async (res) => {
-            if (res.confirm) {
-              await this.submitAudit(item.id, "APPROVED");
-            }
+            if (!res.confirm)
+              return;
+            await this.submitAudit(item.id, "APPROVED");
           }
         });
       },
@@ -12219,28 +15206,17 @@ if (uni.restoreGlobal) {
           editable: true,
           placeholderText: "请输入拒绝原因",
           success: async (res) => {
-            if (res.confirm) {
-              const reason = res.content;
-              if (!reason) {
-                uni.showToast({ title: "请输入原因", icon: "none" });
-                return;
-              }
-              await this.submitAudit(item.id, "REJECTED", reason);
+            if (!res.confirm)
+              return;
+            const reason = res.content;
+            if (!reason) {
+              uni.showToast({ title: "请输入原因", icon: "none" });
+              return;
             }
+            await this.submitAudit(item.id, "REJECTED", reason);
           }
         });
       },
-      // async confirmReject(value) {
-      //   if (!value) {
-      //     uni.showToast({ title: '请输入拒绝原因', icon: 'none' })
-      //     return
-      //   }
-      //   await this.submitAudit(this.tempItem.id, 'REJECTED', value)
-      //   this.$refs.rejectPopup.close()
-      // },
-      // closeReject() {
-      //   this.$refs.rejectPopup.close()
-      // },
       async submitAudit(id, status, reason = "") {
         try {
           uni.showLoading({ title: "处理中..." });
@@ -12249,152 +15225,340 @@ if (uni.restoreGlobal) {
             status,
             rejectReason: reason
           }, "POST");
-          uni.hideLoading();
           uni.showToast({ title: "操作成功", icon: "success" });
           this.loadData();
-        } catch (e) {
-          uni.hideLoading();
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/car-audit.vue:358", "车辆审核操作失败", error);
           uni.showToast({ title: "操作成功(演示)", icon: "success" });
-          this.list = this.list.filter((i) => i.id !== id);
+          this.list = this.list.filter((item) => item.id !== id);
+        } finally {
+          uni.hideLoading();
         }
+      },
+      formatTime(time) {
+        if (!time)
+          return "-";
+        return String(time).replace("T", " ");
       }
     }
   };
   function _sfc_render$a(_ctx, _cache, $props, $setup, $data, $options) {
-    return vue.openBlock(), vue.createElementBlock("view", { class: "container" }, [
-      vue.createCommentVNode(" 顶部选项卡 "),
-      vue.createElementVNode("view", { class: "tabs" }, [
-        vue.createElementVNode(
-          "view",
-          {
-            class: vue.normalizeClass(["tab-item", { active: $data.currentTab === "PENDING" }]),
-            onClick: _cache[0] || (_cache[0] = ($event) => $options.switchTab("PENDING"))
-          },
-          " 待审核 ",
-          2
-          /* CLASS */
-        ),
-        vue.createElementVNode(
-          "view",
-          {
-            class: vue.normalizeClass(["tab-item", { active: $data.currentTab === "HISTORY" }]),
-            onClick: _cache[1] || (_cache[1] = ($event) => $options.switchTab("HISTORY"))
-          },
-          " 审核记录 ",
-          2
-          /* CLASS */
-        )
-      ]),
-      vue.createCommentVNode(" 列表内容 "),
-      vue.createElementVNode("view", { class: "list-container" }, [
-        $data.list.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-          key: 0,
-          class: "empty-tip"
-        }, "暂无数据")) : vue.createCommentVNode("v-if", true),
-        (vue.openBlock(true), vue.createElementBlock(
-          vue.Fragment,
-          null,
-          vue.renderList($data.list, (item) => {
-            return vue.openBlock(), vue.createElementBlock("view", {
-              class: "card",
-              key: item.id
-            }, [
-              vue.createElementVNode("view", { class: "card-header" }, [
+    const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
+    return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
+      showSidebar: $data.showSidebar,
+      "onUpdate:showSidebar": _cache[8] || (_cache[8] = ($event) => $data.showSidebar = $event),
+      pageTitle: "车辆审核",
+      currentPage: "/admin/pages/admin/car-audit",
+      pageBreadcrumb: "管理后台 / 停车管理 / 车辆审核",
+      showPageBanner: false
+    }, {
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "车辆审核列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一为后台审核表格页，保留通过、拒绝和审核历史切换。")
+            ]),
+            vue.createElementVNode("view", { class: "overview-chip" }, [
+              vue.createElementVNode("text", { class: "overview-chip-label" }, "当前视图"),
+              vue.createElementVNode(
+                "text",
+                { class: "overview-chip-value" },
+                vue.toDisplayString($data.currentTab === "PENDING" ? "待审核" : "审核记录"),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar car-status-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card pending", { active: $data.currentTab === "PENDING" }]),
+                onClick: _cache[0] || (_cache[0] = ($event) => $options.switchTab("PENDING"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "待审核"),
                 vue.createElementVNode(
                   "text",
-                  { class: "plate-no" },
-                  vue.toDisplayString(item.plateNo),
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.currentTab === "PENDING" ? $data.list.length : $options.pendingCount),
                   1
                   /* TEXT */
-                ),
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card history", { active: $data.currentTab === "HISTORY" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.switchTab("HISTORY"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "审核记录"),
                 vue.createElementVNode(
                   "text",
-                  {
-                    class: vue.normalizeClass(["status-tag", item.status])
-                  },
-                  vue.toDisplayString($options.statusText(item.status)),
-                  3
-                  /* TEXT, CLASS */
+                  { class: "summary-value" },
+                  vue.toDisplayString($data.currentTab === "HISTORY" ? $data.list.length : $options.historyCount),
+                  1
+                  /* TEXT */
                 )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card approved", { active: $data.historyStatusFilter === "APPROVED" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.handleHistoryStatus("APPROVED"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已通过"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.approvedCount),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card rejected", { active: $data.historyStatusFilter === "REJECTED" }]),
+                onClick: _cache[3] || (_cache[3] = ($event) => $options.handleHistoryStatus("REJECTED"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "已拒绝"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.rejectedCount),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid car-query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field query-field-wide" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "关键词"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => $data.searchQuery = $event),
+                    class: "query-input",
+                    type: "text",
+                    placeholder: "按车牌号、申请人或车位号筛选当前列表"
+                  },
+                  null,
+                  512
+                  /* NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.searchQuery]
+                ])
               ]),
-              vue.createElementVNode("view", { class: "card-body" }, [
-                vue.createElementVNode("view", { class: "info-row" }, [
-                  vue.createElementVNode("text", { class: "label" }, "申请人"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "value" },
-                    vue.toDisplayString(item.ownerName) + " (" + vue.toDisplayString(item.phone) + ")",
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                vue.createElementVNode("view", { class: "info-row" }, [
-                  vue.createElementVNode("text", { class: "label" }, "车辆信息"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "value" },
-                    vue.toDisplayString(item.brand) + " - " + vue.toDisplayString(item.color),
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                vue.createElementVNode("view", { class: "info-row" }, [
-                  vue.createElementVNode("text", { class: "label" }, "申请车位"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "value highlight" },
-                    vue.toDisplayString(item.spaceNo),
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                vue.createElementVNode("view", { class: "info-row" }, [
-                  vue.createElementVNode("text", { class: "label" }, "申请时间"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "value" },
-                    vue.toDisplayString(item.createTime),
-                    1
-                    /* TEXT */
-                  )
-                ]),
-                item.status === "REJECTED" ? (vue.openBlock(), vue.createElementBlock("view", {
-                  key: 0,
-                  class: "info-row reject-reason"
-                }, [
-                  vue.createElementVNode("text", { class: "label" }, "拒绝原因"),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "value" },
-                    vue.toDisplayString(item.rejectReason),
-                    1
-                    /* TEXT */
-                  )
-                ])) : vue.createCommentVNode("v-if", true)
-              ]),
-              vue.createCommentVNode(" 操作按钮 (仅待审核状态显示) "),
-              item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("view", {
+              $data.currentTab === "HISTORY" ? (vue.openBlock(), vue.createElementBlock("view", {
                 key: 0,
-                class: "card-footer"
+                class: "query-field"
               }, [
-                vue.createElementVNode("button", {
-                  class: "btn reject",
-                  onClick: ($event) => $options.handleReject(item)
-                }, "拒绝", 8, ["onClick"]),
-                vue.createElementVNode("button", {
-                  class: "btn approve",
-                  onClick: ($event) => $options.handleApprove(item)
-                }, "通过", 8, ["onClick"])
+                vue.createElementVNode("text", { class: "query-label" }, "记录状态"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.historyStatusOptions,
+                  "range-key": "label",
+                  value: $options.historyStatusIndex,
+                  onChange: _cache[5] || (_cache[5] = (...args) => $options.handleHistoryStatusChange && $options.handleHistoryStatusChange(...args))
+                }, [
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentHistoryStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
               ])) : vue.createCommentVNode("v-if", true)
-            ]);
-          }),
-          128
-          /* KEYED_FRAGMENT */
-        ))
+            ]),
+            vue.createElementVNode("view", { class: "query-actions" }, [
+              vue.createElementVNode("button", {
+                class: "query-btn primary",
+                onClick: _cache[6] || (_cache[6] = (...args) => $options.loadData && $options.loadData(...args))
+              }, "刷新"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[7] || (_cache[7] = (...args) => $options.handleResetFilters && $options.handleResetFilters(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "当前列表 " + vue.toDisplayString($options.displayList.length) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                vue.toDisplayString($data.currentTab === "PENDING" ? "待审核视图" : "历史记录视图"),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-panel" }, [
+            vue.createElementVNode("view", { class: "scroll-table" }, [
+              vue.createElementVNode("view", { class: "table-head car-table" }, [
+                vue.createElementVNode("text", { class: "table-col col-plate" }, "车牌号"),
+                vue.createElementVNode("text", { class: "table-col col-owner" }, "申请人"),
+                vue.createElementVNode("text", { class: "table-col col-car" }, "车辆信息"),
+                vue.createElementVNode("text", { class: "table-col col-space" }, "申请车位"),
+                vue.createElementVNode("text", { class: "table-col col-time" }, "申请时间"),
+                vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+                vue.createElementVNode("text", { class: "table-col col-reason" }, "拒绝原因"),
+                vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+              ]),
+              (vue.openBlock(true), vue.createElementBlock(
+                vue.Fragment,
+                null,
+                vue.renderList($options.displayList, (item, index) => {
+                  return vue.openBlock(), vue.createElementBlock(
+                    "view",
+                    {
+                      key: item.id || `${item.plateNo}-${index}`,
+                      class: "table-row car-table",
+                      style: vue.normalizeStyle({ animationDelay: `${Math.min(320, index * 40)}ms` })
+                    },
+                    [
+                      vue.createElementVNode("view", { class: "table-col col-plate" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "primary-text" },
+                          vue.toDisplayString(item.plateNo || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-owner" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString(item.ownerName || "未知用户"),
+                          1
+                          /* TEXT */
+                        ),
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString(item.phone || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-car" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString(item.brand || "-"),
+                          1
+                          /* TEXT */
+                        ),
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString(item.color || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-space" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString(item.spaceNo || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-time" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString($options.formatTime(item.createTime)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-status" }, [
+                        vue.createElementVNode(
+                          "text",
+                          {
+                            class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
+                          },
+                          vue.toDisplayString($options.statusText(item.status)),
+                          3
+                          /* TEXT, CLASS */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-reason" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "desc-text" },
+                          vue.toDisplayString(item.rejectReason || "无"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                        item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("button", {
+                          key: 0,
+                          class: "row-btn secondary-warn",
+                          onClick: ($event) => $options.handleReject(item)
+                        }, "拒绝", 8, ["onClick"])) : vue.createCommentVNode("v-if", true),
+                        item.status === "PENDING" ? (vue.openBlock(), vue.createElementBlock("button", {
+                          key: 1,
+                          class: "row-btn primary",
+                          onClick: ($event) => $options.handleApprove(item)
+                        }, "通过", 8, ["onClick"])) : (vue.openBlock(), vue.createElementBlock("text", {
+                          key: 2,
+                          class: "minor-text"
+                        }, "已处理"))
+                      ])
+                    ],
+                    4
+                    /* STYLE */
+                  );
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ]),
+            $options.displayList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", null, "暂无数据")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])
+        ])
       ]),
-      vue.createCommentVNode(" 拒绝原因弹窗 "),
-      vue.createCommentVNode(' <uni-popup ref="rejectPopup" type="dialog">\n      <uni-popup-dialog \n        mode="input" \n        title="拒绝申请" \n        placeholder="请输入拒绝原因" \n        :before-close="true" \n        @confirm="confirmReject" \n        @close="closeReject"\n      ></uni-popup-dialog>\n    </uni-popup> ')
-    ]);
+      _: 1
+      /* STABLE */
+    }, 8, ["showSidebar"]);
   }
   const AdminPagesAdminCarAudit = /* @__PURE__ */ _export_sfc(_sfc_main$b, [["render", _sfc_render$a], ["__scopeId", "data-v-9dc841ea"], ["__file", "D:/HBuilderProjects/smart-community/admin/pages/admin/car-audit.vue"]]);
   const _sfc_main$a = {
@@ -12405,13 +15569,13 @@ if (uni.restoreGlobal) {
       return {
         showSidebar: false,
         loading: false,
+        pageSizeOptions: [10, 20, 50],
         queryParams: {
           pageNum: 1,
           pageSize: 10,
           title: "",
           operName: "",
           status: ""
-          // 0正常 1异常
         },
         statusOptions: [
           { value: "", label: "全部状态" },
@@ -12420,14 +15584,38 @@ if (uni.restoreGlobal) {
         ],
         logList: [],
         total: 0,
-        // 详情弹窗
         showDetailModal: false,
         currentLog: {}
       };
     },
     computed: {
       totalPages() {
-        return Math.ceil(this.total / this.queryParams.pageSize) || 1;
+        return Math.max(1, Math.ceil(this.total / this.queryParams.pageSize));
+      },
+      pageSizeIndex() {
+        return Math.max(0, this.pageSizeOptions.indexOf(this.queryParams.pageSize));
+      },
+      statusPickerIndex() {
+        return Math.max(0, this.statusOptions.findIndex((item) => item.value === this.queryParams.status));
+      },
+      currentStatusLabel() {
+        const current = this.statusOptions.find((item) => item.value === this.queryParams.status);
+        return current ? current.label : "全部状态";
+      },
+      pageStats() {
+        return this.logList.reduce((stats, item) => {
+          stats.total += 1;
+          if (Number(item.status) === 0) {
+            stats.normal += 1;
+          } else {
+            stats.fail += 1;
+          }
+          return stats;
+        }, {
+          total: 0,
+          normal: 0,
+          fail: 0
+        });
       }
     },
     onLoad() {
@@ -12445,9 +15633,9 @@ if (uni.restoreGlobal) {
           const res = await request("/api/monitor/operlog/list", { params }, "GET");
           const records = res.records || ((_a = res.data) == null ? void 0 : _a.records) || [];
           this.total = res.total || ((_b = res.data) == null ? void 0 : _b.total) || 0;
-          this.logList = records;
-        } catch (e) {
-          formatAppLog("error", "at admin/pages/admin/oper-log.vue:216", "加载日志失败", e);
+          this.logList = Array.isArray(records) ? records : [];
+        } catch (error) {
+          formatAppLog("error", "at admin/pages/admin/oper-log.vue:299", "加载日志失败", error);
           uni.showToast({ title: "加载失败", icon: "none" });
         } finally {
           this.loading = false;
@@ -12468,44 +15656,64 @@ if (uni.restoreGlobal) {
         this.loadData();
       },
       handleStatusChange(e) {
-        this.queryParams.status = this.statusOptions[e.detail.value].value;
+        const index = Number(e.detail.value);
+        this.queryParams.status = this.statusOptions[index].value;
       },
-      handleClean() {
-        uni.showModal({
-          title: "警告",
-          content: "确定要清空所有操作日志吗？此操作不可恢复！",
-          confirmColor: "#ff4757",
-          success: async (res) => {
-            if (res.confirm) {
-              try {
-                await request("/api/monitor/operlog/clean", {}, "DELETE");
-                uni.showToast({ title: "清空成功", icon: "success" });
-                this.handleReset();
-              } catch (e) {
-                uni.showToast({ title: "清空失败", icon: "none" });
-              }
-            }
-          }
-        });
+      applyQuickStatus(status) {
+        this.queryParams.status = status;
+        this.queryParams.pageNum = 1;
+        this.loadData();
       },
-      handleDetail(item) {
-        this.currentLog = item;
-        this.showDetailModal = true;
-      },
-      closeDetailModal() {
-        this.showDetailModal = false;
+      handlePageSizeChange(e) {
+        const index = Number(e.detail.value);
+        const pageSize = this.pageSizeOptions[index];
+        if (pageSize) {
+          this.queryParams.pageSize = pageSize;
+          this.queryParams.pageNum = 1;
+          this.loadData();
+        }
       },
       handlePrevPage() {
         if (this.queryParams.pageNum > 1) {
-          this.queryParams.pageNum--;
+          this.queryParams.pageNum -= 1;
           this.loadData();
         }
       },
       handleNextPage() {
         if (this.queryParams.pageNum < this.totalPages) {
-          this.queryParams.pageNum++;
+          this.queryParams.pageNum += 1;
           this.loadData();
         }
+      },
+      handleClean() {
+        uni.showModal({
+          title: "清空日志",
+          content: "确定要清空所有操作日志吗？该操作不可恢复。",
+          confirmColor: "#ee6374",
+          success: async (res) => {
+            if (!res.confirm)
+              return;
+            try {
+              await request("/api/monitor/operlog/clean", {}, "DELETE");
+              uni.showToast({ title: "清空成功", icon: "success" });
+              this.handleReset();
+            } catch (error) {
+              formatAppLog("error", "at admin/pages/admin/oper-log.vue:361", "清空日志失败", error);
+              uni.showToast({ title: "清空失败", icon: "none" });
+            }
+          }
+        });
+      },
+      handleDetail(item) {
+        this.currentLog = item || {};
+        this.showDetailModal = true;
+      },
+      closeDetailModal() {
+        this.showDetailModal = false;
+        this.currentLog = {};
+      },
+      getStatusClass(status) {
+        return Number(status) === 0 ? "status-normal" : "status-fail";
       },
       getBusinessType(type) {
         const map = {
@@ -12520,12 +15728,21 @@ if (uni.restoreGlobal) {
           8: "生成代码",
           9: "清空数据"
         };
-        return map[type] || type;
+        return map[type] || type || "-";
       },
       formatTime(time) {
         if (!time)
-          return "";
-        return new Date(time).toLocaleString();
+          return "-";
+        const date = new Date(time);
+        if (Number.isNaN(date.getTime()))
+          return time;
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hour = String(date.getHours()).padStart(2, "0");
+        const minute = String(date.getMinutes()).padStart(2, "0");
+        const second = String(date.getSeconds()).padStart(2, "0");
+        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
       }
     }
   };
@@ -12533,315 +15750,436 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[12] || (_cache[12] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[17] || (_cache[17] = ($event) => $data.showSidebar = $event),
       pageTitle: "操作日志",
-      currentPage: "/admin/pages/admin/oper-log"
+      currentPage: "/admin/pages/admin/oper-log",
+      pageBreadcrumb: "管理后台 / 操作日志",
+      showPageBanner: false
     }, {
-      default: vue.withCtx(() => {
-        var _a;
-        return [
-          vue.createElementVNode("view", { class: "manage-container" }, [
-            vue.createCommentVNode(" 搜索和筛选栏 "),
-            vue.createElementVNode("view", { class: "search-filter-bar" }, [
-              vue.createElementVNode("view", { class: "search-row" }, [
+      default: vue.withCtx(() => [
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "系统操作日志"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一使用后台表格页展示系统模块操作记录，保留条件筛选、分页和日志详情查看。")
+            ]),
+            vue.createElementVNode("view", { class: "overview-chip" }, [
+              vue.createElementVNode("text", { class: "overview-chip-label" }, "当前页码"),
+              vue.createElementVNode(
+                "text",
+                { class: "overview-chip-value" },
+                vue.toDisplayString($data.queryParams.pageNum),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar oper-status-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: $data.queryParams.status === "" }]),
+                onClick: _cache[0] || (_cache[0] = ($event) => $options.applyQuickStatus(""))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "当前页总数"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.pageStats.total),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card success", { active: $data.queryParams.status === 0 }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.applyQuickStatus(0))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "正常日志"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.pageStats.normal),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card fail", { active: $data.queryParams.status === 1 }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.applyQuickStatus(1))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "异常日志"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.pageStats.fail),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid oper-query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "模块标题"),
                 vue.withDirectives(vue.createElementVNode(
                   "input",
                   {
+                    "onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => $data.queryParams.title = $event),
+                    class: "query-input",
                     type: "text",
                     placeholder: "请输入模块标题",
-                    "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.queryParams.title = $event),
-                    class: "search-input"
+                    onConfirm: _cache[4] || (_cache[4] = (...args) => $options.handleSearch && $options.handleSearch(...args))
                   },
                   null,
-                  512
-                  /* NEED_PATCH */
+                  544
+                  /* NEED_HYDRATION, NEED_PATCH */
                 ), [
                   [vue.vModelText, $data.queryParams.title]
-                ]),
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "操作人员"),
                 vue.withDirectives(vue.createElementVNode(
                   "input",
                   {
+                    "onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => $data.queryParams.operName = $event),
+                    class: "query-input",
                     type: "text",
                     placeholder: "请输入操作人员",
-                    "onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => $data.queryParams.operName = $event),
-                    class: "search-input"
+                    onConfirm: _cache[6] || (_cache[6] = (...args) => $options.handleSearch && $options.handleSearch(...args))
                   },
                   null,
-                  512
-                  /* NEED_PATCH */
+                  544
+                  /* NEED_HYDRATION, NEED_PATCH */
                 ), [
                   [vue.vModelText, $data.queryParams.operName]
                 ])
               ]),
-              vue.createElementVNode("view", { class: "search-row" }, [
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "执行状态"),
                 vue.createElementVNode("picker", {
                   mode: "selector",
                   range: $data.statusOptions,
                   "range-key": "label",
-                  value: $data.statusOptions.findIndex((opt) => opt.value === $data.queryParams.status),
-                  onChange: _cache[2] || (_cache[2] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args)),
-                  class: "filter-picker"
+                  value: $options.statusPickerIndex,
+                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleStatusChange && $options.handleStatusChange(...args))
                 }, [
-                  vue.createElementVNode(
-                    "view",
-                    { class: "filter-picker-text" },
-                    vue.toDisplayString(((_a = $data.statusOptions.find((opt) => opt.value === $data.queryParams.status)) == null ? void 0 : _a.label) || "全部状态"),
-                    1
-                    /* TEXT */
-                  )
-                ], 40, ["range", "value"]),
-                vue.createElementVNode("view", { class: "btn-group" }, [
-                  vue.createElementVNode("button", {
-                    class: "action-btn search",
-                    onClick: _cache[3] || (_cache[3] = (...args) => $options.handleSearch && $options.handleSearch(...args))
-                  }, "搜索"),
-                  vue.createElementVNode("button", {
-                    class: "action-btn reset",
-                    onClick: _cache[4] || (_cache[4] = (...args) => $options.handleReset && $options.handleReset(...args))
-                  }, "重置")
-                ])
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentStatusLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
               ])
             ]),
-            vue.createCommentVNode(" 操作栏 "),
-            vue.createElementVNode("view", { class: "action-bar" }, [
+            vue.createElementVNode("view", { class: "query-actions" }, [
               vue.createElementVNode("button", {
-                class: "action-btn clean",
-                onClick: _cache[5] || (_cache[5] = (...args) => $options.handleClean && $options.handleClean(...args))
-              }, "清空日志")
+                class: "query-btn primary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleSearch && $options.handleSearch(...args))
+              }, "查询"),
+              vue.createElementVNode("button", {
+                class: "query-btn secondary",
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.handleReset && $options.handleReset(...args))
+              }, "重置")
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "日志总量 " + vue.toDisplayString($data.total) + " 条",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                "当前页 " + vue.toDisplayString($data.logList.length) + " 条",
+                1
+                /* TEXT */
+              )
             ]),
-            vue.createCommentVNode(" 日志列表 "),
-            vue.createElementVNode("view", { class: "list-container" }, [
-              $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 0,
-                class: "loading-state"
-              }, [
-                vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
-              ])) : $data.logList.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 1,
-                class: "log-list"
-              }, [
-                vue.createCommentVNode(" 表头 (仅在大屏或模拟表格时显示，这里用卡片布局更适合移动端，但尝试模拟表格头部) "),
-                vue.createElementVNode("view", { class: "list-header" }, [
-                  vue.createElementVNode("text", { class: "col id" }, "日志编号"),
-                  vue.createElementVNode("text", { class: "col title" }, "系统模块"),
-                  vue.createElementVNode("text", { class: "col type" }, "业务类型"),
-                  vue.createElementVNode("text", { class: "col user" }, "操作人员"),
-                  vue.createElementVNode("text", { class: "col status" }, "状态"),
-                  vue.createElementVNode("text", { class: "col time" }, "操作日期"),
-                  vue.createElementVNode("text", { class: "col action" }, "操作")
-                ]),
-                (vue.openBlock(true), vue.createElementBlock(
-                  vue.Fragment,
-                  null,
-                  vue.renderList($data.logList, (item) => {
-                    return vue.openBlock(), vue.createElementBlock("view", {
-                      key: item.id,
-                      class: "log-item"
-                    }, [
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col id" },
-                        vue.toDisplayString(item.id),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col title" },
-                        vue.toDisplayString(item.title),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col type" },
-                        vue.toDisplayString($options.getBusinessType(item.businessType)),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col user" },
-                        vue.toDisplayString(item.operName),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode("view", { class: "col status" }, [
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode("button", {
+                class: "row-btn danger",
+                onClick: _cache[10] || (_cache[10] = (...args) => $options.handleClean && $options.handleClean(...args))
+              }, "清空日志")
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "scroll-table" }, [
+              vue.createElementVNode("view", { class: "table-head oper-table" }, [
+                vue.createElementVNode("text", { class: "table-col col-id" }, "日志编号"),
+                vue.createElementVNode("text", { class: "table-col col-title" }, "系统模块"),
+                vue.createElementVNode("text", { class: "table-col col-type" }, "业务类型"),
+                vue.createElementVNode("text", { class: "table-col col-user" }, "操作人员"),
+                vue.createElementVNode("text", { class: "table-col col-status" }, "状态"),
+                vue.createElementVNode("text", { class: "table-col col-time" }, "操作时间"),
+                vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+              ]),
+              (vue.openBlock(true), vue.createElementBlock(
+                vue.Fragment,
+                null,
+                vue.renderList($data.logList, (item, index) => {
+                  return vue.openBlock(), vue.createElementBlock(
+                    "view",
+                    {
+                      key: item.id || index,
+                      class: "table-row oper-table",
+                      style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                    },
+                    [
+                      vue.createElementVNode("view", { class: "table-col col-id" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          "#" + vue.toDisplayString(item.id),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-title" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "primary-text" },
+                          vue.toDisplayString(item.title || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-type" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString($options.getBusinessType(item.businessType)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-user" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "plain-text" },
+                          vue.toDisplayString(item.operName || "-"),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-status" }, [
                         vue.createElementVNode(
                           "text",
                           {
-                            class: vue.normalizeClass(["status-tag", item.status === 0 ? "success" : "fail"])
+                            class: vue.normalizeClass(["status-pill", $options.getStatusClass(item.status)])
                           },
                           vue.toDisplayString(item.status === 0 ? "正常" : "失败"),
                           3
                           /* TEXT, CLASS */
                         )
                       ]),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col time" },
-                        vue.toDisplayString($options.formatTime(item.operTime)),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode("view", { class: "col action" }, [
+                      vue.createElementVNode("view", { class: "table-col col-time" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "minor-text" },
+                          vue.toDisplayString($options.formatTime(item.operTime)),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
                         vue.createElementVNode("button", {
-                          class: "detail-btn",
+                          class: "row-btn ghost",
                           onClick: ($event) => $options.handleDetail(item)
-                        }, "详细", 8, ["onClick"])
+                        }, "查看详情", 8, ["onClick"])
                       ])
-                    ]);
-                  }),
-                  128
-                  /* KEYED_FRAGMENT */
-                ))
-              ])) : (vue.openBlock(), vue.createElementBlock("view", {
-                key: 2,
-                class: "empty-state"
-              }, [
-                vue.createElementVNode("text", null, "暂无操作日志")
-              ])),
-              vue.createCommentVNode(" 分页组件 "),
-              $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 3,
-                class: "pagination"
-              }, [
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.queryParams.pageNum === 1,
-                  onClick: _cache[6] || (_cache[6] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
-                }, " 上一页 ", 8, ["disabled"]),
-                vue.createElementVNode("view", { class: "page-info" }, [
+                    ],
+                    4
+                    /* STYLE */
+                  );
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ]),
+            $data.logList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", null, "暂无操作日志")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
+          $data.total > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 2,
+            class: "pagination"
+          }, [
+            vue.createElementVNode("view", { class: "page-meta" }, [
+              vue.createElementVNode(
+                "text",
+                null,
+                "第 " + vue.toDisplayString($data.queryParams.pageNum) + " / " + vue.toDisplayString($options.totalPages) + " 页",
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode("view", { class: "page-controls" }, [
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.queryParams.pageNum <= 1,
+                onClick: _cache[11] || (_cache[11] = (...args) => $options.handlePrevPage && $options.handlePrevPage(...args))
+              }, "上一页", 8, ["disabled"]),
+              vue.createElementVNode("button", {
+                class: "page-btn",
+                disabled: $data.queryParams.pageNum >= $options.totalPages,
+                onClick: _cache[12] || (_cache[12] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
+              }, "下一页", 8, ["disabled"]),
+              vue.createElementVNode("view", { class: "page-size" }, [
+                vue.createElementVNode("text", null, "每页"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.pageSizeOptions,
+                  value: $options.pageSizeIndex,
+                  onChange: _cache[13] || (_cache[13] = (...args) => $options.handlePageSizeChange && $options.handlePageSizeChange(...args))
+                }, [
                   vue.createElementVNode(
                     "text",
-                    null,
-                    vue.toDisplayString($data.queryParams.pageNum),
-                    1
-                    /* TEXT */
-                  ),
-                  vue.createElementVNode("text", { class: "page-separator" }, "/"),
-                  vue.createElementVNode(
-                    "text",
-                    null,
-                    vue.toDisplayString($options.totalPages),
+                    { class: "page-size-text" },
+                    vue.toDisplayString($data.queryParams.pageSize) + " 条",
                     1
                     /* TEXT */
                   )
-                ]),
-                vue.createElementVNode("button", {
-                  class: "page-btn",
-                  disabled: $data.queryParams.pageNum === $options.totalPages,
-                  onClick: _cache[7] || (_cache[7] = (...args) => $options.handleNextPage && $options.handleNextPage(...args))
-                }, " 下一页 ", 8, ["disabled"])
-              ])) : vue.createCommentVNode("v-if", true)
-            ]),
-            vue.createCommentVNode(" 详情弹窗 "),
-            $data.showDetailModal ? (vue.openBlock(), vue.createElementBlock("view", {
-              key: 0,
-              class: "modal-mask",
-              onClick: _cache[11] || (_cache[11] = (...args) => $options.closeDetailModal && $options.closeDetailModal(...args))
+                ], 40, ["range", "value"])
+              ])
+            ])
+          ])) : vue.createCommentVNode("v-if", true),
+          $data.showDetailModal ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 3,
+            class: "detail-modal",
+            onClick: _cache[16] || (_cache[16] = (...args) => $options.closeDetailModal && $options.closeDetailModal(...args))
+          }, [
+            vue.createElementVNode("view", {
+              class: "detail-content log-detail-content",
+              onClick: _cache[15] || (_cache[15] = vue.withModifiers(() => {
+              }, ["stop"]))
             }, [
-              vue.createElementVNode("view", {
-                class: "modal-content",
-                onClick: _cache[10] || (_cache[10] = vue.withModifiers(() => {
-                }, ["stop"]))
+              vue.createElementVNode("view", { class: "detail-header" }, [
+                vue.createElementVNode("text", { class: "detail-title" }, "操作日志详情"),
+                vue.createElementVNode("button", {
+                  class: "close-btn",
+                  onClick: _cache[14] || (_cache[14] = (...args) => $options.closeDetailModal && $options.closeDetailModal(...args))
+                }, "关闭")
+              ]),
+              vue.createElementVNode("scroll-view", {
+                "scroll-y": "",
+                class: "log-detail-scroll"
               }, [
-                vue.createElementVNode("view", { class: "modal-header" }, [
-                  vue.createElementVNode("text", { class: "modal-title" }, "操作日志详情"),
-                  vue.createElementVNode("text", {
-                    class: "close-btn",
-                    onClick: _cache[8] || (_cache[8] = (...args) => $options.closeDetailModal && $options.closeDetailModal(...args))
-                  }, "×")
-                ]),
-                vue.createElementVNode("scroll-view", {
-                  "scroll-y": "",
-                  class: "modal-body"
-                }, [
+                vue.createElementVNode("view", { class: "detail-body" }, [
                   vue.createElementVNode("view", { class: "detail-item" }, [
-                    vue.createElementVNode("text", { class: "label" }, "操作模块："),
+                    vue.createElementVNode("text", { class: "detail-label" }, "操作模块:"),
                     vue.createElementVNode(
                       "text",
-                      { class: "value" },
-                      vue.toDisplayString($data.currentLog.title) + " / " + vue.toDisplayString($options.getBusinessType($data.currentLog.businessType)),
+                      { class: "detail-value" },
+                      vue.toDisplayString($data.currentLog.title || "-") + " / " + vue.toDisplayString($options.getBusinessType($data.currentLog.businessType)),
                       1
                       /* TEXT */
                     )
                   ]),
                   vue.createElementVNode("view", { class: "detail-item" }, [
-                    vue.createElementVNode("text", { class: "label" }, "请求地址："),
+                    vue.createElementVNode("text", { class: "detail-label" }, "请求地址:"),
                     vue.createElementVNode(
                       "text",
-                      { class: "value" },
-                      vue.toDisplayString($data.currentLog.operUrl),
+                      { class: "detail-value" },
+                      vue.toDisplayString($data.currentLog.operUrl || "-"),
                       1
                       /* TEXT */
                     )
                   ]),
                   vue.createElementVNode("view", { class: "detail-item" }, [
-                    vue.createElementVNode("text", { class: "label" }, "请求方式："),
+                    vue.createElementVNode("text", { class: "detail-label" }, "请求方式:"),
                     vue.createElementVNode(
                       "text",
-                      { class: "value" },
-                      vue.toDisplayString($data.currentLog.requestMethod),
+                      { class: "detail-value" },
+                      vue.toDisplayString($data.currentLog.requestMethod || "-"),
                       1
                       /* TEXT */
                     )
                   ]),
-                  vue.createElementVNode("view", { class: "detail-item" }, [
-                    vue.createElementVNode("text", { class: "label" }, "操作方法："),
+                  vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                    vue.createElementVNode("text", { class: "detail-label" }, "操作方法:"),
                     vue.createElementVNode(
                       "text",
-                      { class: "value code" },
-                      vue.toDisplayString($data.currentLog.method),
+                      { class: "detail-value log-code" },
+                      vue.toDisplayString($data.currentLog.method || "-"),
                       1
                       /* TEXT */
                     )
                   ]),
-                  vue.createElementVNode("view", { class: "detail-item" }, [
-                    vue.createElementVNode("text", { class: "label" }, "请求参数："),
+                  vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                    vue.createElementVNode("text", { class: "detail-label" }, "请求参数:"),
                     vue.createElementVNode(
                       "text",
-                      { class: "value code" },
-                      vue.toDisplayString($data.currentLog.operParam),
+                      { class: "detail-value log-code" },
+                      vue.toDisplayString($data.currentLog.operParam || "-"),
                       1
                       /* TEXT */
                     )
                   ]),
-                  vue.createElementVNode("view", { class: "detail-item" }, [
-                    vue.createElementVNode("text", { class: "label" }, "返回结果："),
+                  vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                    vue.createElementVNode("text", { class: "detail-label" }, "返回结果:"),
                     vue.createElementVNode(
                       "text",
-                      { class: "value code" },
-                      vue.toDisplayString($data.currentLog.jsonResult),
+                      { class: "detail-value log-code" },
+                      vue.toDisplayString($data.currentLog.jsonResult || "-"),
                       1
                       /* TEXT */
                     )
                   ]),
                   $data.currentLog.status === 1 ? (vue.openBlock(), vue.createElementBlock("view", {
                     key: 0,
-                    class: "detail-item"
+                    class: "detail-item detail-item-block"
                   }, [
-                    vue.createElementVNode("text", { class: "label error" }, "错误信息："),
+                    vue.createElementVNode("text", { class: "detail-label" }, "错误信息:"),
                     vue.createElementVNode(
                       "text",
-                      { class: "value error" },
-                      vue.toDisplayString($data.currentLog.errorMsg),
+                      { class: "detail-value log-error" },
+                      vue.toDisplayString($data.currentLog.errorMsg || "-"),
                       1
                       /* TEXT */
                     )
                   ])) : vue.createCommentVNode("v-if", true)
-                ]),
-                vue.createElementVNode("view", { class: "modal-footer" }, [
-                  vue.createElementVNode("button", {
-                    class: "modal-btn",
-                    onClick: _cache[9] || (_cache[9] = (...args) => $options.closeDetailModal && $options.closeDetailModal(...args))
-                  }, "关闭")
                 ])
               ])
-            ])) : vue.createCommentVNode("v-if", true)
-          ])
-        ];
-      }),
+            ])
+          ])) : vue.createCommentVNode("v-if", true)
+        ])
+      ]),
       _: 1
       /* STABLE */
     }, 8, ["showSidebar"]);
@@ -12862,7 +16200,10 @@ if (uni.restoreGlobal) {
         open: false,
         dict: {
           type: {
-            sys_yes_no: [{ value: "Y", label: "是" }, { value: "N", label: "否" }]
+            sys_yes_no: [
+              { value: "Y", label: "是" },
+              { value: "N", label: "否" }
+            ]
           }
         },
         queryParams: {
@@ -12875,6 +16216,34 @@ if (uni.restoreGlobal) {
         form: {},
         selectedConfig: null
       };
+    },
+    computed: {
+      configTypePickerIndex() {
+        const current = this.queryParams.configType;
+        if (current === void 0 || current === null)
+          return -1;
+        return Math.max(0, this.dict.type.sys_yes_no.findIndex((item) => item.value === current));
+      },
+      currentTypeLabel() {
+        if (!this.queryParams.configType)
+          return "全部参数";
+        return this.queryParams.configType === "Y" ? "系统内置" : "业务参数";
+      },
+      stats() {
+        return this.configList.reduce((result, item) => {
+          result.total += 1;
+          if (item.configType === "Y") {
+            result.builtin += 1;
+          } else {
+            result.custom += 1;
+          }
+          return result;
+        }, {
+          total: 0,
+          builtin: 0,
+          custom: 0
+        });
+      }
     },
     onLoad() {
       this.getList();
@@ -12899,11 +16268,12 @@ if (uni.restoreGlobal) {
               remark: (item == null ? void 0 : item.remark) ?? (item == null ? void 0 : item.remarks)
             };
           });
-          this.configList = normalized.filter((i) => i && i.configId !== void 0 && i.configId !== null);
+          this.configList = normalized.filter((item) => item && item.configId !== void 0 && item.configId !== null);
           this.total = Array.isArray(response) ? this.configList.length : response.total || ((_b = response.data) == null ? void 0 : _b.total) || this.configList.length || 0;
-          this.loading = false;
-        }).catch((err) => {
-          formatAppLog("error", "at admin/pages/admin/system-config.vue:201", "获取配置列表失败:", err);
+        }).catch((error) => {
+          formatAppLog("error", "at admin/pages/admin/system-config.vue:319", "获取配置列表失败:", error);
+          uni.showToast({ title: "加载失败", icon: "none" });
+        }).finally(() => {
           this.loading = false;
         });
       },
@@ -12935,23 +16305,32 @@ if (uni.restoreGlobal) {
         };
         this.handleQuery();
       },
+      applyQuickType(type) {
+        this.queryParams.configType = type;
+        this.handleQuery();
+      },
       handleSelectionChange(e) {
         this.ids = e.detail.value;
         this.single = this.ids.length !== 1;
         this.multiple = !this.ids.length;
         if (this.ids.length === 1) {
-          this.selectedConfig = this.configList.find((item) => String(item.configId) === this.ids[0]);
+          this.selectedConfig = this.configList.find((item) => String(item.configId) === this.ids[0]) || null;
         } else {
           this.selectedConfig = null;
         }
       },
       handleTypeChange(e) {
-        this.queryParams.configType = this.dict.type.sys_yes_no[e.detail.value].value;
+        const index = Number(e.detail.value);
+        const option = this.dict.type.sys_yes_no[index];
+        this.queryParams.configType = option ? option.value : void 0;
+      },
+      handleFormTypeChange(e) {
+        this.form.configType = e.detail.value;
       },
       handleAdd() {
         this.reset();
-        this.open = true;
         this.title = "添加参数";
+        this.open = true;
       },
       handleUpdate(row) {
         this.reset();
@@ -12964,10 +16343,14 @@ if (uni.restoreGlobal) {
           const data = response.data || response;
           this.form = {
             ...data,
-            configId: (data == null ? void 0 : data.configId) ?? (data == null ? void 0 : data.config_id) ?? (data == null ? void 0 : data.id)
+            configId: (data == null ? void 0 : data.configId) ?? (data == null ? void 0 : data.config_id) ?? (data == null ? void 0 : data.id),
+            configType: (data == null ? void 0 : data.configType) ?? (data == null ? void 0 : data.config_type) ?? (data == null ? void 0 : data.type) ?? "N"
           };
-          this.open = true;
           this.title = "修改参数";
+          this.open = true;
+        }).catch((error) => {
+          formatAppLog("error", "at admin/pages/admin/system-config.vue:397", "获取配置详情失败:", error);
+          uni.showToast({ title: "加载详情失败", icon: "none" });
         });
       },
       submitForm() {
@@ -12975,50 +16358,68 @@ if (uni.restoreGlobal) {
           uni.showToast({ title: "必填项不能为空", icon: "none" });
           return;
         }
-        if (this.form.configId != void 0) {
-          updateConfig(this.form).then(() => {
-            uni.showToast({ title: "修改成功", icon: "success" });
-            this.open = false;
-            this.getList();
+        const action = this.form.configId !== void 0 ? updateConfig(this.form) : addConfig(this.form);
+        action.then(() => {
+          uni.showToast({
+            title: this.form.configId !== void 0 ? "修改成功" : "新增成功",
+            icon: "success"
           });
-        } else {
-          addConfig(this.form).then(() => {
-            uni.showToast({ title: "新增成功", icon: "success" });
-            this.open = false;
-            this.getList();
-          });
-        }
+          this.open = false;
+          this.getList();
+        }).catch((error) => {
+          formatAppLog("error", "at admin/pages/admin/system-config.vue:415", "保存参数失败:", error);
+          uni.showToast({ title: "保存失败", icon: "none" });
+        });
       },
       handleDelete(row) {
         const rowId = (row == null ? void 0 : row.configId) ?? (row == null ? void 0 : row.config_id) ?? (row == null ? void 0 : row.id);
         const configIds = rowId ? [rowId] : this.ids;
-        const hasBuiltIn = this.configList.some(
-          (item) => configIds.map(String).includes(String(item.configId)) && item.configType === "Y"
-        );
+        const hasBuiltIn = this.configList.some((item) => configIds.map(String).includes(String(item.configId)) && item.configType === "Y");
         if (hasBuiltIn) {
           uni.showToast({ title: "包含系统内置参数，不允许删除", icon: "none" });
           return;
         }
+        if (!configIds.length) {
+          uni.showToast({ title: "请选择要删除的数据", icon: "none" });
+          return;
+        }
         uni.showModal({
-          title: "提示",
-          content: "是否确认删除选中数据项？",
+          title: "删除确认",
+          content: "是否确认删除选中参数？",
           success: (res) => {
-            if (res.confirm) {
-              const doDelete = async () => {
-                for (const id of configIds) {
-                  await delConfig(id);
-                }
-              };
-              doDelete().then(() => {
-                this.getList();
-                uni.showToast({ title: "删除成功", icon: "success" });
-                this.ids = [];
-              }).catch(() => {
-                uni.showToast({ title: "删除失败", icon: "none" });
-              });
-            }
+            if (!res.confirm)
+              return;
+            const doDelete = async () => {
+              for (const id of configIds) {
+                await delConfig(id);
+              }
+            };
+            doDelete().then(() => {
+              this.ids = [];
+              this.selectedConfig = null;
+              this.single = true;
+              this.multiple = true;
+              this.getList();
+              uni.showToast({ title: "删除成功", icon: "success" });
+            }).catch((error) => {
+              formatAppLog("error", "at admin/pages/admin/system-config.vue:449", "删除参数失败:", error);
+              uni.showToast({ title: "删除失败", icon: "none" });
+            });
           }
         });
+      },
+      formatTime(time) {
+        if (!time)
+          return "-";
+        const date = new Date(time);
+        if (Number.isNaN(date.getTime()))
+          return time;
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hour = String(date.getHours()).padStart(2, "0");
+        const minute = String(date.getMinutes()).padStart(2, "0");
+        return `${year}-${month}-${day} ${hour}:${minute}`;
       }
     }
   };
@@ -13026,229 +16427,365 @@ if (uni.restoreGlobal) {
     const _component_admin_sidebar = resolveEasycom(vue.resolveDynamicComponent("admin-sidebar"), __easycom_0);
     return vue.openBlock(), vue.createBlock(_component_admin_sidebar, {
       showSidebar: $data.showSidebar,
-      "onUpdate:showSidebar": _cache[17] || (_cache[17] = ($event) => $data.showSidebar = $event),
+      "onUpdate:showSidebar": _cache[24] || (_cache[24] = ($event) => $data.showSidebar = $event),
       pageTitle: "系统参数配置",
-      currentPage: "/admin/pages/admin/system-config"
+      currentPage: "/admin/pages/admin/system-config",
+      pageBreadcrumb: "管理后台 / 系统配置",
+      showPageBanner: false
     }, {
       default: vue.withCtx(() => [
-        vue.createElementVNode("view", { class: "config-container" }, [
-          vue.createCommentVNode(" 搜索栏 "),
-          vue.createElementVNode("view", { class: "search-bar" }, [
-            vue.createElementVNode("view", { class: "search-item" }, [
-              vue.createElementVNode("text", { class: "label" }, "参数名称"),
-              vue.withDirectives(vue.createElementVNode(
-                "input",
-                {
-                  class: "input",
-                  "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => $data.queryParams.configName = $event),
-                  placeholder: "请输入参数名称"
-                },
-                null,
-                512
-                /* NEED_PATCH */
-              ), [
-                [vue.vModelText, $data.queryParams.configName]
-              ])
+        vue.createElementVNode("view", { class: "manage-container" }, [
+          vue.createElementVNode("view", { class: "overview-panel" }, [
+            vue.createElementVNode("view", { class: "overview-copy" }, [
+              vue.createElementVNode("text", { class: "overview-title" }, "系统参数列表"),
+              vue.createElementVNode("text", { class: "overview-subtitle" }, "统一以后台参数表格页管理系统配置，保留新增、编辑、删除和内置参数限制。")
             ]),
-            vue.createElementVNode("view", { class: "search-item" }, [
-              vue.createElementVNode("text", { class: "label" }, "参数键名"),
-              vue.withDirectives(vue.createElementVNode(
-                "input",
-                {
-                  class: "input",
-                  "onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => $data.queryParams.configKey = $event),
-                  placeholder: "请输入参数键名"
-                },
-                null,
-                512
-                /* NEED_PATCH */
-              ), [
-                [vue.vModelText, $data.queryParams.configKey]
-              ])
-            ]),
-            vue.createElementVNode("view", { class: "search-item" }, [
-              vue.createElementVNode("text", { class: "label" }, "系统内置"),
-              vue.createElementVNode("picker", {
-                mode: "selector",
-                range: $data.dict.type.sys_yes_no,
-                "range-key": "label",
-                onChange: _cache[2] || (_cache[2] = (...args) => $options.handleTypeChange && $options.handleTypeChange(...args))
-              }, [
+            vue.createElementVNode("view", { class: "overview-chip" }, [
+              vue.createElementVNode("text", { class: "overview-chip-label" }, "配置总数"),
+              vue.createElementVNode(
+                "text",
+                { class: "overview-chip-value" },
+                vue.toDisplayString($data.total),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "status-summary-bar config-status-bar" }, [
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card", { active: !$data.queryParams.configType }]),
+                onClick: _cache[0] || (_cache[0] = ($event) => $options.applyQuickType(void 0))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "全部参数"),
                 vue.createElementVNode(
-                  "view",
-                  { class: "picker" },
-                  vue.toDisplayString($data.queryParams.configType ? $data.queryParams.configType === "Y" ? "是" : "否" : "请选择"),
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.stats.total),
                   1
                   /* TEXT */
                 )
-              ], 40, ["range"])
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card custom", { active: $data.queryParams.configType === "N" }]),
+                onClick: _cache[1] || (_cache[1] = ($event) => $options.applyQuickType("N"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "业务参数"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.stats.custom),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            ),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["status-summary-card builtin", { active: $data.queryParams.configType === "Y" }]),
+                onClick: _cache[2] || (_cache[2] = ($event) => $options.applyQuickType("Y"))
+              },
+              [
+                vue.createElementVNode("text", { class: "summary-label" }, "系统内置"),
+                vue.createElementVNode(
+                  "text",
+                  { class: "summary-value" },
+                  vue.toDisplayString($options.stats.builtin),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
+            )
+          ]),
+          vue.createElementVNode("view", { class: "query-panel" }, [
+            vue.createElementVNode("view", { class: "query-grid config-query-grid" }, [
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "参数名称"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => $data.queryParams.configName = $event),
+                    class: "query-input",
+                    type: "text",
+                    placeholder: "请输入参数名称",
+                    onConfirm: _cache[4] || (_cache[4] = (...args) => $options.handleQuery && $options.handleQuery(...args))
+                  },
+                  null,
+                  544
+                  /* NEED_HYDRATION, NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.queryParams.configName]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "参数键名"),
+                vue.withDirectives(vue.createElementVNode(
+                  "input",
+                  {
+                    "onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => $data.queryParams.configKey = $event),
+                    class: "query-input",
+                    type: "text",
+                    placeholder: "请输入参数键名",
+                    onConfirm: _cache[6] || (_cache[6] = (...args) => $options.handleQuery && $options.handleQuery(...args))
+                  },
+                  null,
+                  544
+                  /* NEED_HYDRATION, NEED_PATCH */
+                ), [
+                  [vue.vModelText, $data.queryParams.configKey]
+                ])
+              ]),
+              vue.createElementVNode("view", { class: "query-field" }, [
+                vue.createElementVNode("text", { class: "query-label" }, "系统内置"),
+                vue.createElementVNode("picker", {
+                  mode: "selector",
+                  range: $data.dict.type.sys_yes_no,
+                  "range-key": "label",
+                  value: $options.configTypePickerIndex,
+                  onChange: _cache[7] || (_cache[7] = (...args) => $options.handleTypeChange && $options.handleTypeChange(...args))
+                }, [
+                  vue.createElementVNode("view", { class: "query-picker" }, [
+                    vue.createElementVNode(
+                      "text",
+                      { class: "query-picker-text" },
+                      vue.toDisplayString($options.currentTypeLabel),
+                      1
+                      /* TEXT */
+                    )
+                  ])
+                ], 40, ["range", "value"])
+              ])
             ]),
-            vue.createElementVNode("view", { class: "search-btns" }, [
+            vue.createElementVNode("view", { class: "query-actions" }, [
               vue.createElementVNode("button", {
-                class: "btn search-btn",
-                onClick: _cache[3] || (_cache[3] = (...args) => $options.handleQuery && $options.handleQuery(...args))
-              }, "搜索"),
+                class: "query-btn primary",
+                onClick: _cache[8] || (_cache[8] = (...args) => $options.handleQuery && $options.handleQuery(...args))
+              }, "查询"),
               vue.createElementVNode("button", {
-                class: "btn reset-btn",
-                onClick: _cache[4] || (_cache[4] = (...args) => $options.resetQuery && $options.resetQuery(...args))
+                class: "query-btn secondary",
+                onClick: _cache[9] || (_cache[9] = (...args) => $options.resetQuery && $options.resetQuery(...args))
               }, "重置")
             ])
           ]),
-          vue.createCommentVNode(" 功能按钮区 "),
-          vue.createElementVNode("view", { class: "action-bar" }, [
-            vue.createElementVNode("button", {
-              class: "btn add-btn",
-              onClick: _cache[5] || (_cache[5] = (...args) => $options.handleAdd && $options.handleAdd(...args))
-            }, "新增"),
-            vue.createElementVNode("button", {
-              class: "btn edit-btn",
-              disabled: $data.single,
-              onClick: _cache[6] || (_cache[6] = ($event) => $options.handleUpdate($data.selectedConfig))
-            }, "修改", 8, ["disabled"]),
-            vue.createElementVNode("button", {
-              class: "btn del-btn",
-              disabled: $data.multiple,
-              onClick: _cache[7] || (_cache[7] = (...args) => $options.handleDelete && $options.handleDelete(...args))
-            }, "删除", 8, ["disabled"])
-          ]),
-          vue.createCommentVNode(" 数据表格 (使用列表模拟) "),
-          vue.createElementVNode("view", { class: "data-list" }, [
-            vue.createElementVNode("view", { class: "list-header" }, [
-              vue.createElementVNode("text", { class: "col col-check" }, "选择"),
-              vue.createElementVNode("text", { class: "col col-id" }, "主键"),
-              vue.createElementVNode("text", { class: "col col-name" }, "参数名称"),
-              vue.createElementVNode("text", { class: "col col-key" }, "参数键名"),
-              vue.createElementVNode("text", { class: "col col-value" }, "参数键值"),
-              vue.createElementVNode("text", { class: "col col-type" }, "内置"),
-              vue.createElementVNode("text", { class: "col col-remark" }, "备注"),
-              vue.createElementVNode("text", { class: "col col-time" }, "创建时间"),
-              vue.createElementVNode("text", { class: "col col-action" }, "操作")
+          vue.createElementVNode("view", { class: "table-toolbar" }, [
+            vue.createElementVNode("view", { class: "toolbar-left-group" }, [
+              vue.createElementVNode("button", {
+                class: "row-btn primary",
+                onClick: _cache[10] || (_cache[10] = (...args) => $options.handleAdd && $options.handleAdd(...args))
+              }, "新增参数"),
+              vue.createElementVNode("button", {
+                class: "row-btn ghost",
+                disabled: $data.single,
+                onClick: _cache[11] || (_cache[11] = ($event) => $options.handleUpdate($data.selectedConfig))
+              }, "修改", 8, ["disabled"]),
+              vue.createElementVNode("button", {
+                class: "row-btn danger",
+                disabled: $data.multiple,
+                onClick: _cache[12] || (_cache[12] = ($event) => $options.handleDelete())
+              }, "删除", 8, ["disabled"])
             ]),
-            vue.createElementVNode(
-              "checkbox-group",
-              {
-                onChange: _cache[8] || (_cache[8] = (...args) => $options.handleSelectionChange && $options.handleSelectionChange(...args))
-              },
-              [
-                (vue.openBlock(true), vue.createElementBlock(
-                  vue.Fragment,
-                  null,
-                  vue.renderList($data.configList, (item) => {
-                    return vue.openBlock(), vue.createElementBlock("view", {
-                      class: "list-item",
-                      key: item.configId
-                    }, [
-                      vue.createElementVNode("view", { class: "col col-check" }, [
-                        vue.createElementVNode("checkbox", {
-                          value: String(item.configId),
-                          checked: $data.ids.includes(String(item.configId))
-                        }, null, 8, ["value", "checked"])
-                      ]),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col col-id" },
-                        vue.toDisplayString(item.configId),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col col-name" },
-                        vue.toDisplayString(item.configName),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col col-key" },
-                        vue.toDisplayString(item.configKey),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col col-value" },
-                        vue.toDisplayString(item.configValue),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode("view", { class: "col col-type" }, [
-                        vue.createElementVNode(
-                          "text",
-                          {
-                            class: vue.normalizeClass(["tag", item.configType === "Y" ? "tag-danger" : "tag-success"])
-                          },
-                          vue.toDisplayString(item.configType === "Y" ? "是" : "否"),
-                          3
-                          /* TEXT, CLASS */
-                        )
-                      ]),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col col-remark" },
-                        vue.toDisplayString(item.remark),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode(
-                        "text",
-                        { class: "col col-time" },
-                        vue.toDisplayString(item.createTime),
-                        1
-                        /* TEXT */
-                      ),
-                      vue.createElementVNode("view", { class: "col col-action" }, [
-                        vue.createElementVNode("text", {
-                          class: "link-btn",
-                          onClick: ($event) => $options.handleUpdate(item)
-                        }, "修改", 8, ["onClick"]),
-                        item.configType !== "Y" ? (vue.openBlock(), vue.createElementBlock("text", {
-                          key: 0,
-                          class: "link-btn link-danger",
-                          onClick: ($event) => $options.handleDelete(item)
-                        }, "删除", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
-                      ])
-                    ]);
-                  }),
-                  128
-                  /* KEYED_FRAGMENT */
-                ))
-              ],
-              32
-              /* NEED_HYDRATION */
-            ),
+            vue.createElementVNode("view", { class: "toolbar-right-group" }, [
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta" },
+                "已选 " + vue.toDisplayString($data.ids.length) + " 项",
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "toolbar-meta active" },
+                vue.toDisplayString($options.currentTypeLabel),
+                1
+                /* TEXT */
+              )
+            ])
+          ]),
+          $data.loading ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "loading-state"
+          }, [
+            vue.createElementVNode("text", { class: "loading-text" }, "加载中...")
+          ])) : (vue.openBlock(), vue.createElementBlock("view", {
+            key: 1,
+            class: "table-panel"
+          }, [
+            vue.createElementVNode("view", { class: "scroll-table" }, [
+              vue.createElementVNode("view", { class: "table-head config-table" }, [
+                vue.createElementVNode("text", { class: "table-col col-check" }, "选择"),
+                vue.createElementVNode("text", { class: "table-col col-id" }, "主键"),
+                vue.createElementVNode("text", { class: "table-col col-name" }, "参数名称"),
+                vue.createElementVNode("text", { class: "table-col col-key" }, "参数键名"),
+                vue.createElementVNode("text", { class: "table-col col-value" }, "参数键值"),
+                vue.createElementVNode("text", { class: "table-col col-type" }, "内置"),
+                vue.createElementVNode("text", { class: "table-col col-remark" }, "备注"),
+                vue.createElementVNode("text", { class: "table-col col-time" }, "创建时间"),
+                vue.createElementVNode("text", { class: "table-col col-actions" }, "操作")
+              ]),
+              vue.createElementVNode(
+                "checkbox-group",
+                {
+                  onChange: _cache[13] || (_cache[13] = (...args) => $options.handleSelectionChange && $options.handleSelectionChange(...args))
+                },
+                [
+                  (vue.openBlock(true), vue.createElementBlock(
+                    vue.Fragment,
+                    null,
+                    vue.renderList($data.configList, (item, index) => {
+                      return vue.openBlock(), vue.createElementBlock(
+                        "view",
+                        {
+                          key: item.configId,
+                          class: "table-row config-table",
+                          style: vue.normalizeStyle({ animationDelay: `${Math.min(360, index * 40)}ms` })
+                        },
+                        [
+                          vue.createElementVNode("view", { class: "table-col col-check" }, [
+                            vue.createElementVNode("checkbox", {
+                              value: String(item.configId),
+                              checked: $data.ids.includes(String(item.configId))
+                            }, null, 8, ["value", "checked"])
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-id" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "minor-text" },
+                              "#" + vue.toDisplayString(item.configId),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-name" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "primary-text" },
+                              vue.toDisplayString(item.configName || "-"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-key" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "plain-text" },
+                              vue.toDisplayString(item.configKey || "-"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-value" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "desc-text" },
+                              vue.toDisplayString(item.configValue || "-"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-type" }, [
+                            vue.createElementVNode(
+                              "text",
+                              {
+                                class: vue.normalizeClass(["status-pill", item.configType === "Y" ? "type-builtin" : "type-custom"])
+                              },
+                              vue.toDisplayString(item.configType === "Y" ? "是" : "否"),
+                              3
+                              /* TEXT, CLASS */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-remark" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "desc-text" },
+                              vue.toDisplayString(item.remark || "无"),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-time" }, [
+                            vue.createElementVNode(
+                              "text",
+                              { class: "minor-text" },
+                              vue.toDisplayString($options.formatTime(item.createTime)),
+                              1
+                              /* TEXT */
+                            )
+                          ]),
+                          vue.createElementVNode("view", { class: "table-col col-actions row-actions" }, [
+                            vue.createElementVNode("button", {
+                              class: "row-btn ghost",
+                              onClick: ($event) => $options.handleUpdate(item)
+                            }, "修改", 8, ["onClick"]),
+                            item.configType !== "Y" ? (vue.openBlock(), vue.createElementBlock("button", {
+                              key: 0,
+                              class: "row-btn danger",
+                              onClick: ($event) => $options.handleDelete(item)
+                            }, "删除", 8, ["onClick"])) : vue.createCommentVNode("v-if", true)
+                          ])
+                        ],
+                        4
+                        /* STYLE */
+                      );
+                    }),
+                    128
+                    /* KEYED_FRAGMENT */
+                  ))
+                ],
+                32
+                /* NEED_HYDRATION */
+              )
+            ]),
             $data.configList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
               key: 0,
-              class: "empty-text"
-            }, "暂无数据")) : vue.createCommentVNode("v-if", true)
-          ]),
-          vue.createCommentVNode(" 新增/修改对话框 "),
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", null, "暂无配置参数")
+            ])) : vue.createCommentVNode("v-if", true)
+          ])),
           $data.open ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 0,
-            class: "modal-mask"
+            key: 2,
+            class: "detail-modal",
+            onClick: _cache[23] || (_cache[23] = (...args) => $options.cancel && $options.cancel(...args))
           }, [
-            vue.createElementVNode("view", { class: "modal-content" }, [
-              vue.createElementVNode("view", { class: "modal-header" }, [
+            vue.createElementVNode("view", {
+              class: "detail-content config-detail-content",
+              onClick: _cache[22] || (_cache[22] = vue.withModifiers(() => {
+              }, ["stop"]))
+            }, [
+              vue.createElementVNode("view", { class: "detail-header" }, [
                 vue.createElementVNode(
                   "text",
-                  { class: "modal-title" },
+                  { class: "detail-title" },
                   vue.toDisplayString($data.title),
                   1
                   /* TEXT */
                 ),
-                vue.createElementVNode("text", {
-                  class: "close-icon",
-                  onClick: _cache[9] || (_cache[9] = (...args) => $options.cancel && $options.cancel(...args))
-                }, "×")
+                vue.createElementVNode("button", {
+                  class: "close-btn",
+                  onClick: _cache[14] || (_cache[14] = (...args) => $options.cancel && $options.cancel(...args))
+                }, "关闭")
               ]),
-              vue.createElementVNode("view", { class: "modal-body" }, [
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "form-label required" }, "参数名称"),
+              vue.createElementVNode("view", { class: "detail-body" }, [
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "参数名称:"),
                   vue.withDirectives(vue.createElementVNode(
                     "input",
                     {
-                      class: "form-input",
-                      "onUpdate:modelValue": _cache[10] || (_cache[10] = ($event) => $data.form.configName = $event),
+                      class: "form-input-inline",
+                      "onUpdate:modelValue": _cache[15] || (_cache[15] = ($event) => $data.form.configName = $event),
                       placeholder: "请输入参数名称"
                     },
                     null,
@@ -13258,26 +16795,25 @@ if (uni.restoreGlobal) {
                     [vue.vModelText, $data.form.configName]
                   ])
                 ]),
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "form-label required" }, "参数键名"),
-                  vue.createCommentVNode(" 内置参数禁止修改键名 "),
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "参数键名:"),
                   vue.withDirectives(vue.createElementVNode("input", {
-                    class: "form-input",
-                    "onUpdate:modelValue": _cache[11] || (_cache[11] = ($event) => $data.form.configKey = $event),
+                    class: "form-input-inline",
+                    "onUpdate:modelValue": _cache[16] || (_cache[16] = ($event) => $data.form.configKey = $event),
                     disabled: $data.form.configType === "Y" && $data.form.configId !== void 0,
-                    style: vue.normalizeStyle({ backgroundColor: $data.form.configType === "Y" && $data.form.configId !== void 0 ? "#f5f7fa" : "#fff" }),
+                    style: vue.normalizeStyle({ backgroundColor: $data.form.configType === "Y" && $data.form.configId !== void 0 ? "#f5f7fa" : "#fbfdff" }),
                     placeholder: "请输入参数键名"
                   }, null, 12, ["disabled"]), [
                     [vue.vModelText, $data.form.configKey]
                   ])
                 ]),
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "form-label required" }, "参数键值"),
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "参数键值:"),
                   vue.withDirectives(vue.createElementVNode(
                     "input",
                     {
-                      class: "form-input",
-                      "onUpdate:modelValue": _cache[12] || (_cache[12] = ($event) => $data.form.configValue = $event),
+                      class: "form-input-inline",
+                      "onUpdate:modelValue": _cache[17] || (_cache[17] = ($event) => $data.form.configValue = $event),
                       placeholder: "请输入参数键值"
                     },
                     null,
@@ -13287,42 +16823,43 @@ if (uni.restoreGlobal) {
                     [vue.vModelText, $data.form.configValue]
                   ])
                 ]),
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "form-label" }, "系统内置"),
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "系统内置:"),
                   vue.createElementVNode(
                     "radio-group",
                     {
-                      onChange: _cache[13] || (_cache[13] = (e) => $data.form.configType = e.detail.value),
-                      class: "radio-group"
+                      onChange: _cache[18] || (_cache[18] = (...args) => $options.handleFormTypeChange && $options.handleFormTypeChange(...args)),
+                      class: "config-radio-group"
                     },
                     [
-                      vue.createElementVNode("label", { class: "radio-label" }, [
+                      vue.createElementVNode("label", { class: "config-radio-label" }, [
                         vue.createElementVNode("radio", {
                           value: "Y",
                           checked: $data.form.configType === "Y"
                         }, null, 8, ["checked"]),
-                        vue.createTextVNode("是 ")
+                        vue.createElementVNode("text", null, "是")
                       ]),
-                      vue.createElementVNode("label", { class: "radio-label" }, [
+                      vue.createElementVNode("label", { class: "config-radio-label" }, [
                         vue.createElementVNode("radio", {
                           value: "N",
                           checked: $data.form.configType === "N"
                         }, null, 8, ["checked"]),
-                        vue.createTextVNode("否 ")
+                        vue.createElementVNode("text", null, "否")
                       ])
                     ],
                     32
                     /* NEED_HYDRATION */
                   )
                 ]),
-                vue.createElementVNode("view", { class: "form-item" }, [
-                  vue.createElementVNode("text", { class: "form-label" }, "备注"),
+                vue.createElementVNode("view", { class: "detail-item detail-item-block" }, [
+                  vue.createElementVNode("text", { class: "detail-label" }, "备注:"),
                   vue.withDirectives(vue.createElementVNode(
                     "textarea",
                     {
-                      class: "form-textarea",
-                      "onUpdate:modelValue": _cache[14] || (_cache[14] = ($event) => $data.form.remark = $event),
-                      placeholder: "请输入内容"
+                      class: "modal-textarea",
+                      "onUpdate:modelValue": _cache[19] || (_cache[19] = ($event) => $data.form.remark = $event),
+                      maxlength: "300",
+                      placeholder: "请输入备注"
                     },
                     null,
                     512
@@ -13330,17 +16867,17 @@ if (uni.restoreGlobal) {
                   ), [
                     [vue.vModelText, $data.form.remark]
                   ])
+                ]),
+                vue.createElementVNode("view", { class: "detail-actions" }, [
+                  vue.createElementVNode("button", {
+                    class: "detail-btn secondary",
+                    onClick: _cache[20] || (_cache[20] = (...args) => $options.cancel && $options.cancel(...args))
+                  }, "取消"),
+                  vue.createElementVNode("button", {
+                    class: "detail-btn primary",
+                    onClick: _cache[21] || (_cache[21] = (...args) => $options.submitForm && $options.submitForm(...args))
+                  }, "保存")
                 ])
-              ]),
-              vue.createElementVNode("view", { class: "modal-footer" }, [
-                vue.createElementVNode("button", {
-                  class: "modal-btn confirm-btn",
-                  onClick: _cache[15] || (_cache[15] = (...args) => $options.submitForm && $options.submitForm(...args))
-                }, "确 定"),
-                vue.createElementVNode("button", {
-                  class: "modal-btn cancel-btn",
-                  onClick: _cache[16] || (_cache[16] = (...args) => $options.cancel && $options.cancel(...args))
-                }, "取 消")
               ])
             ])
           ])) : vue.createCommentVNode("v-if", true)

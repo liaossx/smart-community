@@ -1,0 +1,305 @@
+/* 深色主题配置文件 - 参考APRICOT设计风格 */
+
+/* ==================== 颜色变量 ==================== */
+:root {
+  /* 主色调 - 深色背景 */
+  --dark-bg-primary: #1a1a2e;
+  --dark-bg-secondary: #16213e;
+  --dark-bg-tertiary: #0f3460;
+
+  /* 卡片和面板 */
+  --dark-card-bg: #252b48;
+  --dark-panel-bg: #2d3561;
+
+  /* 侧边栏 */
+  --dark-sidebar-bg: #16213e;
+  --dark-sidebar-active: #0f3460;
+  --dark-sidebar-hover: rgba(15, 52, 96, 0.5);
+
+  /* 顶部导航 */
+  --dark-topbar-bg: #16213e;
+  --dark-topbar-border: #0f3460;
+
+  /* 文字颜色 */
+  --dark-text-primary: #e4e4e7;
+  --dark-text-secondary: #a1a1aa;
+  --dark-text-tertiary: #71717a;
+  --dark-text-white: #ffffff;
+
+  /* 主题色 */
+  --dark-primary: #4facfe;
+  --dark-primary-hover: #00b4d8;
+  --dark-primary-light: rgba(79, 172, 254, 0.1);
+
+  /* 成功色 */
+  --dark-success: #52c41a;
+  --dark-success-bg: rgba(82, 196, 26, 0.1);
+
+  /* 警告色 */
+  --dark-warning: #faad14;
+  --dark-warning-bg: rgba(250, 173, 20, 0.1);
+
+  /* 错误色 */
+  --dark-error: #ff4d4f;
+  --dark-error-bg: rgba(255, 77, 79, 0.1);
+
+  /* 信息色 */
+  --dark-info: #1890ff;
+  --dark-info-bg: rgba(24, 144, 255, 0.1);
+
+  /* 边框颜色 */
+  --dark-border-primary: #3f3f46;
+  --dark-border-secondary: #27272a;
+
+  /* 输入框 */
+  --dark-input-bg: #27272a;
+  --dark-input-border: #3f3f46;
+  --dark-input-focus: #4facfe;
+
+  /* 按钮 */
+  --dark-btn-primary: #4facfe;
+  --dark-btn-primary-hover: #00b4d8;
+  --dark-btn-secondary: #3f3f46;
+  --dark-btn-secondary-hover: #52525b;
+
+  /* 阴影 */
+  --dark-shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.3);
+  --dark-shadow-md: 0 4rpx 16rpx rgba(0, 0, 0, 0.4);
+  --dark-shadow-lg: 0 8rpx 24rpx rgba(0, 0, 0, 0.5);
+
+  /* 圆角 */
+  --border-radius-sm: 8rpx;
+  --border-radius-md: 12rpx;
+  --border-radius-lg: 16rpx;
+  --border-radius-xl: 20rpx;
+
+  /* 间距 */
+  --spacing-xs: 8rpx;
+  --spacing-sm: 12rpx;
+  --spacing-md: 16rpx;
+  --spacing-lg: 24rpx;
+  --spacing-xl: 32rpx;
+}
+
+/* ==================== 全局样式 ==================== */
+.dark-theme {
+  background-color: var(--dark-bg-primary);
+  color: var(--dark-text-primary);
+}
+
+/* ==================== 卡片样式 ==================== */
+.dark-card {
+  background-color: var(--dark-card-bg);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--dark-shadow-md);
+  padding: var(--spacing-lg);
+}
+
+.dark-panel {
+  background-color: var(--dark-panel-bg);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+}
+
+/* ==================== 输入框样式 ==================== */
+.dark-input {
+  background-color: var(--dark-input-bg);
+  border: 2rpx solid var(--dark-input-border);
+  color: var(--dark-text-primary);
+  border-radius: var(--border-radius-sm);
+  padding: 24rpx 32rpx;
+  font-size: 28rpx;
+  transition: all 0.3s ease;
+}
+
+.dark-input:focus {
+  border-color: var(--dark-input-focus);
+  background-color: rgba(79, 172, 254, 0.05);
+}
+
+.dark-input::placeholder {
+  color: var(--dark-text-tertiary);
+}
+
+/* ==================== 按钮样式 ==================== */
+.dark-btn-primary {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: var(--dark-text-white);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  padding: 24rpx 48rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  box-shadow: 0 4rpx 12rpx rgba(79, 172, 254, 0.3);
+  transition: all 0.3s ease;
+}
+
+.dark-btn-primary:hover {
+  transform: translateY(-2rpx);
+  box-shadow: 0 6rpx 16rpx rgba(79, 172, 254, 0.4);
+}
+
+.dark-btn-secondary {
+  background-color: var(--dark-btn-secondary);
+  color: var(--dark-text-primary);
+  border: 2rpx solid var(--dark-border-primary);
+  border-radius: var(--border-radius-sm);
+  padding: 24rpx 48rpx;
+  font-size: 28rpx;
+  transition: all 0.3s ease;
+}
+
+.dark-btn-secondary:hover {
+  background-color: var(--dark-btn-secondary-hover);
+}
+
+.dark-btn-danger {
+  background-color: var(--dark-error);
+  color: var(--dark-text-white);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  padding: 24rpx 48rpx;
+  font-size: 28rpx;
+  box-shadow: 0 4rpx 12rpx rgba(255, 77, 79, 0.3);
+}
+
+.dark-btn-success {
+  background-color: var(--dark-success);
+  color: var(--dark-text-white);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  padding: 24rpx 48rpx;
+  font-size: 28rpx;
+  box-shadow: 0 4rpx 12rpx rgba(82, 196, 26, 0.3);
+}
+
+/* ==================== 表格样式 ==================== */
+.dark-table {
+  background-color: var(--dark-card-bg);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+}
+
+.dark-table-header {
+  background-color: var(--dark-bg-tertiary);
+  padding: 24rpx;
+  font-weight: 600;
+  color: var(--dark-text-primary);
+  border-bottom: 2rpx solid var(--dark-border-primary);
+}
+
+.dark-table-row {
+  padding: 24rpx;
+  border-bottom: 1rpx solid var(--dark-border-secondary);
+  transition: background-color 0.2s ease;
+}
+
+.dark-table-row:hover {
+  background-color: rgba(79, 172, 254, 0.05);
+}
+
+/* ==================== 标签样式 ==================== */
+.dark-tag {
+  display: inline-block;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+}
+
+.dark-tag-primary {
+  background-color: var(--dark-primary-light);
+  color: var(--dark-primary);
+}
+
+.dark-tag-success {
+  background-color: var(--dark-success-bg);
+  color: var(--dark-success);
+}
+
+.dark-tag-warning {
+  background-color: var(--dark-warning-bg);
+  color: var(--dark-warning);
+}
+
+.dark-tag-error {
+  background-color: var(--dark-error-bg);
+  color: var(--dark-error);
+}
+
+/* ==================== 分割线 ==================== */
+.dark-divider {
+  height: 1rpx;
+  background-color: var(--dark-border-secondary);
+  margin: var(--spacing-lg) 0;
+}
+
+/* ==================== 标题样式 ==================== */
+.dark-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--dark-text-primary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.dark-subtitle {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: var(--dark-text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+/* ==================== 加载状态 ==================== */
+.dark-loading {
+  text-align: center;
+  padding: 80rpx 0;
+  color: var(--dark-text-secondary);
+  font-size: 28rpx;
+}
+
+/* ==================== 空状态 ==================== */
+.dark-empty {
+  text-align: center;
+  padding: 120rpx 0;
+  color: var(--dark-text-tertiary);
+  font-size: 28rpx;
+}
+
+/* ==================== 模态框样式 ==================== */
+.dark-modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 999;
+}
+
+.dark-modal {
+  background-color: var(--dark-card-bg);
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--dark-shadow-lg);
+  padding: var(--spacing-xl);
+}
+
+.dark-modal-header {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--dark-text-primary);
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2rpx solid var(--dark-border-primary);
+}
+
+.dark-modal-body {
+  padding: var(--spacing-lg) 0;
+}
+
+.dark-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-lg);
+  border-top: 2rpx solid var(--dark-border-primary);
+}

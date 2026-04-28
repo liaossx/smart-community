@@ -1,112 +1,172 @@
 <template>
-  <admin-sidebar 
-    :showSidebar="showSidebar" 
+  <admin-sidebar
+    :showSidebar="showSidebar"
     @update:showSidebar="showSidebar = $event"
     pageTitle="任务中心"
     currentPage="/admin/pages/admin/worker-tasks"
+    pageBreadcrumb="管理后台 / 任务中心"
+    :showPageBanner="false"
   >
-    <view class="worker-container">
-      <!-- 顶部状态切换 -->
-      <view class="tab-bar">
-        <view 
-          v-for="tab in tabs" 
-          :key="tab.value" 
-          class="tab-item" 
-          :class="{ active: currentTab === tab.value }"
-          @click="switchTab(tab.value)"
-        >
-          <text class="tab-text">{{ tab.label }}</text>
-          <view class="tab-line" v-if="currentTab === tab.value"></view>
+    <view class="manage-container">
+      <view class="overview-panel">
+        <view class="overview-copy">
+          <text class="overview-title">维修任务中心</text>
+          <text class="overview-subtitle">统一按后台任务表格页呈现待处理、处理中和已完成工单，并保留处理结果提交流程。</text>
+        </view>
+
+        <view class="overview-chip">
+          <text class="overview-chip-label">当前阶段</text>
+          <text class="overview-chip-value">{{ currentTabLabel }}</text>
         </view>
       </view>
 
-      <!-- 任务列表 -->
-      <scroll-view scroll-y class="list-container">
-        <view v-for="item in taskList" :key="item.id" class="task-card">
-          <view class="task-header">
-          <text class="task-id">工单号: {{ item.orderNo || item.id }}</text>
-          <text :class="['priority-badge', getPriorityClass(item.priority)]">
-            {{ getPriorityText(item.priority) }}
-          </text>
+      <view class="status-summary-bar worker-status-bar">
+        <view
+          v-for="tab in tabs"
+          :key="tab.value"
+          class="status-summary-card"
+          :class="[tab.statusClass, { active: currentTab === tab.value }]"
+          @click="switchTab(tab.value)"
+        >
+          <text class="summary-label">{{ tab.label }}</text>
+          <text class="summary-value">{{ currentTab === tab.value ? taskList.length : '-' }}</text>
         </view>
-          <view class="task-body">
-            <view class="info-item">
-              <text class="label">报修类型:</text>
-              <text class="value">{{ getRepairType(item) }}</text>
+      </view>
+
+      <view class="table-toolbar">
+        <view class="toolbar-left-group">
+          <text class="toolbar-meta">当前阶段：{{ currentTabLabel }}</text>
+          <text class="toolbar-meta active">任务数 {{ taskList.length }} 条</text>
+        </view>
+
+        <view class="toolbar-right-group">
+          <button class="row-btn ghost" @click="loadTasks">刷新列表</button>
+        </view>
+      </view>
+
+      <view v-if="loading" class="loading-state">
+        <text class="loading-text">加载中...</text>
+      </view>
+
+      <view v-else class="table-panel">
+        <view class="scroll-table">
+          <view class="table-head worker-table">
+            <text class="table-col col-order">工单号</text>
+            <text class="table-col col-type">报修类型</text>
+            <text class="table-col col-desc">报修内容</text>
+            <text class="table-col col-phone">手机号</text>
+            <text class="table-col col-address">报修地点</text>
+            <text class="table-col col-priority">优先级</text>
+            <text class="table-col col-time">创建时间</text>
+            <text class="table-col col-actions">操作</text>
+          </view>
+
+          <view
+            v-for="(item, index) in taskList"
+            :key="item.id || index"
+            class="table-row worker-table"
+            :style="{ animationDelay: `${Math.min(360, index * 40)}ms` }"
+          >
+            <view class="table-col col-order">
+              <text class="primary-text">{{ item.orderNo || item.id || '-' }}</text>
             </view>
-            <view class="info-item" v-if="getRepairDesc(item)">
-              <text class="label">报修内容:</text>
-              <text class="value">{{ getRepairDesc(item) }}</text>
+
+            <view class="table-col col-type">
+              <text class="plain-text">{{ getRepairType(item) }}</text>
             </view>
-            <view class="info-item">
-              <text class="label">用户手机:</text>
-              <text class="value">{{ getOwnerPhone(item) }}</text>
+
+            <view class="table-col col-desc">
+              <text class="desc-text">{{ getRepairDesc(item) || '暂无描述' }}</text>
             </view>
-            <view class="info-item">
-              <text class="label">报修地点:</text>
-              <text class="value">{{ getRepairAddress(item) }}</text>
+
+            <view class="table-col col-phone">
+              <text class="plain-text">{{ getOwnerPhone(item) }}</text>
             </view>
-            <view class="info-item">
-              <text class="label">创建时间:</text>
-              <text class="value">{{ formatTime(item.createTime) }}</text>
+
+            <view class="table-col col-address">
+              <text class="desc-text">{{ getRepairAddress(item) }}</text>
+            </view>
+
+            <view class="table-col col-priority">
+              <text class="status-pill" :class="getPriorityClass(item.priority)">
+                {{ getPriorityText(item.priority) }}
+              </text>
+            </view>
+
+            <view class="table-col col-time">
+              <text class="minor-text">{{ formatTime(item.createTime) }}</text>
+            </view>
+
+            <view class="table-col col-actions row-actions">
+              <button
+                v-if="item.status === 'ASSIGNED'"
+                class="row-btn primary"
+                @click="handleStart(item.id)"
+              >
+                开始处理
+              </button>
+              <button
+                v-else-if="item.status === 'PROCESSING'"
+                class="row-btn secondary-warn"
+                @click="openCompleteForm(item)"
+              >
+                提交完成
+              </button>
+              <text v-else class="minor-text">已完成</text>
             </view>
           </view>
-          
-          <!-- 操作按钮 -->
-          <view class="task-footer">
-            <button 
-              v-if="item.status === 'ASSIGNED'" 
-              class="btn-start" 
-              @click="handleStart(item.id)"
-            >开始处理</button>
-            
-            <button 
-              v-if="item.status === 'PROCESSING'" 
-              class="btn-complete" 
-              @click="openCompleteForm(item)"
-            >提交完成</button>
-            
-            <text v-if="item.status === 'COMPLETED'" class="completed-text">已完成</text>
-          </view>
         </view>
-        
+
         <view v-if="taskList.length === 0" class="empty-state">
-          <image src="/static/logo.png" class="empty-img"></image>
           <text>暂无{{ currentTabLabel }}的任务</text>
         </view>
-      </scroll-view>
+      </view>
 
-      <!-- 完成表单弹窗 -->
-      <view v-if="showCompleteForm" class="form-mask" @click="closeCompleteForm">
-        <view class="form-container" @click.stop>
-          <view class="form-header">
-            <text class="form-title">提交处理结果</text>
-            <text class="form-close" @click="closeCompleteForm">×</text>
+      <view v-if="showCompleteForm" class="detail-modal" @click="closeCompleteForm">
+        <view class="detail-content worker-detail-content" @click.stop>
+          <view class="detail-header">
+            <text class="detail-title">提交处理结果</text>
+            <button class="close-btn" @click="closeCompleteForm">关闭</button>
           </view>
-          <view class="form-body">
-            <view class="form-item">
-              <text class="form-label">处理结果描述</text>
-              <textarea 
-                v-model="completeForm.result" 
-                placeholder="请输入处理过程及结果描述..." 
-                class="form-textarea"
-              />
+
+          <view class="detail-body">
+            <view class="detail-item">
+              <text class="detail-label">工单号:</text>
+              <text class="detail-value">{{ currentTask ? (currentTask.orderNo || currentTask.id) : '-' }}</text>
             </view>
-            <view class="form-item">
-              <text class="form-label">现场图片</text>
-              <view class="upload-container">
-                <view v-for="(img, index) in completeForm.images" :key="index" class="upload-item">
+
+            <view class="detail-item detail-item-block">
+              <text class="detail-label">处理结果:</text>
+              <textarea
+                v-model="completeForm.result"
+                class="modal-textarea"
+                maxlength="500"
+                placeholder="请输入处理过程及结果描述"
+              ></textarea>
+            </view>
+
+            <view class="detail-item detail-item-block">
+              <text class="detail-label">现场图片:</text>
+              <view class="upload-grid">
+                <view
+                  v-for="(img, index) in completeForm.images"
+                  :key="index"
+                  class="upload-card"
+                >
                   <image :src="img" class="upload-img" mode="aspectFill"></image>
-                  <text class="img-remove" @click="removeImage(index)">×</text>
+                  <text class="upload-remove" @click="removeImage(index)">×</text>
                 </view>
-                <view v-if="completeForm.images.length < 3" class="upload-btn" @click="chooseImage">
-                  <text class="upload-icon">+</text>
+                <view v-if="completeForm.images.length < 3" class="upload-card upload-card-add" @click="chooseImage">
+                  <text class="upload-plus">+</text>
+                  <text class="upload-tip">添加图片</text>
                 </view>
               </view>
             </view>
-          </view>
-          <view class="form-footer">
-            <button class="btn-submit" @click="handleCompleteSubmit" :loading="submitting">提交完成</button>
+
+            <view class="detail-actions">
+              <button class="detail-btn secondary" @click="closeCompleteForm">取消</button>
+              <button class="detail-btn primary" :disabled="submitting" @click="handleCompleteSubmit">提交完成</button>
+            </view>
           </view>
         </view>
       </view>
@@ -125,13 +185,14 @@ export default {
   data() {
     return {
       showSidebar: false,
+      loading: false,
       currentTab: 'ASSIGNED',
       submitting: false,
       taskList: [],
       tabs: [
-        { label: '待处理', value: 'ASSIGNED' },
-        { label: '进行中', value: 'PROCESSING' },
-        { label: '已完成', value: 'COMPLETED' }
+        { label: '待处理', value: 'ASSIGNED', statusClass: 'tab-assigned' },
+        { label: '进行中', value: 'PROCESSING', statusClass: 'tab-processing' },
+        { label: '已完成', value: 'COMPLETED', statusClass: 'tab-completed' }
       ],
       showCompleteForm: false,
       currentTask: null,
@@ -143,7 +204,7 @@ export default {
   },
   computed: {
     currentTabLabel() {
-      const tab = this.tabs.find(t => t.value === this.currentTab)
+      const tab = this.tabs.find(item => item.value === this.currentTab)
       return tab ? tab.label : ''
     }
   },
@@ -155,87 +216,77 @@ export default {
   },
   methods: {
     async loadTasks() {
-      console.log('--- 开始加载任务 ---')
-      console.log('当前标签:', this.currentTab)
-      const userInfo = uni.getStorageSync('userInfo')
-      console.log('当前登录用户信息:', userInfo)
-      
+      this.loading = true
       try {
         const res = await request('/api/workorder/list', {
           params: {
             status: this.currentTab
           }
         }, 'GET')
-        
-        console.log('API 请求 URL: /api/workorder/list')
-        console.log('API 响应原始数据:', res)
-        
         const data = res.data || res
-        console.log('解析后的数据对象:', data)
-        
         const list = data.records || data || []
-        this.taskList = list.slice().sort((a, b) => {
-          const diff = this.getPriorityRank(b.priority) - this.getPriorityRank(a.priority)
-          if (diff !== 0) return diff
-          return new Date(b.createTime || 0).getTime() - new Date(a.createTime || 0).getTime()
-        })
-        console.log('最终渲染的列表长度:', this.taskList.length)
-        console.log('--- 加载任务结束 ---')
-      } catch (e) {
-        console.error('加载任务失败', e)
+        this.taskList = Array.isArray(list)
+          ? list.slice().sort((a, b) => {
+              const diff = this.getPriorityRank(b.priority) - this.getPriorityRank(a.priority)
+              if (diff !== 0) return diff
+              return new Date(b.createTime || 0).getTime() - new Date(a.createTime || 0).getTime()
+            })
+          : []
+      } catch (error) {
+        console.error('加载任务失败', error)
         uni.showToast({ title: '加载失败', icon: 'none' })
+      } finally {
+        this.loading = false
       }
     },
     switchTab(tab) {
+      if (this.currentTab === tab) return
       this.currentTab = tab
       this.loadTasks()
     },
-    getPriorityText(p) {
-      const map = { 
-        'LOW': '低', 
-        'MEDIUM': '中', 
-        'HIGH': '高', 
-        'URGENT': '紧急',
+    getPriorityText(priority) {
+      const map = {
+        LOW: '低',
+        MEDIUM: '中',
+        HIGH: '高',
+        URGENT: '紧急',
         '1': '低',
         '2': '中',
         '3': '高',
         '4': '紧急'
       }
-      return map[String(p)] || p || '低'
+      return map[String(priority).toUpperCase()] || priority || '低'
     },
-    getPriorityClass(p) {
-      if (!p) return 'priority-low'
-      const pStr = String(p).toUpperCase()
-      const classMap = {
-        'LOW': 'priority-low',
+    getPriorityClass(priority) {
+      if (!priority) return 'priority-low'
+      const map = {
+        LOW: 'priority-low',
         '1': 'priority-low',
-        'MEDIUM': 'priority-medium',
+        MEDIUM: 'priority-medium',
         '2': 'priority-medium',
-        'HIGH': 'priority-high',
+        HIGH: 'priority-high',
         '3': 'priority-high',
-        'URGENT': 'priority-urgent',
+        URGENT: 'priority-urgent',
         '4': 'priority-urgent'
       }
-      return classMap[pStr] || ('priority-' + pStr.toLowerCase())
+      return map[String(priority).toUpperCase()] || 'priority-low'
     },
-    getPriorityRank(p) {
-      const pStr = String(p).toUpperCase()
+    getPriorityRank(priority) {
       const map = {
-        'LOW': 1,
+        LOW: 1,
         '1': 1,
-        'MEDIUM': 2,
+        MEDIUM: 2,
         '2': 2,
-        'HIGH': 3,
+        HIGH: 3,
         '3': 3,
-        'URGENT': 4,
+        URGENT: 4,
         '4': 4
       }
-      return map[pStr] || 1
+      return map[String(priority).toUpperCase()] || 1
     },
     getRepairDesc(item) {
       if (!item) return ''
-      const desc =
-        (item.repairInfo && item.repairInfo.faultDesc) ||
+      const desc = (item.repairInfo && item.repairInfo.faultDesc) ||
         item.faultDesc ||
         item.repairFaultDesc ||
         item.repairDesc ||
@@ -246,57 +297,59 @@ export default {
     },
     getRepairType(item) {
       if (!item) return '未知'
-      const type =
-        (item.repairInfo && item.repairInfo.faultType) ||
+      return (item.repairInfo && item.repairInfo.faultType) ||
         item.faultType ||
         item.repairFaultType ||
         item.repairType ||
-        (item.repair && item.repair.faultType)
-      if (type) return type
-      return '未知'
+        (item.repair && item.repair.faultType) ||
+        '未知'
     },
     getOwnerPhone(item) {
       if (!item) return '未知'
-      const phone =
-        (item.repairInfo && item.repairInfo.ownerPhone) ||
+      return (item.repairInfo && item.repairInfo.ownerPhone) ||
         item.ownerPhone ||
         item.userPhone ||
         item.phone ||
         item.repairUserPhone ||
-        (item.repair && (item.repair.ownerPhone || item.repair.userPhone || item.repair.phone))
-      if (phone) return phone
-      return '未知'
+        (item.repair && (item.repair.ownerPhone || item.repair.userPhone || item.repair.phone)) ||
+        '未知'
     },
     getRepairAddress(item) {
       if (!item) return '地点未知'
-      const address =
-        (item.repairInfo && item.repairInfo.address) ||
+      return (item.repairInfo && item.repairInfo.address) ||
         item.address ||
         item.repairAddress ||
         (item.repair && item.repair.address) ||
-        item.location
-      if (address) return address
-      return '社区内'
+        item.location ||
+        '社区内'
     },
-    formatTime(t) {
-      if (!t) return '-'
-      const date = new Date(t)
-      return `${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:${date.getMinutes()}`
+    formatTime(time) {
+      if (!time) return '-'
+      const date = new Date(time)
+      if (Number.isNaN(date.getTime())) return time
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hour = String(date.getHours()).padStart(2, '0')
+      const minute = String(date.getMinutes()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hour}:${minute}`
     },
     async handleStart(orderId) {
       try {
         await request(`/api/workorder/worker/start?orderId=${orderId}`, {}, 'POST')
         uni.showToast({ title: '已开始处理', icon: 'success' })
         this.loadTasks()
-      } catch (e) {
-        console.error('操作失败', e)
+      } catch (error) {
+        console.error('开始处理失败', error)
         uni.showToast({ title: '操作失败', icon: 'none' })
       }
     },
     openCompleteForm(task) {
       this.currentTask = task
-      this.completeForm.result = ''
-      this.completeForm.images = []
+      this.completeForm = {
+        result: '',
+        images: []
+      }
       this.showCompleteForm = true
     },
     closeCompleteForm() {
@@ -307,7 +360,7 @@ export default {
       uni.chooseImage({
         count: 3 - this.completeForm.images.length,
         success: (res) => {
-          this.completeForm.images = [...this.completeForm.images, ...res.tempFilePaths]
+          this.completeForm.images = this.completeForm.images.concat(res.tempFilePaths || []).slice(0, 3)
         }
       })
     },
@@ -315,11 +368,14 @@ export default {
       this.completeForm.images.splice(index, 1)
     },
     async handleCompleteSubmit() {
-      if (!this.completeForm.result) {
+      if (!this.completeForm.result.trim()) {
         uni.showToast({ title: '请输入处理结果', icon: 'none' })
         return
       }
-      
+      if (!this.currentTask || !this.currentTask.id) {
+        uni.showToast({ title: '未找到任务信息', icon: 'none' })
+        return
+      }
       this.submitting = true
       try {
         await request('/api/workorder/worker/complete', {
@@ -329,12 +385,11 @@ export default {
             images: this.completeForm.images.join(',')
           }
         }, 'POST')
-        
         uni.showToast({ title: '提交成功', icon: 'success' })
         this.closeCompleteForm()
         this.loadTasks()
-      } catch (e) {
-        console.error('提交失败', e)
+      } catch (error) {
+        console.error('提交失败', error)
         uni.showToast({ title: '提交失败', icon: 'none' })
       } finally {
         this.submitting = false
@@ -344,270 +399,103 @@ export default {
 }
 </script>
 
+<style scoped src="../../styles/admin-table-page.css"></style>
 <style scoped>
-.worker-container {
-  min-height: 100vh;
-  background-color: #f5f5f5;
-  display: flex;
-  flex-direction: column;
+.worker-status-bar {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.tab-bar {
-  display: flex;
-  background: #fff;
-  height: 90rpx;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+.status-summary-card.tab-assigned {
+  background: linear-gradient(180deg, #fff 0%, #eef5ff 100%);
 }
 
-.tab-item {
-  flex: 1;
+.status-summary-card.tab-processing {
+  background: linear-gradient(180deg, #fff 0%, #fff8e6 100%);
+}
+
+.status-summary-card.tab-completed {
+  background: linear-gradient(180deg, #fff 0%, #eefaf4 100%);
+}
+
+.worker-table {
+  grid-template-columns: 220rpx 180rpx 260rpx 180rpx 260rpx 140rpx 200rpx 180rpx;
+  min-width: 1900rpx;
+}
+
+.status-pill.priority-low {
+  background: #edf9f1;
+  color: #2d8c59;
+}
+
+.status-pill.priority-medium {
+  background: #fff8e6;
+  color: #cd8b1d;
+}
+
+.status-pill.priority-high {
+  background: #fff1f3;
+  color: #c44859;
+}
+
+.status-pill.priority-urgent {
+  background: #e95a6c;
+  color: #fff;
+}
+
+.worker-detail-content {
+  max-width: 900rpx;
+}
+
+.upload-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18rpx;
+}
+
+.upload-card {
+  position: relative;
+  width: 168rpx;
+  height: 168rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  border: 1rpx solid #dce6f2;
+  background: #f7faff;
+}
+
+.upload-card-add {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  position: relative;
-}
-
-.tab-text {
-  font-size: 30rpx;
-  color: #666;
-}
-
-.tab-item.active .tab-text {
-  color: #2D81FF;
-  font-weight: bold;
-}
-
-.tab-line {
-  position: absolute;
-  bottom: 0;
-  width: 60rpx;
-  height: 6rpx;
-  background: #2D81FF;
-  border-radius: 3rpx;
-}
-
-.list-container {
-  flex: 1;
-  padding: 20rpx;
-  box-sizing: border-box;
-}
-
-.task-card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 15rpx rgba(0,0,0,0.05);
-}
-
-.task-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20rpx;
-}
-
-.task-id {
-  font-size: 28rpx;
-  font-weight: bold;
-  color: #333;
-}
-
-.priority-badge {
-  font-size: 22rpx;
-  padding: 2rpx 12rpx;
-  border-radius: 4rpx;
-}
-
-.priority-low { background: #e8f5e9; color: #4caf50; }
-.priority-medium { background: #fff3e0; color: #ff9800; }
-.priority-high { background: #ffebee; color: #f44336; }
-.priority-urgent { background: #f44336; color: #fff; }
-
-.task-body {
-  padding: 10rpx 0;
-}
-
-.info-item {
-  display: flex;
-  margin-bottom: 12rpx;
-  font-size: 26rpx;
-}
-
-.label {
-  color: #999;
-  width: 140rpx;
-}
-
-.value {
-  color: #444;
-  flex: 1;
-}
-
-.task-footer {
-  margin-top: 30rpx;
-  display: flex;
-  justify-content: flex-end;
-  border-top: 1rpx solid #f0f0f0;
-  padding-top: 20rpx;
-}
-
-.btn-start, .btn-complete {
-  margin: 0;
-  height: 70rpx;
-  line-height: 70rpx;
-  padding: 0 40rpx;
-  font-size: 28rpx;
-  border-radius: 35rpx;
-  color: #fff;
-}
-
-.btn-start { background: #2D81FF; }
-.btn-complete { background: #4caf50; }
-
-.completed-text {
-  font-size: 26rpx;
-  color: #999;
-}
-
-.empty-state {
-  padding-top: 200rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #999;
-}
-
-.empty-img {
-  width: 200rpx;
-  height: 200rpx;
-  margin-bottom: 20rpx;
-  opacity: 0.5;
-}
-
-/* Form Styles */
-.form-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.6);
-  z-index: 100;
-  display: flex;
-  align-items: flex-end;
-}
-
-.form-container {
-  background: #fff;
-  width: 100%;
-  border-radius: 30rpx 30rpx 0 0;
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.form-header {
-  padding: 30rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1rpx solid #eee;
-}
-
-.form-title {
-  font-size: 32rpx;
-  font-weight: bold;
-}
-
-.form-close {
-  font-size: 44rpx;
-  color: #999;
-}
-
-.form-body {
-  padding: 30rpx;
-}
-
-.form-item {
-  margin-bottom: 30rpx;
-}
-
-.form-label {
-  font-size: 28rpx;
-  color: #333;
-  margin-bottom: 20rpx;
-  display: block;
-}
-
-.form-textarea {
-  width: 100%;
-  height: 200rpx;
-  background: #f9f9f9;
-  border-radius: 12rpx;
-  padding: 20rpx;
-  box-sizing: border-box;
-  font-size: 28rpx;
-}
-
-.upload-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20rpx;
-}
-
-.upload-item, .upload-btn {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 12rpx;
-  position: relative;
+  gap: 6rpx;
 }
 
 .upload-img {
   width: 100%;
   height: 100%;
-  border-radius: 12rpx;
 }
 
-.img-remove {
+.upload-remove {
   position: absolute;
-  top: -10rpx;
-  right: -10rpx;
+  top: 8rpx;
+  right: 8rpx;
   width: 36rpx;
   height: 36rpx;
-  background: rgba(0,0,0,0.5);
-  color: #fff;
+  line-height: 34rpx;
   border-radius: 50%;
-  text-align: center;
-  line-height: 32rpx;
-  font-size: 30rpx;
-}
-
-.upload-btn {
-  background: #f5f5f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1rpx dashed #ccc;
-}
-
-.upload-icon {
-  font-size: 60rpx;
-  color: #999;
-}
-
-.form-footer {
-  padding: 30rpx;
-}
-
-.btn-submit {
-  background: #2D81FF;
+  background: rgba(18, 34, 53, 0.6);
   color: #fff;
-  height: 90rpx;
-  line-height: 90rpx;
-  border-radius: 45rpx;
-  font-size: 32rpx;
+  text-align: center;
+  font-size: 28rpx;
+}
+
+.upload-plus {
+  font-size: 44rpx;
+  color: #6582a0;
+}
+
+.upload-tip {
+  font-size: 22rpx;
+  color: #8797aa;
 }
 </style>

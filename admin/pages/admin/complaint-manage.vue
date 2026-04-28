@@ -1,177 +1,208 @@
 <template>
-  <admin-sidebar 
-    :showSidebar="showSidebar" 
+  <admin-sidebar
+    :showSidebar="showSidebar"
     @update:showSidebar="showSidebar = $event"
     pageTitle="投诉处理"
     currentPage="/admin/pages/admin/complaint-manage"
+    pageBreadcrumb="管理后台 / 投诉处理"
+    :showPageBanner="false"
   >
     <view class="manage-container">
-      <!-- 统计卡片 -->
-      <view class="stats-card-container">
-        <view class="stats-card" @click="handleStatsClick('')">
-          <text class="stats-number">{{ stats.total }}</text>
-          <text class="stats-label">总投诉数</text>
+      <view class="overview-panel">
+        <view class="overview-copy">
+          <text class="overview-title">投诉工单列表</text>
+          <text class="overview-subtitle">统一按后台表格页方式呈现，保留回复处理、联系业主和图片查看。</text>
         </view>
-        <view class="stats-card status-pending" @click="handleStatsClick('pending')">
-          <text class="stats-number">{{ stats.pending }}</text>
-          <text class="stats-label">待处理</text>
-        </view>
-        <view class="stats-card status-processed" @click="handleStatsClick('processed')">
-          <text class="stats-number">{{ stats.processed }}</text>
-          <text class="stats-label">已处理</text>
-        </view>
-      </view>
 
-      <view class="stats-filter">
         <picker mode="selector" :range="monthOptions" range-key="label" @change="handleMonthChange">
-          <view class="stats-filter-btn">
-            <text class="stats-filter-text">{{ currentMonthLabel }}</text>
-            <text class="stats-filter-arrow">▼</text>
+          <view class="month-filter-chip">
+            <text class="month-filter-label">统计月份</text>
+            <text class="month-filter-value">{{ currentMonthLabel }}</text>
           </view>
         </picker>
       </view>
 
-      <!-- 搜索和筛选栏 -->
-      <view class="search-filter-bar">
-        <view class="search-box">
-          <input 
-            type="text"
-            placeholder="搜索投诉内容、业主姓名"
-            v-model="searchQuery"
-            @confirm="handleSearch"
-            class="search-input"
-          />
-          <button class="search-btn" @click="handleSearch">搜索</button>
+      <view class="status-summary-bar">
+        <view class="status-summary-card" :class="{ active: statusFilter === '' }" @click="handleStatsClick('')">
+          <text class="summary-label">总投诉数</text>
+          <text class="summary-value">{{ stats.total }}</text>
         </view>
-        
-        <view class="filter-row">
-          <picker 
-            mode="selector"
-            :range="statusOptions"
-            :range-key="'label'"
-            :value="statusOptions.findIndex(opt => opt.value === statusFilter)"
-            @change="handleStatusChange"
-            class="filter-picker"
-          >
-            <view class="filter-picker-text">
-              {{ statusOptions.find(opt => opt.value === statusFilter)?.label || '全部状态' }}
-            </view>
-          </picker>
+        <view class="status-summary-card pending" :class="{ active: statusFilter === 'PENDING' }" @click="handleStatsClick('PENDING')">
+          <text class="summary-label">待处理</text>
+          <text class="summary-value">{{ stats.pending }}</text>
+        </view>
+        <view class="status-summary-card processed" :class="{ active: statusFilter === 'DONE' }" @click="handleStatsClick('DONE')">
+          <text class="summary-label">已处理</text>
+          <text class="summary-value">{{ stats.processed }}</text>
         </view>
       </view>
 
-      <!-- 投诉列表 -->
-      <view class="list-container">
-        <view v-if="loading" class="loading-state">
-          <text class="loading-text">加载中...</text>
-        </view>
-        
-        <view v-else-if="complaintList.length > 0" class="complaint-list">
-          <view v-for="item in complaintList" :key="item.id" class="complaint-item">
-            <view class="item-header">
-              <view class="title-row">
-                <text class="item-title">{{ item.type }}</text>
-                <text class="time-text">{{ formatTime(item.createTime) }}</text>
+      <view class="query-panel">
+        <view class="query-grid">
+          <view class="query-field query-field-wide">
+            <text class="query-label">关键词</text>
+            <input
+              v-model="searchQuery"
+              class="query-input"
+              type="text"
+              placeholder="搜索投诉内容、业主姓名"
+              @confirm="handleSearch"
+            />
+          </view>
+
+          <view class="query-field">
+            <text class="query-label">处理状态</text>
+            <picker
+              mode="selector"
+              :range="statusOptions"
+              range-key="label"
+              :value="statusPickerIndex"
+              @change="handleStatusChange"
+            >
+              <view class="query-picker">
+                <text class="query-picker-text">{{ currentStatusLabel }}</text>
               </view>
-              <text class="status-tag" :class="getStatusClass(item.status)">
-                {{ getStatusText(item.status) }}
-              </text>
-            </view>
-            <view class="item-content">
-              <text class="content-text">{{ item.content }}</text>
-              <view v-if="item.images" class="image-preview">
-                 <!-- 假设 images 是逗号分隔的字符串 -->
-                 <image 
-                   v-for="(img, index) in item.images.split(',')" 
-                   :key="index" 
-                   :src="img" 
-                   mode="aspectFill" 
-                   class="complain-img"
-                   @click="previewImage(item.images, index)"
-                 ></image>
-              </view>
-            </view>
-            <view class="item-info">
-                <view class="info-row">
-                  <text class="label">投诉人：</text>
-                  <text class="value">{{ item.ownerName || item.userName || '匿名' }} <text class="phone" v-if="item.phone" @click="makeCall(item.phone)">{{ item.phone }}</text></text>
-                </view>
-                <view class="info-row">
-                  <text class="label">房号：</text>
-                  <text class="value" v-if="item.buildingNo && item.houseNo">{{ item.buildingNo }}栋{{ item.houseNo }}室</text>
-                  <text class="value" v-else>未绑定房屋</text>
-                </view>
-              <view v-if="item.status === 'DONE'" class="result-box">
-                <text class="label">处理结果：</text>
-                <text class="value">{{ item.result }}</text>
-              </view>
-            </view>
-            
-            <view class="item-footer">
-              <button 
-                class="action-btn handle" 
-                @click="openHandleModal(item)"
-              >
-                {{ String(item.status) === 'PENDING' ? '立即处理' : '重新处理' }}
-              </button>
-              <button 
-                class="action-btn call" 
-                v-if="item.phone"
-                @click="makeCall(item.phone)"
-              >
-                联系业主
-              </button>
-            </view>
+            </picker>
           </view>
         </view>
-        
-        <view v-else class="empty-state">
+
+        <view class="query-actions">
+          <button class="query-btn primary" @click="handleSearch">查询</button>
+          <button class="query-btn secondary" @click="handleResetFilters">重置</button>
+        </view>
+      </view>
+
+      <view class="table-toolbar">
+        <view class="toolbar-left-group">
+          <text class="toolbar-meta">共 {{ total }} 条</text>
+          <text class="toolbar-meta active">待处理 {{ stats.pending }} 条</text>
+        </view>
+
+        <view class="toolbar-right-group">
+          <text class="toolbar-meta">已处理 {{ stats.processed }} 条</text>
+        </view>
+      </view>
+
+      <view v-if="loading" class="loading-state">
+        <text class="loading-text">加载中...</text>
+      </view>
+
+      <view v-else class="table-panel">
+        <view class="table-head">
+          <text class="table-col col-type">投诉类型</text>
+          <text class="table-col col-content">投诉内容</text>
+          <text class="table-col col-owner">投诉人</text>
+          <text class="table-col col-house">房号</text>
+          <text class="table-col col-time">提交时间</text>
+          <text class="table-col col-status">状态</text>
+          <text class="table-col col-image">图片</text>
+          <text class="table-col col-result">处理结果</text>
+          <text class="table-col col-actions">操作</text>
+        </view>
+
+        <view
+          v-for="(item, index) in complaintList"
+          :key="item.id"
+          class="table-row"
+          :style="{ animationDelay: `${Math.min(360, index * 40)}ms` }"
+        >
+          <view class="table-col col-type">
+            <text class="primary-text">{{ item.type || '-' }}</text>
+          </view>
+
+          <view class="table-col col-content">
+            <text class="desc-text">{{ item.content || '暂无内容' }}</text>
+          </view>
+
+          <view class="table-col col-owner">
+            <text class="plain-text">{{ getOwnerText(item) }}</text>
+            <text v-if="item.phone" class="minor-link" @click="makeCall(item.phone)">{{ item.phone }}</text>
+          </view>
+
+          <view class="table-col col-house">
+            <text class="plain-text">{{ formatHouse(item) }}</text>
+          </view>
+
+          <view class="table-col col-time">
+            <text class="minor-text">{{ formatTime(item.createTime) }}</text>
+          </view>
+
+          <view class="table-col col-status">
+            <text class="status-pill" :class="getStatusClass(item.status)">
+              {{ getStatusText(item.status) }}
+            </text>
+          </view>
+
+          <view class="table-col col-image">
+            <text class="minor-text">{{ getImageCount(item.images) }} 张</text>
+          </view>
+
+          <view class="table-col col-result">
+            <text class="desc-text">{{ item.result || '待回复' }}</text>
+          </view>
+
+          <view class="table-col col-actions row-actions">
+            <button v-if="getImageCount(item.images) > 0" class="row-btn ghost" @click="previewImage(item.images, 0)">图片</button>
+            <button class="row-btn primary" @click="openHandleModal(item)">
+              {{ String(item.status) === 'PENDING' ? '处理' : '重处理' }}
+            </button>
+            <button v-if="item.phone" class="row-btn ghost" @click="makeCall(item.phone)">联系</button>
+          </view>
+        </view>
+
+        <view v-if="complaintList.length === 0" class="empty-state">
           <text>暂无投诉记录</text>
         </view>
+      </view>
 
-        <!-- 分页组件 -->
-        <view v-if="total > 0" class="pagination">
-          <button 
-            class="page-btn" 
-            :disabled="currentPage === 1"
-            @click="handlePrevPage"
-          >
-            上一页
-          </button>
-          
-          <view class="page-info">
-            <text>{{ currentPage }}</text>
-            <text class="page-separator">/</text>
-            <text>{{ totalPages }}</text>
+      <view v-if="total > 0" class="pagination">
+        <view class="page-meta">
+          <text>第 {{ currentPage }} / {{ totalPages }} 页</text>
+        </view>
+
+        <view class="page-controls">
+          <button class="page-btn" :disabled="currentPage === 1" @click="handlePrevPage">上一页</button>
+          <button class="page-btn" :disabled="currentPage === totalPages" @click="handleNextPage">下一页</button>
+          <view class="page-size">
+            <text>每页</text>
+            <picker mode="selector" :range="[10, 20, 50, 100]" :value="pageSizeIndex" @change="handlePageSizeChange">
+              <text class="page-size-text">{{ pageSize }} 条</text>
+            </picker>
           </view>
-          
-          <button 
-            class="page-btn" 
-            :disabled="currentPage === totalPages"
-            @click="handleNextPage"
-          >
-            下一页
-          </button>
         </view>
       </view>
-      
-      <!-- 处理弹窗 -->
-      <view v-if="showHandleModal" class="modal-mask" @click="closeHandleModal">
-        <view class="modal-content" @click.stop>
-          <view class="modal-header">
-            <text class="modal-title">处理投诉</text>
-            <text class="close-icon" @click="closeHandleModal">×</text>
+
+      <view v-if="showHandleModal" class="detail-modal" @click="closeHandleModal">
+        <view class="detail-content" @click.stop>
+          <view class="detail-header">
+            <text class="detail-title">处理投诉</text>
+            <button class="close-btn" @click="closeHandleModal">关闭</button>
           </view>
-          <view class="modal-body">
-            <textarea 
-              v-model="handleResult" 
-              placeholder="请输入处理结果/回复内容" 
-              class="handle-textarea"
-            ></textarea>
-          </view>
-          <view class="modal-footer">
-            <button class="cancel-btn" @click="closeHandleModal">取消</button>
-            <button class="confirm-btn" @click="submitHandle">确认回复</button>
+
+          <view class="detail-body">
+            <view class="detail-item">
+              <text class="detail-label">投诉类型:</text>
+              <text class="detail-value">{{ currentComplaint ? currentComplaint.type : '-' }}</text>
+            </view>
+
+            <view class="detail-item">
+              <text class="detail-label">投诉人:</text>
+              <text class="detail-value">{{ currentComplaint ? getOwnerText(currentComplaint) : '-' }}</text>
+            </view>
+
+            <view class="detail-item detail-item-block">
+              <text class="detail-label">回复内容:</text>
+              <textarea
+                v-model="handleResult"
+                placeholder="请输入处理结果/回复内容"
+                class="handle-textarea"
+              ></textarea>
+            </view>
+
+            <view class="detail-actions">
+              <button class="detail-btn secondary" @click="closeHandleModal">取消</button>
+              <button class="detail-btn primary" @click="submitHandle">确认回复</button>
+            </view>
           </view>
         </view>
       </view>
@@ -199,20 +230,14 @@ export default {
         { value: 'DONE', label: '已处理' }
       ],
       complaintList: [],
-      
-      // 分页相关
       currentPage: 1,
       pageSize: 10,
       total: 0,
-      
-      // 统计数据
       stats: {
         total: 0,
         pending: 0,
         processed: 0
       },
-
-      // 处理弹窗
       showHandleModal: false,
       currentComplaint: null,
       handleResult: '',
@@ -223,11 +248,22 @@ export default {
   },
   computed: {
     totalPages() {
-      return Math.ceil(this.total / this.pageSize) || 1
+      return Math.max(1, Math.ceil(this.total / this.pageSize))
+    },
+    pageSizeIndex() {
+      const options = [10, 20, 50, 100]
+      return Math.max(0, options.indexOf(this.pageSize))
     },
     currentMonthLabel() {
-      const opt = this.monthOptions && this.monthOptions[this.monthIndex]
-      return (opt && opt.label) || this.monthValue || '选择月份'
+      const option = this.monthOptions[this.monthIndex]
+      return option ? option.label : (this.monthValue || '选择月份')
+    },
+    statusPickerIndex() {
+      return Math.max(0, this.statusOptions.findIndex(item => item.value === this.statusFilter))
+    },
+    currentStatusLabel() {
+      const current = this.statusOptions.find(item => item.value === this.statusFilter)
+      return current ? current.label : '全部状态'
     }
   },
   onLoad() {
@@ -238,26 +274,37 @@ export default {
   methods: {
     initMonthOptions() {
       const now = new Date()
-      const y = now.getFullYear()
-      const m = now.getMonth() + 1
-      const current = `${y}-${String(m).padStart(2, '0')}`
-      const opts = []
+      const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const options = []
       for (let i = 0; i < 12; i++) {
-        const d = new Date(y, m - 1 - i, 1)
-        const yy = d.getFullYear()
-        const mm = String(d.getMonth() + 1).padStart(2, '0')
-        const value = `${yy}-${mm}`
-        opts.push({ label: value, value })
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        options.push({ label: value, value })
       }
-      this.monthOptions = opts
+      this.monthOptions = options
       this.monthValue = current
-      this.monthIndex = Math.max(0, opts.findIndex(o => o.value === current))
+      this.monthIndex = Math.max(0, options.findIndex(item => item.value === current))
+    },
+    normalizeComplaintResponse(data) {
+      if (Array.isArray(data)) return { records: data, total: data.length }
+      if (Array.isArray(data.records)) return { records: data.records, total: data.total || data.records.length }
+      if (data.data && Array.isArray(data.data.records)) return { records: data.data.records, total: data.data.total || data.data.records.length }
+      if (Array.isArray(data.rows)) return { records: data.rows, total: data.total || data.rows.length }
+      return { records: [], total: 0 }
+    },
+    extractTotal(data) {
+      if (typeof data?.total === 'number') return data.total
+      if (typeof data?.data?.total === 'number') return data.data.total
+      if (Array.isArray(data?.records)) return data.records.length
+      if (Array.isArray(data?.data?.records)) return data.data.records.length
+      if (Array.isArray(data)) return data.length
+      return 0
     },
     handleMonthChange(e) {
-      const idx = Number(e && e.detail ? e.detail.value : 0)
-      const option = this.monthOptions && this.monthOptions[idx]
+      const index = Number(e?.detail?.value || 0)
+      const option = this.monthOptions[index]
       if (!option) return
-      this.monthIndex = idx
+      this.monthIndex = index
       this.monthValue = option.value
       this.currentPage = 1
       this.loadData()
@@ -273,15 +320,10 @@ export default {
           pageNum: this.currentPage,
           pageSize: this.pageSize
         }
-        
-        // 调用后端接口
         const data = await request('/api/complaint/list', { params }, 'GET')
-        
-        // 兼容处理返回结构
-        const records = Array.isArray(data) ? data : (data.records || data.data?.records || data.rows || [])
-        this.total = typeof data.total === 'number' ? data.total : (data.data?.total || records.length || 0)
-        
-        this.complaintList = records.map(item => ({
+        const normalized = this.normalizeComplaintResponse(data)
+        this.total = Number(normalized.total || 0)
+        this.complaintList = normalized.records.map(item => ({
           id: item.id,
           type: item.type,
           content: item.content,
@@ -292,153 +334,144 @@ export default {
           buildingNo: item.buildingNo,
           houseNo: item.houseNo,
           createTime: item.createTime,
-          status: item.status, // PENDING/DONE
+          status: item.status,
           result: item.result
         }))
-      } catch (e) {
-        console.error('加载投诉列表失败', e)
-        uni.showToast({ title: '加载失败', icon: 'none' })
+      } catch (error) {
+        console.error('加载投诉列表失败', error)
         this.complaintList = []
         this.total = 0
+        uni.showToast({ title: '加载失败', icon: 'none' })
       } finally {
         this.loading = false
       }
     },
-    
-    // 加载统计数据
     async loadStats() {
       try {
         const month = this.monthValue || undefined
-        // 使用 loadData 的逻辑来获取统计数据，确保接口调用一致
-        // 1. 获取总数
-        const totalReq = request('/api/complaint/list', { params: { pageNum: 1, pageSize: 1, month } }, 'GET')
-        // 2. 获取待处理数
-        const pendingReq = request('/api/complaint/list', { params: { pageNum: 1, pageSize: 1, status: 'PENDING', month } }, 'GET')
-        // 3. 获取已处理数
-        const processedReq = request('/api/complaint/list', { params: { pageNum: 1, pageSize: 1, status: 'DONE', month } }, 'GET')
-        
-        const [totalRes, pendingRes, processedRes] = await Promise.all([totalReq, pendingReq, processedReq])
-        
-        console.log('Stats Response Data:', { totalRes, pendingRes, processedRes })
-        
+        const [totalRes, pendingRes, processedRes] = await Promise.all([
+          request('/api/complaint/list', { params: { pageNum: 1, pageSize: 1, month } }, 'GET'),
+          request('/api/complaint/list', { params: { pageNum: 1, pageSize: 1, status: 'PENDING', month } }, 'GET'),
+          request('/api/complaint/list', { params: { pageNum: 1, pageSize: 1, status: 'DONE', month } }, 'GET')
+        ])
         this.stats = {
-          total: totalRes?.total || 0,
-          pending: pendingRes?.total || 0,
-          processed: processedRes?.total || 0
+          total: this.extractTotal(totalRes),
+          pending: this.extractTotal(pendingRes),
+          processed: this.extractTotal(processedRes)
         }
-      } catch (e) {
-        console.error('加载统计数据失败', e)
+      } catch (error) {
+        console.error('加载统计数据失败', error)
       }
     },
-    
     handleStatsClick(status) {
       this.statusFilter = status
       this.currentPage = 1
       this.loadData()
     },
-    
     handleSearch() {
       this.currentPage = 1
       this.loadData()
     },
-    
-    handleStatusChange(e) {
-      this.statusFilter = this.statusOptions[e.detail.value].value
+    handleResetFilters() {
+      this.searchQuery = ''
+      this.statusFilter = ''
       this.currentPage = 1
       this.loadData()
     },
-    
+    handleStatusChange(e) {
+      const index = Number(e?.detail?.value || 0)
+      this.statusFilter = this.statusOptions[index]?.value || ''
+      this.currentPage = 1
+      this.loadData()
+    },
     handlePrevPage() {
-      if (this.currentPage > 1) {
-        this.currentPage--
-        this.loadData()
-      }
+      if (this.currentPage <= 1) return
+      this.currentPage -= 1
+      this.loadData()
     },
-    
     handleNextPage() {
-      if (this.currentPage < this.totalPages) {
-        this.currentPage++
-        this.loadData()
-      }
+      if (this.currentPage >= this.totalPages) return
+      this.currentPage += 1
+      this.loadData()
     },
-    
+    handlePageSizeChange(e) {
+      const options = [10, 20, 50, 100]
+      const index = Number(e?.detail?.value || 0)
+      this.pageSize = options[index] || 10
+      this.currentPage = 1
+      this.loadData()
+    },
     openHandleModal(item) {
       this.currentComplaint = item
-      this.handleResult = ''
+      this.handleResult = item?.result || ''
       this.showHandleModal = true
     },
-    
     closeHandleModal() {
       this.showHandleModal = false
       this.currentComplaint = null
+      this.handleResult = ''
     },
-    
     async submitHandle() {
-      if (!this.handleResult) {
+      if (!this.handleResult.trim()) {
         uni.showToast({ title: '请输入处理结果', icon: 'none' })
         return
       }
-      
       uni.showLoading({ title: '提交中...' })
       try {
-        // 调用处理接口，注意后端接收的是 query param 而不是 json body
-        // 这里的 request 封装默认如果是 POST/PUT 且 data 是对象，会序列化为 JSON body
-        // 但后端的 @RequestParam 需要的是 query parameters 或者 form-data
-        // 所以我们需要手动拼接参数到 URL，或者修改 request 封装（这里选择拼接 URL 最稳妥）
         const url = `/api/complaint/handle?id=${this.currentComplaint.id}&result=${encodeURIComponent(this.handleResult)}`
-        
         await request(url, {}, 'PUT')
-        
-        // 本地更新状态
-        const item = this.complaintList.find(i => i.id === this.currentComplaint.id)
-        if (item) {
-          item.status = 'DONE'
-          item.result = this.handleResult
-        }
-        
         uni.showToast({ title: '处理成功', icon: 'success' })
         this.closeHandleModal()
-        this.loadStats() // 重新加载统计
-      } catch (e) {
-        console.error('处理投诉失败', e)
+        this.loadData()
+        this.loadStats()
+      } catch (error) {
+        console.error('处理投诉失败', error)
         uni.showToast({ title: '提交失败', icon: 'none' })
       } finally {
         uni.hideLoading()
       }
     },
-    
     makeCall(phone) {
       if (!phone) return
       uni.makePhoneCall({ phoneNumber: phone })
     },
-    
     previewImage(images, index) {
       if (!images) return
-      const urls = images.split(',')
+      const urls = String(images).split(',').filter(Boolean)
+      if (!urls.length) return
       uni.previewImage({
-        current: urls[index],
-        urls: urls
+        current: urls[index] || urls[0],
+        urls
       })
     },
-
-    getStatusClass(status) {
-      return {
-        'status-pending': status === 'PENDING',
-        'status-processed': status === 'DONE'
-      }
+    getImageCount(images) {
+      if (!images) return 0
+      return String(images).split(',').filter(Boolean).length
     },
-    
+    getOwnerText(item) {
+      return item.ownerName || item.userName || '匿名'
+    },
+    getStatusClass(status) {
+      return status === 'DONE' ? 'status-processed' : 'status-pending'
+    },
     getStatusText(status) {
       const map = {
-        'PENDING': '待处理',
-        'DONE': '已处理'
+        PENDING: '待处理',
+        DONE: '已处理'
       }
-      return map[status] || status
+      return map[status] || status || '-'
     },
-    
+    formatHouse(item) {
+      if (item.buildingNo && item.houseNo) {
+        return `${item.buildingNo}栋${item.houseNo}室`
+      }
+      return '未绑定房屋'
+    },
     formatTime(time) {
-      if (!time) return ''
-      return new Date(time).toLocaleString()
+      if (!time) return '-'
+      const date = new Date(String(time).replace(' ', 'T'))
+      if (Number.isNaN(date.getTime())) return String(time)
+      return date.toLocaleString()
     }
   }
 }
@@ -446,387 +479,540 @@ export default {
 
 <style scoped>
 .manage-container {
-  padding: 30rpx;
-  background-color: #f5f7fa;
-  min-height: 100vh;
-  padding-top: 100rpx;
+  --complaint-primary: #2e7cf6;
+  --complaint-primary-strong: #1f5fd0;
+  --complaint-line: #e7edf5;
+  --complaint-text: #24384e;
+  --complaint-muted: #8797aa;
+  min-height: 100%;
+  color: var(--complaint-text);
+  background:
+    radial-gradient(circle at 0 0, rgba(46, 124, 246, 0.12), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
+  animation: pageFadeIn 260ms ease-out both;
 }
 
-/* 统计卡片样式 */
-.stats-card-container {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20rpx;
-  margin-bottom: 20rpx;
+.overview-panel,
+.query-panel,
+.table-toolbar,
+.table-panel,
+.pagination {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid var(--complaint-line);
+  border-radius: 22rpx;
+  box-shadow: 0 16rpx 40rpx rgba(20, 50, 80, 0.06);
 }
 
-.stats-filter {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 20rpx;
-}
-
-.stats-filter-btn {
+.overview-panel {
   display: flex;
   align-items: center;
-  background: #fff;
-  padding: 12rpx 18rpx;
-  border-radius: 999rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 28rpx 30rpx;
+  margin-bottom: 20rpx;
 }
 
-.stats-filter-text {
-  font-size: 24rpx;
-  color: #333;
+.overview-title {
+  display: block;
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #17324a;
 }
 
-.stats-filter-arrow {
-  margin-left: 10rpx;
+.overview-subtitle {
+  display: block;
+  margin-top: 10rpx;
   font-size: 22rpx;
-  color: #999;
+  color: var(--complaint-muted);
 }
 
-.stats-card {
-  background-color: #fff;
-  padding: 30rpx;
-  border-radius: 15rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-  text-align: center;
-  cursor: pointer;
-  border-left: 6rpx solid #2D81FF;
-}
-
-.stats-card.status-pending {
-  border-left-color: #ff4757;
-}
-
-.stats-card.status-processed {
-  border-left-color: #2ed573;
-}
-
-.stats-number {
-  display: block;
-  font-size: 40rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 10rpx;
-}
-
-.stats-label {
-  display: block;
-  font-size: 24rpx;
-  color: #999;
-}
-
-/* 搜索栏 */
-.search-filter-bar {
-  background: white;
-  padding: 20rpx;
-  border-radius: 15rpx;
-  margin-bottom: 30rpx;
+.month-filter-chip {
   display: flex;
   flex-direction: column;
-  gap: 20rpx;
+  align-items: flex-end;
+  min-width: 180rpx;
+  padding: 18rpx 24rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(135deg, #f7fbff 0%, #eef5ff 100%);
+  border: 1rpx solid #d8e5fb;
 }
 
-.search-box {
+.month-filter-label {
+  font-size: 20rpx;
+  color: var(--complaint-muted);
+}
+
+.month-filter-value {
+  margin-top: 6rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #183f68;
+}
+
+.status-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.status-summary-card {
+  padding: 24rpx 26rpx;
+  border-radius: 20rpx;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1rpx solid var(--complaint-line);
+  box-shadow: 0 10rpx 24rpx rgba(20, 50, 80, 0.05);
+  animation: cardRise 320ms ease-out both;
+}
+
+.status-summary-card.active {
+  border-color: rgba(46, 124, 246, 0.36);
+  box-shadow: 0 16rpx 28rpx rgba(46, 124, 246, 0.12);
+}
+
+.status-summary-card.pending {
+  background: linear-gradient(180deg, #fff 0%, #fff4f6 100%);
+}
+
+.status-summary-card.processed {
+  background: linear-gradient(180deg, #fff 0%, #eefaf4 100%);
+}
+
+.summary-label {
+  display: block;
+  font-size: 22rpx;
+  color: var(--complaint-muted);
+}
+
+.summary-value {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1b3248;
+}
+
+.query-panel {
   display: flex;
-  gap: 20rpx;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 20rpx;
 }
 
-.search-input {
+.query-grid {
   flex: 1;
-  background: #f5f7fa;
-  height: 70rpx;
-  border-radius: 35rpx;
-  padding: 0 30rpx;
-  font-size: 28rpx;
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 18rpx;
 }
 
-.search-btn {
-  height: 70rpx;
-  line-height: 70rpx;
-  background: #2D81FF;
-  color: white;
-  font-size: 28rpx;
-  border-radius: 35rpx;
-  padding: 0 40rpx;
+.query-field,
+.query-field-wide {
+  min-width: 0;
 }
 
-.filter-picker {
-  background: #f5f7fa;
-  height: 70rpx;
-  border-radius: 35rpx;
+.query-label {
+  display: block;
+  margin-bottom: 10rpx;
+  font-size: 22rpx;
+  color: #64778c;
+}
+
+.query-input,
+.query-picker,
+.handle-textarea {
+  border-radius: 14rpx;
+  border: 1rpx solid #dce6f2;
+  background: #fbfdff;
+  font-size: 26rpx;
+  color: var(--complaint-text);
+}
+
+.query-input,
+.query-picker {
+  height: 76rpx;
+  padding: 0 24rpx;
+  display: flex;
+  align-items: center;
+}
+
+.query-picker-text {
+  font-size: 26rpx;
+  color: #607387;
+}
+
+.query-actions {
+  display: flex;
+  gap: 12rpx;
+}
+
+.query-btn,
+.row-btn,
+.page-btn,
+.detail-btn,
+.close-btn {
+  margin: 0;
+  border: none;
+  border-radius: 12rpx;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.query-btn {
+  height: 76rpx;
+  line-height: 76rpx;
+  padding: 0 28rpx;
+  font-size: 26rpx;
+}
+
+.query-btn.primary,
+.row-btn.primary,
+.detail-btn.primary {
+  background: linear-gradient(135deg, var(--complaint-primary) 0%, #58a3ff 100%);
+  color: #fff;
+  box-shadow: 0 12rpx 24rpx rgba(46, 124, 246, 0.2);
+}
+
+.query-btn.secondary,
+.row-btn.ghost,
+.page-btn,
+.detail-btn.secondary,
+.close-btn {
+  background: #f5f8fc;
+  color: var(--complaint-text);
+  border: 1rpx solid #dce6f2;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 18rpx 24rpx;
+  margin-bottom: 18rpx;
+}
+
+.toolbar-left-group,
+.toolbar-right-group,
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.toolbar-meta {
+  font-size: 22rpx;
+  color: var(--complaint-muted);
+}
+
+.toolbar-meta.active {
+  color: var(--complaint-primary-strong);
+  font-weight: 600;
+}
+
+.table-panel {
+  overflow: hidden;
+}
+
+.table-head,
+.table-row {
+  display: grid;
+  grid-template-columns: 170rpx minmax(260rpx, 1.2fr) 220rpx 170rpx 220rpx 140rpx 120rpx minmax(220rpx, 1fr) 260rpx;
+  align-items: center;
+}
+
+.table-head {
+  min-height: 86rpx;
+  padding: 0 18rpx;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f6fb 100%);
+  border-bottom: 1rpx solid var(--complaint-line);
+}
+
+.table-row {
+  min-height: 120rpx;
+  padding: 0 18rpx;
+  border-bottom: 1rpx solid #edf2f7;
+  background: rgba(255, 255, 255, 0.95);
+  animation: rowSlideIn 320ms ease-out both;
+}
+
+.table-col {
+  padding: 18rpx 12rpx;
+  font-size: 24rpx;
+  color: var(--complaint-muted);
+}
+
+.primary-text,
+.plain-text,
+.minor-text,
+.desc-text,
+.minor-link {
+  display: block;
+  font-size: 24rpx;
+}
+
+.primary-text,
+.plain-text {
+  color: var(--complaint-text);
+}
+
+.primary-text {
+  font-weight: 600;
+}
+
+.minor-text {
+  color: #7e8fa2;
+}
+
+.minor-link {
+  margin-top: 6rpx;
+  color: #2d74e5;
+}
+
+.desc-text {
+  color: #66788b;
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.status-pill.status-pending {
+  background: #fff1f3;
+  color: #c44859;
+}
+
+.status-pill.status-processed {
+  background: #edf9f1;
+  color: #2d8c59;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  flex-wrap: wrap;
+}
+
+.row-btn {
+  min-height: 52rpx;
+  line-height: 52rpx;
+  padding: 0 18rpx;
+  font-size: 22rpx;
+}
+
+.loading-state,
+.empty-state {
+  padding: 80rpx 20rpx;
+  text-align: center;
+}
+
+.loading-text,
+.empty-state text {
+  font-size: 28rpx;
+  color: var(--complaint-muted);
+}
+
+.pagination {
+  margin-top: 18rpx;
+  padding: 18rpx 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.page-meta {
+  font-size: 22rpx;
+  color: var(--complaint-muted);
+}
+
+.page-btn {
+  min-height: 58rpx;
+  line-height: 58rpx;
+  padding: 0 20rpx;
+  font-size: 24rpx;
+}
+
+.page-size {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  font-size: 22rpx;
+  color: var(--complaint-muted);
+}
+
+.page-size-text {
+  display: inline-flex;
+  align-items: center;
+  min-height: 58rpx;
+  padding: 0 18rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid #dce6f2;
+  background: #f8fbff;
+  color: var(--complaint-text);
+}
+
+.detail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.filter-picker-text {
-  font-size: 28rpx;
-  color: #666;
-}
-
-/* 列表 */
-.complaint-item {
-  background: white;
-  border-radius: 15rpx;
   padding: 30rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+  background: rgba(18, 34, 53, 0.52);
 }
 
-.item-header {
+.detail-content {
+  width: 100%;
+  max-width: 760rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  box-shadow: 0 28rpx 80rpx rgba(15, 35, 56, 0.22);
+}
+
+.detail-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  padding: 28rpx 30rpx;
+  border-bottom: 1rpx solid var(--complaint-line);
+}
+
+.detail-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #163149;
+}
+
+.close-btn {
+  min-width: 120rpx;
+  min-height: 56rpx;
+  line-height: 56rpx;
+  font-size: 22rpx;
+}
+
+.detail-body {
+  padding: 28rpx 30rpx 32rpx;
+}
+
+.detail-item {
+  display: flex;
   align-items: flex-start;
   margin-bottom: 20rpx;
 }
 
-.title-row {
-  display: flex;
-  flex-direction: column;
-}
-
-.item-title {
-  font-size: 32rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 6rpx;
-}
-
-.time-text {
-  font-size: 24rpx;
-  color: #999;
-}
-
-.status-tag {
-  font-size: 24rpx;
-  padding: 6rpx 16rpx;
-  border-radius: 6rpx;
-  white-space: nowrap;
-}
-
-.status-tag.status-pending {
-  background: rgba(255, 71, 87, 0.1);
-  color: #ff4757;
-}
-
-.status-tag.status-processed {
-  background: rgba(46, 213, 115, 0.1);
-  color: #2ed573;
-}
-
-.item-content {
-  margin-bottom: 20rpx;
-  padding: 20rpx;
-  background: #f9f9f9;
-  border-radius: 10rpx;
-}
-
-.content-text {
-  font-size: 28rpx;
-  color: #666;
-  line-height: 1.5;
+.detail-item-block {
   display: block;
 }
 
-.image-preview {
-  margin-top: 20rpx;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15rpx;
-}
-
-.complain-img {
+.detail-label {
   width: 150rpx;
-  height: 150rpx;
-  border-radius: 8rpx;
-  background: #eee;
+  font-size: 25rpx;
+  color: #6f8092;
 }
 
-.item-info {
-  margin-bottom: 20rpx;
-  border-top: 1rpx dashed #eee;
-  padding-top: 20rpx;
-}
-
-.info-row {
-  display: flex;
-  margin-bottom: 10rpx;
-  font-size: 26rpx;
-  color: #666;
-}
-
-.info-row .label {
-  width: 140rpx;
-  color: #999;
-}
-
-.info-row .phone {
-  color: #2D81FF;
-  margin-left: 10rpx;
-}
-
-.result-box {
-  margin-top: 15rpx;
-  background: #f0f9eb;
-  padding: 15rpx;
-  border-radius: 8rpx;
-  font-size: 26rpx;
-  color: #67c23a;
-  display: flex;
-}
-
-.result-box .label {
-  font-weight: bold;
-  margin-right: 10rpx;
-}
-
-.item-footer {
-  border-top: 1rpx solid #f0f0f0;
-  padding-top: 20rpx;
-  display: flex;
-  justify-content: flex-end;
-  gap: 20rpx;
-}
-
-.action-btn {
-  display: inline-block;
-  font-size: 26rpx;
-  padding: 0 30rpx;
-  height: 60rpx;
-  line-height: 60rpx;
-  border-radius: 30rpx;
-  margin: 0;
-}
-
-.action-btn.handle {
-  background: #2D81FF;
-  color: white;
-}
-
-.action-btn.call {
-  background: #e6f7ff;
-  color: #1890ff;
-  border: 1rpx solid #91d5ff;
-}
-
-/* 分页组件样式 */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20rpx;
-  margin-top: 40rpx;
-  padding: 20rpx 0;
-  background-color: #fff;
-  border-radius: 10rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-}
-
-.page-btn {
-  padding: 10rpx 20rpx;
-  background-color: #f5f7fa;
-  color: #333;
-  border: 1rpx solid #e4e7ed;
-  border-radius: 6rpx;
-  font-size: 28rpx;
-  min-width: 100rpx;
-}
-
-.page-btn[disabled] {
-  opacity: 0.5;
-  color: #909399;
-}
-
-.page-info {
-  display: flex;
-  align-items: center;
-  font-size: 28rpx;
-  color: #333;
-}
-
-.page-separator {
-  margin: 0 10rpx;
-  color: #909399;
-}
-
-/* 弹窗 */
-.modal-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  width: 80%;
-  background: white;
-  border-radius: 20rpx;
-  overflow: hidden;
-}
-
-.modal-header {
-  padding: 30rpx;
-  border-bottom: 1rpx solid #eee;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-title {
-  font-size: 32rpx;
-  font-weight: bold;
-}
-
-.close-icon {
-  font-size: 40rpx;
-  color: #999;
-  padding: 0 10rpx;
-}
-
-.modal-body {
-  padding: 30rpx;
+.detail-value {
+  flex: 1;
+  font-size: 25rpx;
+  color: var(--complaint-text);
 }
 
 .handle-textarea {
   width: 100%;
-  height: 200rpx;
-  background: #f5f7fa;
-  border-radius: 10rpx;
+  min-height: 220rpx;
   padding: 20rpx;
-  font-size: 28rpx;
   box-sizing: border-box;
 }
 
-.modal-footer {
-  padding: 20rpx 30rpx 30rpx;
+.detail-actions {
   display: flex;
-  gap: 20rpx;
+  gap: 14rpx;
+  margin-top: 28rpx;
 }
 
-.modal-footer button {
+.detail-btn {
   flex: 1;
-  font-size: 28rpx;
-  height: 80rpx;
-  line-height: 80rpx;
-  border-radius: 40rpx;
+  min-height: 68rpx;
+  line-height: 68rpx;
+  font-size: 24rpx;
 }
 
-.cancel-btn {
-  background: #f5f7fa;
-  color: #666;
+.query-btn:active,
+.row-btn:active,
+.page-btn:active,
+.detail-btn:active,
+.close-btn:active,
+.status-summary-card:active {
+  transform: scale(0.985);
 }
 
-.confirm-btn {
-  background: #2D81FF;
-  color: white;
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cardRise {
+  from {
+    opacity: 0;
+    transform: translateY(18rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rowSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(16rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 1360rpx) {
+  .query-panel,
+  .pagination,
+  .table-toolbar,
+  .overview-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .status-summary-bar,
+  .query-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-panel {
+    overflow-x: auto;
+  }
+
+  .table-head,
+  .table-row {
+    min-width: 1950rpx;
+  }
 }
 </style>

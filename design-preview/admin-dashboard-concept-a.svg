@@ -1,0 +1,173 @@
+<svg width="1600" height="960" viewBox="0 0 1600 960" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgA" x1="0" y1="0" x2="1600" y2="960" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EEF1F5"/>
+      <stop offset="1" stop-color="#E2E7EE"/>
+    </linearGradient>
+    <linearGradient id="sidebarA" x1="0" y1="0" x2="0" y2="960" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E2C3D"/>
+      <stop offset="1" stop-color="#2E435D"/>
+    </linearGradient>
+    <linearGradient id="headerA" x1="0" y1="0" x2="1200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#243750"/>
+      <stop offset="1" stop-color="#304763"/>
+    </linearGradient>
+    <linearGradient id="heroA" x1="0" y1="0" x2="900" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7F3EA"/>
+      <stop offset="1" stop-color="#EEE8DD"/>
+    </linearGradient>
+    <linearGradient id="goldA" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#C69B5E"/>
+      <stop offset="1" stop-color="#E0BF84"/>
+    </linearGradient>
+    <filter id="shadowA" x="-40" y="-40" width="200" height="200" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#20324A" flood-opacity="0.12"/>
+    </filter>
+    <filter id="cardShadowA" x="-60" y="-60" width="520" height="420" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#23354D" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="960" fill="url(#bgA)"/>
+  <rect x="0" y="0" width="280" height="960" rx="0" fill="url(#sidebarA)"/>
+  <rect x="280" y="0" width="1320" height="78" fill="url(#headerA)"/>
+
+  <text x="34" y="54" fill="#F8F7F3" font-size="38" font-family="Segoe UI, Arial, sans-serif" font-weight="300" letter-spacing="2">ORCHARD</text>
+  <text x="214" y="54" fill="#E8D8B8" font-size="18" font-family="Segoe UI, Arial, sans-serif">Admin v2</text>
+
+  <rect x="32" y="102" width="216" height="46" rx="12" fill="#314860"/>
+  <circle cx="56" cy="125" r="8" fill="#C69B5E"/>
+  <text x="74" y="132" fill="#BAC6D5" font-size="18" font-family="Segoe UI, Arial, sans-serif">Search menu</text>
+
+  <text x="34" y="188" fill="#9BA9BA" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.4">OVERVIEW</text>
+  <g filter="url(#shadowA)">
+    <rect x="24" y="204" width="232" height="60" rx="16" fill="#101B29"/>
+  </g>
+  <rect x="24" y="204" width="6" height="60" rx="3" fill="url(#goldA)"/>
+  <text x="48" y="242" fill="#FAF7F1" font-size="20" font-family="Segoe UI, Arial, sans-serif">Dashboard</text>
+  <circle cx="232" cy="234" r="5" fill="#E4C58D"/>
+
+  <text x="34" y="320" fill="#9BA9BA" font-size="14" font-family="Segoe UI, Arial, sans-serif" letter-spacing="1.4">OPERATIONS</text>
+  <g fill="#C9D3DE" font-family="Segoe UI, Arial, sans-serif" font-size="20">
+    <text x="48" y="374">Repair Center</text>
+    <text x="48" y="432">Work Orders</text>
+    <text x="48" y="490">Visitor Review</text>
+    <text x="48" y="548">Announcements</text>
+    <text x="48" y="606">Finance</text>
+    <text x="48" y="664">System Config</text>
+  </g>
+  <g fill="#6F8197">
+    <circle cx="232" cy="366" r="5"/>
+    <circle cx="232" cy="424" r="5"/>
+    <circle cx="232" cy="482" r="5"/>
+    <circle cx="232" cy="540" r="5"/>
+    <circle cx="232" cy="598" r="5"/>
+    <circle cx="232" cy="656" r="5"/>
+  </g>
+  <rect x="34" y="734" width="212" height="160" rx="22" fill="#364D68"/>
+  <text x="54" y="774" fill="#EAD8B2" font-size="18" font-family="Segoe UI, Arial, sans-serif">Today</text>
+  <text x="54" y="818" fill="#FFFFFF" font-size="42" font-family="Georgia, serif">27</text>
+  <text x="54" y="850" fill="#B8C4D3" font-size="16" font-family="Segoe UI, Arial, sans-serif">Open repairs: 12</text>
+  <text x="54" y="878" fill="#B8C4D3" font-size="16" font-family="Segoe UI, Arial, sans-serif">Pending audits: 6</text>
+
+  <rect x="318" y="16" width="320" height="46" rx="23" fill="#223248"/>
+  <text x="350" y="45" fill="#F5F7FA" font-size="18" font-family="Segoe UI, Arial, sans-serif">Tue, 27 Apr 2026</text>
+  <rect x="654" y="16" width="180" height="46" rx="23" fill="#223248"/>
+  <text x="690" y="45" fill="#F5F7FA" font-size="18" font-family="Segoe UI, Arial, sans-serif">16 : 05 : 41</text>
+  <rect x="852" y="16" width="260" height="46" rx="23" fill="#223248"/>
+  <text x="884" y="45" fill="#F5F7FA" font-size="18" font-family="Segoe UI, Arial, sans-serif">Cloudy 26C   12km/h</text>
+  <circle cx="1470" cy="39" r="23" fill="#E8EDF4"/>
+  <text x="1506" y="45" fill="#FFFFFF" font-size="22" font-family="Segoe UI, Arial, sans-serif">Hi, Admin</text>
+
+  <rect x="318" y="96" width="1248" height="106" rx="22" fill="url(#heroA)" stroke="#E2DBCF"/>
+  <path d="M318 96H424V202H318V96Z" fill="#F4EEE4"/>
+  <path d="M318 96L360 96L318 138V96Z" fill="#DAD2C3"/>
+  <text x="368" y="138" fill="#7D8894" font-size="34" font-family="Segoe UI, Arial, sans-serif" font-weight="500">Community Control Deck</text>
+  <text x="368" y="170" fill="#A38F70" font-size="18" font-family="Segoe UI, Arial, sans-serif">Elegant operations console with warm editorial panels and clean hierarchy.</text>
+  <rect x="1242" y="123" width="276" height="50" rx="25" fill="#FFFFFF" stroke="#D2D7DE"/>
+  <text x="1274" y="154" fill="#98A3AF" font-size="20" font-family="Segoe UI, Arial, sans-serif">Search records...</text>
+
+  <text x="330" y="240" fill="#8B97A5" font-size="18" font-family="Segoe UI, Arial, sans-serif">Home / Admin / Dashboard</text>
+
+  <g filter="url(#cardShadowA)">
+    <rect x="318" y="270" width="1248" height="166" rx="24" fill="#FFFFFF"/>
+  </g>
+  <text x="346" y="312" fill="#93A0AE" font-size="18" font-family="Consolas, monospace">BASIC METRICS</text>
+
+  <rect x="348" y="338" width="270" height="68" rx="18" fill="#F7F8FA"/>
+  <rect x="648" y="338" width="270" height="68" rx="18" fill="#F7F8FA"/>
+  <rect x="948" y="338" width="270" height="68" rx="18" fill="#F7F8FA"/>
+  <rect x="1248" y="338" width="270" height="68" rx="18" fill="#F7F8FA"/>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <text x="382" y="368" fill="#A1ACB8" font-size="16">Residents</text>
+    <text x="382" y="394" fill="#344558" font-size="30" font-weight="700">1,286</text>
+    <text x="682" y="368" fill="#A1ACB8" font-size="16">Repairs Today</text>
+    <text x="682" y="394" fill="#344558" font-size="30" font-weight="700">24</text>
+    <text x="982" y="368" fill="#A1ACB8" font-size="16">Open Workorders</text>
+    <text x="982" y="394" fill="#344558" font-size="30" font-weight="700">18</text>
+    <text x="1282" y="368" fill="#A1ACB8" font-size="16">Collection Rate</text>
+    <text x="1282" y="394" fill="#344558" font-size="30" font-weight="700">96.4%</text>
+  </g>
+
+  <g filter="url(#cardShadowA)">
+    <rect x="318" y="462" width="612" height="220" rx="24" fill="#FFFFFF"/>
+  </g>
+  <text x="346" y="504" fill="#667586" font-size="22" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Repair Trend</text>
+  <path d="M366 620H884" stroke="#E9EDF2" stroke-width="2"/>
+  <path d="M366 588H884" stroke="#F0F3F6" stroke-width="2"/>
+  <path d="M366 556H884" stroke="#F0F3F6" stroke-width="2"/>
+  <path d="M366 524H884" stroke="#F0F3F6" stroke-width="2"/>
+  <path d="M380 604C430 576 470 592 522 548C574 504 616 516 666 484C718 452 770 500 824 464" stroke="#C79E61" stroke-width="5" stroke-linecap="round"/>
+  <path d="M380 604C430 576 470 592 522 548C574 504 616 516 666 484C718 452 770 500 824 464V620H380V604Z" fill="#F3E6D0" opacity="0.85"/>
+  <g fill="#C79E61">
+    <circle cx="380" cy="604" r="6"/>
+    <circle cx="522" cy="548" r="6"/>
+    <circle cx="666" cy="484" r="6"/>
+    <circle cx="824" cy="464" r="6"/>
+  </g>
+
+  <g filter="url(#cardShadowA)">
+    <rect x="954" y="462" width="612" height="220" rx="24" fill="#FFFFFF"/>
+  </g>
+  <text x="982" y="504" fill="#667586" font-size="22" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Task Distribution</text>
+  <circle cx="1114" cy="580" r="78" stroke="#E9EEF3" stroke-width="28"/>
+  <path d="M1114 502A78 78 0 0 1 1188 567" stroke="#2B435D" stroke-width="28" stroke-linecap="round"/>
+  <path d="M1188 567A78 78 0 0 1 1140 654" stroke="#C79E61" stroke-width="28" stroke-linecap="round"/>
+  <path d="M1140 654A78 78 0 0 1 1047 621" stroke="#8FA17E" stroke-width="28" stroke-linecap="round"/>
+  <text x="1084" y="588" fill="#36495C" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">142</text>
+  <text x="1256" y="554" fill="#516171" font-size="18" font-family="Segoe UI, Arial, sans-serif">Pending</text>
+  <text x="1256" y="590" fill="#516171" font-size="18" font-family="Segoe UI, Arial, sans-serif">Processing</text>
+  <text x="1256" y="626" fill="#516171" font-size="18" font-family="Segoe UI, Arial, sans-serif">Done</text>
+  <circle cx="1232" cy="548" r="8" fill="#2B435D"/>
+  <circle cx="1232" cy="584" r="8" fill="#C79E61"/>
+  <circle cx="1232" cy="620" r="8" fill="#8FA17E"/>
+
+  <g filter="url(#cardShadowA)">
+    <rect x="318" y="708" width="892" height="214" rx="24" fill="#FFFFFF"/>
+  </g>
+  <text x="346" y="750" fill="#667586" font-size="22" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Quick Modules</text>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <rect x="348" y="782" width="180" height="108" rx="20" fill="#F5F7FA"/>
+    <rect x="544" y="782" width="180" height="108" rx="20" fill="#F5F7FA"/>
+    <rect x="740" y="782" width="180" height="108" rx="20" fill="#F5F7FA"/>
+    <rect x="936" y="782" width="180" height="108" rx="20" fill="#F5F7FA"/>
+    <circle cx="402" cy="828" r="24" fill="#2C425C"/>
+    <circle cx="598" cy="828" r="24" fill="#C79E61"/>
+    <circle cx="794" cy="828" r="24" fill="#879CB3"/>
+    <circle cx="990" cy="828" r="24" fill="#8CA37F"/>
+    <text x="382" y="871" fill="#59697A" font-size="18">Repairs</text>
+    <text x="580" y="871" fill="#59697A" font-size="18">Fees</text>
+    <text x="771" y="871" fill="#59697A" font-size="18">Visitors</text>
+    <text x="961" y="871" fill="#59697A" font-size="18">Notices</text>
+  </g>
+
+  <g filter="url(#cardShadowA)">
+    <rect x="1234" y="708" width="332" height="214" rx="24" fill="#FFFFFF"/>
+  </g>
+  <text x="1262" y="750" fill="#667586" font-size="22" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Live Feed</text>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <text x="1262" y="798" fill="#394B5F" font-size="18">08:45  Elevator repair assigned</text>
+    <text x="1262" y="836" fill="#394B5F" font-size="18">09:10  Visitor pass approved</text>
+    <text x="1262" y="874" fill="#394B5F" font-size="18">09:32  Fee anomaly flagged</text>
+  </g>
+</svg>

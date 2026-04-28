@@ -1,51 +1,219 @@
 <template>
-  <view class="container">
-    <view class="header">
-      <view class="title">报名列表</view>
-      <view class="subtitle">共 {{ total }} 人报名</view>
-    </view>
-    
-    <view class="list-container">
+  <admin-sidebar
+    :showSidebar="showSidebar"
+    @update:showSidebar="showSidebar = $event"
+    pageTitle="活动报名"
+    currentPage="/admin/pages/admin/activity-manage"
+    pageBreadcrumb="管理后台 / 社区活动 / 报名管理"
+    :showPageBanner="false"
+  >
+    <view class="manage-container">
+      <view class="overview-panel">
+        <view class="overview-copy">
+          <text class="overview-title">活动报名列表</text>
+          <text class="overview-subtitle">统一按后台表格页展示当前活动的报名记录，并支持当前页快速筛选。</text>
+        </view>
+
+        <view class="overview-chip">
+          <text class="overview-chip-label">活动 ID</text>
+          <text class="overview-chip-value">{{ activityId || '-' }}</text>
+        </view>
+      </view>
+
+      <view class="status-summary-bar signup-status-bar">
+        <view class="status-summary-card" :class="{ active: statusFilter === '' }" @click="statusFilter = ''">
+          <text class="summary-label">当前页总数</text>
+          <text class="summary-value">{{ pageStats.total }}</text>
+        </view>
+        <view class="status-summary-card signed" :class="{ active: statusFilter === 'SIGNED' }" @click="statusFilter = 'SIGNED'">
+          <text class="summary-label">已报名</text>
+          <text class="summary-value">{{ pageStats.signed }}</text>
+        </view>
+        <view class="status-summary-card cancelled" :class="{ active: statusFilter === 'CANCELLED' }" @click="statusFilter = 'CANCELLED'">
+          <text class="summary-label">已取消</text>
+          <text class="summary-value">{{ pageStats.cancelled }}</text>
+        </view>
+      </view>
+
+      <view class="query-panel">
+        <view class="query-grid signup-query-grid">
+          <view class="query-field query-field-wide">
+            <text class="query-label">关键词</text>
+            <input
+              v-model="searchQuery"
+              class="query-input"
+              type="text"
+              placeholder="按姓名或手机号筛选当前页"
+            />
+          </view>
+
+          <view class="query-field">
+            <text class="query-label">报名状态</text>
+            <picker
+              mode="selector"
+              :range="statusOptions"
+              range-key="label"
+              :value="statusPickerIndex"
+              @change="handleStatusChange"
+            >
+              <view class="query-picker">
+                <text class="query-picker-text">{{ currentStatusLabel }}</text>
+              </view>
+            </picker>
+          </view>
+        </view>
+
+        <view class="query-actions">
+          <button class="query-btn primary" @click="handleRefresh">刷新</button>
+          <button class="query-btn secondary" @click="handleResetFilters">重置</button>
+        </view>
+      </view>
+
+      <view class="table-toolbar">
+        <view class="toolbar-left-group">
+          <text class="toolbar-meta">活动总报名 {{ total }} 条</text>
+          <text class="toolbar-meta active">当前页显示 {{ displayList.length }} 条</text>
+        </view>
+
+        <view class="toolbar-right-group">
+          <text class="toolbar-meta">每页 {{ pageSize }} 条</text>
+        </view>
+      </view>
+
       <view v-if="loading" class="loading-state">
         <text class="loading-text">加载中...</text>
       </view>
-      
-      <view v-else-if="list.length > 0" class="signup-list">
-        <view v-for="(item, index) in list" :key="item.id" class="signup-item">
-          <view class="item-left">
-            <text class="index">{{ index + 1 }}</text>
-            <view class="user-info">
-              <text class="name">{{ item.userName || '未知用户' }}</text>
-              <text class="phone">{{ item.userPhone || '暂无电话' }}</text>
+
+      <view v-else class="table-panel">
+        <view class="scroll-table">
+          <view class="table-head signup-table">
+            <text class="table-col col-index">序号</text>
+            <text class="table-col col-name">报名人</text>
+            <text class="table-col col-phone">联系电话</text>
+            <text class="table-col col-time">报名时间</text>
+            <text class="table-col col-status">状态</text>
+          </view>
+
+          <view
+            v-for="(item, index) in displayList"
+            :key="item.id || `${item.userName}-${index}`"
+            class="table-row signup-table"
+            :style="{ animationDelay: `${Math.min(360, index * 40)}ms` }"
+          >
+            <view class="table-col col-index">
+              <text class="minor-text">{{ (pageNum - 1) * pageSize + index + 1 }}</text>
+            </view>
+
+            <view class="table-col col-name">
+              <text class="primary-text">{{ item.userName || '未知用户' }}</text>
+            </view>
+
+            <view class="table-col col-phone">
+              <text class="plain-text">{{ item.userPhone || '暂无电话' }}</text>
+            </view>
+
+            <view class="table-col col-time">
+              <text class="minor-text">{{ formatTime(item.signupTime) }}</text>
+            </view>
+
+            <view class="table-col col-status">
+              <text class="status-pill" :class="getStatusClass(item.status)">
+                {{ getStatusText(item.status) }}
+              </text>
             </view>
           </view>
-          <view class="item-right">
-            <text class="time">{{ formatTime(item.signupTime) }}</text>
-            <text class="status">{{ item.status === 'CANCELLED' ? '已取消' : '已报名' }}</text>
+        </view>
+
+        <view v-if="displayList.length === 0" class="empty-state">
+          <text>暂无报名记录</text>
+        </view>
+      </view>
+
+      <view v-if="total > 0" class="pagination">
+        <view class="page-meta">
+          <text>第 {{ pageNum }} / {{ totalPages }} 页</text>
+        </view>
+
+        <view class="page-controls">
+          <button class="page-btn" :disabled="pageNum <= 1" @click="handlePrevPage">上一页</button>
+          <button class="page-btn" :disabled="pageNum >= totalPages" @click="handleNextPage">下一页</button>
+          <view class="page-size">
+            <text>每页</text>
+            <picker mode="selector" :range="[10, 20, 50]" :value="pageSizeIndex" @change="handlePageSizeChange">
+              <text class="page-size-text">{{ pageSize }} 条</text>
+            </picker>
           </view>
         </view>
       </view>
-      
-      <view v-else class="empty-state">
-        <text>暂无报名记录</text>
-      </view>
     </view>
-  </view>
+  </admin-sidebar>
 </template>
 
 <script>
 import request from '@/utils/request'
+import adminSidebar from '@/admin/components/admin-sidebar/admin-sidebar'
 
 export default {
+  components: {
+    adminSidebar
+  },
   data() {
     return {
+      showSidebar: false,
       activityId: null,
       list: [],
       total: 0,
       loading: false,
       pageNum: 1,
       pageSize: 20,
-      hasMore: true
+      searchQuery: '',
+      statusFilter: '',
+      statusOptions: [
+        { value: '', label: '全部状态' },
+        { value: 'SIGNED', label: '已报名' },
+        { value: 'CANCELLED', label: '已取消' }
+      ]
+    }
+  },
+  computed: {
+    totalPages() {
+      return Math.max(1, Math.ceil(this.total / this.pageSize))
+    },
+    pageSizeIndex() {
+      const options = [10, 20, 50]
+      return Math.max(0, options.indexOf(this.pageSize))
+    },
+    statusPickerIndex() {
+      return Math.max(0, this.statusOptions.findIndex(item => item.value === this.statusFilter))
+    },
+    currentStatusLabel() {
+      const current = this.statusOptions.find(item => item.value === this.statusFilter)
+      return current ? current.label : '全部状态'
+    },
+    pageStats() {
+      return this.list.reduce((stats, item) => {
+        stats.total += 1
+        if (item.status === 'CANCELLED') {
+          stats.cancelled += 1
+        } else {
+          stats.signed += 1
+        }
+        return stats
+      }, {
+        total: 0,
+        signed: 0,
+        cancelled: 0
+      })
+    },
+    displayList() {
+      const keyword = this.searchQuery.trim().toLowerCase()
+      return this.list.filter(item => {
+        const matchesStatus = !this.statusFilter || this.normalizeStatus(item.status) === this.statusFilter
+        if (!matchesStatus) return false
+        if (!keyword) return true
+        const haystack = `${item.userName || ''} ${item.userPhone || ''}`.toLowerCase()
+        return haystack.includes(keyword)
+      })
     }
   },
   onLoad(options) {
@@ -54,24 +222,13 @@ export default {
       this.loadData()
     }
   },
-  onPullDownRefresh() {
-    this.pageNum = 1
-    this.hasMore = true
-    this.loadData().then(() => {
-      uni.stopPullDownRefresh()
-    })
-  },
-  onReachBottom() {
-    if (this.hasMore && !this.loading) {
-      this.pageNum++
-      this.loadData()
-    }
-  },
   methods: {
+    normalizeStatus(status) {
+      return status === 'CANCELLED' ? 'CANCELLED' : 'SIGNED'
+    },
     async loadData() {
-      if (this.loading) return
+      if (!this.activityId || this.loading) return
       this.loading = true
-      
       try {
         const res = await request('/api/activity/signup/list', {
           params: {
@@ -80,125 +237,90 @@ export default {
             pageSize: this.pageSize
           }
         }, 'GET')
-        
-        const records = res.records || []
-        this.total = res.total || 0
-        
-        if (this.pageNum === 1) {
-          this.list = records
-        } else {
-          this.list = [...this.list, ...records]
-        }
-        
-        this.hasMore = records.length === this.pageSize
-      } catch (e) {
-        console.error('加载报名列表失败', e)
+        const records = res.records || res.data?.records || res.data || []
+        this.list = Array.isArray(records) ? records : []
+        this.total = Number(res.total || res.data?.total || this.list.length || 0)
+      } catch (error) {
+        console.error('加载报名列表失败', error)
         uni.showToast({ title: '加载失败', icon: 'none' })
+        this.list = []
+        this.total = 0
       } finally {
         this.loading = false
       }
     },
-    
+    handleRefresh() {
+      this.loadData()
+    },
+    handleResetFilters() {
+      this.searchQuery = ''
+      this.statusFilter = ''
+    },
+    handleStatusChange(e) {
+      const index = Number(e?.detail?.value || 0)
+      this.statusFilter = this.statusOptions[index]?.value || ''
+    },
+    handlePrevPage() {
+      if (this.pageNum <= 1) return
+      this.pageNum -= 1
+      this.loadData()
+    },
+    handleNextPage() {
+      if (this.pageNum >= this.totalPages) return
+      this.pageNum += 1
+      this.loadData()
+    },
+    handlePageSizeChange(e) {
+      const options = [10, 20, 50]
+      const index = Number(e?.detail?.value || 0)
+      this.pageSize = options[index] || 20
+      this.pageNum = 1
+      this.loadData()
+    },
+    getStatusClass(status) {
+      return this.normalizeStatus(status) === 'CANCELLED' ? 'status-cancelled' : 'status-signed'
+    },
+    getStatusText(status) {
+      return this.normalizeStatus(status) === 'CANCELLED' ? '已取消' : '已报名'
+    },
     formatTime(time) {
-      if (!time) return ''
-      return time.replace('T', ' ')
+      if (!time) return '-'
+      return String(time).replace('T', ' ')
     }
   }
 }
 </script>
 
+<style scoped src="../../styles/admin-table-page.css"></style>
 <style scoped>
-.container {
-  min-height: 100vh;
-  background-color: #f5f7fa;
-  padding: 30rpx;
+.signup-status-bar {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.header {
-  margin-bottom: 30rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.status-summary-card.signed {
+  background: linear-gradient(180deg, #fff 0%, #eefaf4 100%);
 }
 
-.title {
-  font-size: 32rpx;
-  font-weight: bold;
-  color: #333;
+.status-summary-card.cancelled {
+  background: linear-gradient(180deg, #fff 0%, #fff1f3 100%);
 }
 
-.subtitle {
-  font-size: 24rpx;
-  color: #666;
+.signup-query-grid {
+  grid-template-columns: 1.6fr 1fr;
 }
 
-.signup-item {
-  background: white;
-  padding: 30rpx;
-  border-radius: 12rpx;
-  margin-bottom: 20rpx;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+.signup-table {
+  grid-template-columns: 120rpx 1.2fr 1fr 1fr 160rpx;
+  min-width: 1200rpx;
 }
 
-.item-left {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
+.status-pill.status-signed {
+  background: #edf9f1;
+  color: #2d8c59;
 }
 
-.index {
-  font-size: 28rpx;
-  color: #999;
-  width: 40rpx;
-}
-
-.user-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.name {
-  font-size: 30rpx;
-  font-weight: bold;
-  color: #333;
-}
-
-.phone {
-  font-size: 24rpx;
-  color: #666;
-}
-
-.item-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8rpx;
-}
-
-.time {
-  font-size: 24rpx;
-  color: #999;
-}
-
-.status {
-  font-size: 24rpx;
-  color: #52c41a;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 100rpx 0;
-  color: #999;
-  font-size: 28rpx;
-}
-
-.loading-state {
-  text-align: center;
-  padding: 30rpx;
-  color: #999;
+.status-pill.status-cancelled {
+  background: #fff1f3;
+  color: #c44859;
 }
 </style>

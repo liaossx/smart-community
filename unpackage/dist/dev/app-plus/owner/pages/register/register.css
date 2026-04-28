@@ -39,15 +39,29 @@ uni-input[data-v-e10ddd9f] {
   font-size: 0.875rem;
   color: #333;
 }
+.role-picker[data-v-e10ddd9f] {
+  flex: 1;
+}
 .picker-value[data-v-e10ddd9f] {
   flex: 1;
   height: 2.8125rem;
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 .picker-text[data-v-e10ddd9f] {
   font-size: 0.875rem;
   color: #333;
+}
+.picker-arrow[data-v-e10ddd9f] {
+  color: #999;
+  font-size: 0.75rem;
+}
+.role-tip[data-v-e10ddd9f] {
+  margin: -0.125rem 0.25rem 0.75rem;
+  color: #999;
+  font-size: 0.75rem;
+  line-height: 1.6;
 }
 .register-btn[data-v-e10ddd9f] {
   background-color: #2D81FF;

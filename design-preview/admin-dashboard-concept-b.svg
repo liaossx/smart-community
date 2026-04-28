@@ -1,0 +1,145 @@
+<svg width="1600" height="960" viewBox="0 0 1600 960" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgB" x1="0" y1="0" x2="1600" y2="960" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#EEF4FA"/>
+    </linearGradient>
+    <linearGradient id="leftB" x1="0" y1="0" x2="0" y2="960" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#102A43"/>
+      <stop offset="1" stop-color="#183B5B"/>
+    </linearGradient>
+    <linearGradient id="blueB" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#2C74FF"/>
+      <stop offset="1" stop-color="#5AA2FF"/>
+    </linearGradient>
+    <linearGradient id="mintB" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#10B981"/>
+      <stop offset="1" stop-color="#6EE7B7"/>
+    </linearGradient>
+    <linearGradient id="purpleB" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#C4B5FD"/>
+    </linearGradient>
+    <filter id="shadowB" x="-60" y="-60" width="620" height="420" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#17314E" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="960" fill="url(#bgB)"/>
+  <rect x="0" y="0" width="250" height="960" fill="url(#leftB)"/>
+  <rect x="250" y="0" width="1350" height="88" fill="#FFFFFF"/>
+  <line x1="250" y1="88" x2="1600" y2="88" stroke="#E8EEF6"/>
+
+  <text x="36" y="60" fill="#FFFFFF" font-size="34" font-family="Segoe UI, Arial, sans-serif" font-weight="700">智慧社区</text>
+  <text x="38" y="88" fill="#86A3C4" font-size="16" font-family="Segoe UI, Arial, sans-serif">物业运营后台</text>
+
+  <rect x="28" y="126" width="194" height="48" rx="14" fill="#21476A"/>
+  <text x="54" y="157" fill="#AAC4E3" font-size="18" font-family="Segoe UI, Arial, sans-serif">搜索内容</text>
+
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <text x="34" y="228" fill="#87A3C2" font-size="13" letter-spacing="1.6">工作台</text>
+    <rect x="20" y="244" width="210" height="58" rx="18" fill="#F2F7FF"/>
+    <rect x="20" y="244" width="8" height="58" rx="4" fill="#2C74FF"/>
+    <text x="54" y="280" fill="#14324D" font-size="19" font-weight="700">仪表盘</text>
+    <text x="54" y="342" fill="#D6E3F3" font-size="19">报修管理</text>
+    <text x="54" y="396" fill="#D6E3F3" font-size="19">工单管理</text>
+    <text x="54" y="450" fill="#D6E3F3" font-size="19">投诉处理</text>
+    <text x="54" y="504" fill="#D6E3F3" font-size="19">访客审核</text>
+    <text x="54" y="558" fill="#D6E3F3" font-size="19">费用管理</text>
+    <text x="54" y="612" fill="#D6E3F3" font-size="19">社区活动</text>
+  </g>
+
+  <rect x="282" y="22" width="360" height="42" rx="21" fill="#F3F7FB"/>
+  <text x="314" y="49" fill="#92A4B9" font-size="18" font-family="Segoe UI, Arial, sans-serif">搜索住户、工单、房号...</text>
+  <text x="1168" y="50" fill="#34465B" font-size="18" font-family="Segoe UI, Arial, sans-serif">提醒 12</text>
+  <text x="1260" y="50" fill="#34465B" font-size="18" font-family="Segoe UI, Arial, sans-serif">待办 08</text>
+  <circle cx="1476" cy="44" r="22" fill="#CFE1FF"/>
+  <text x="1510" y="50" fill="#24384E" font-size="18" font-family="Segoe UI, Arial, sans-serif">陈经理</text>
+
+  <text x="286" y="132" fill="#94A4B6" font-size="15" font-family="Segoe UI, Arial, sans-serif">管理后台 / 仪表盘</text>
+  <text x="286" y="182" fill="#19324A" font-size="40" font-family="Segoe UI, Arial, sans-serif" font-weight="700">清晰、明亮、高效</text>
+  <text x="286" y="214" fill="#6E8195" font-size="19" font-family="Segoe UI, Arial, sans-serif">更清爽的社区运营后台，强化核心数据、快捷操作和轻量分析展示。</text>
+
+  <g filter="url(#shadowB)">
+    <rect x="282" y="252" width="286" height="156" rx="28" fill="#FFFFFF"/>
+  </g>
+  <g filter="url(#shadowB)">
+    <rect x="590" y="252" width="286" height="156" rx="28" fill="#FFFFFF"/>
+  </g>
+  <g filter="url(#shadowB)">
+    <rect x="898" y="252" width="286" height="156" rx="28" fill="#FFFFFF"/>
+  </g>
+  <g filter="url(#shadowB)">
+    <rect x="1206" y="252" width="286" height="156" rx="28" fill="#FFFFFF"/>
+  </g>
+
+  <rect x="308" y="278" width="56" height="56" rx="18" fill="url(#blueB)"/>
+  <rect x="616" y="278" width="56" height="56" rx="18" fill="url(#mintB)"/>
+  <rect x="924" y="278" width="56" height="56" rx="18" fill="url(#purpleB)"/>
+  <rect x="1232" y="278" width="56" height="56" rx="18" fill="#FFB84D"/>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <text x="308" y="360" fill="#8A9AAE" font-size="18">住户总数</text>
+    <text x="308" y="394" fill="#19324A" font-size="42" font-weight="700">2,410</text>
+    <text x="616" y="360" fill="#8A9AAE" font-size="18">今日完成</text>
+    <text x="616" y="394" fill="#19324A" font-size="42" font-weight="700">31</text>
+    <text x="924" y="360" fill="#8A9AAE" font-size="18">处理中工单</text>
+    <text x="924" y="394" fill="#19324A" font-size="42" font-weight="700">58</text>
+    <text x="1232" y="360" fill="#8A9AAE" font-size="18">当日收入</text>
+    <text x="1232" y="394" fill="#19324A" font-size="42" font-weight="700">48k</text>
+  </g>
+
+  <g filter="url(#shadowB)">
+    <rect x="282" y="438" width="770" height="236" rx="28" fill="#FFFFFF"/>
+  </g>
+  <text x="312" y="478" fill="#19324A" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">本周业务走势</text>
+  <rect x="312" y="504" width="708" height="138" rx="22" fill="#F6F9FD"/>
+  <path d="M344 608C392 596 418 540 470 546C522 552 544 618 604 602C664 586 688 498 748 486C808 474 834 540 904 522C948 510 972 474 990 462" stroke="#2C74FF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M344 608C392 596 418 540 470 546C522 552 544 618 604 602C664 586 688 498 748 486C808 474 834 540 904 522C948 510 972 474 990 462V642H344V608Z" fill="#D8E8FF"/>
+
+  <g filter="url(#shadowB)">
+    <rect x="1078" y="438" width="414" height="236" rx="28" fill="#FFFFFF"/>
+  </g>
+  <text x="1108" y="478" fill="#19324A" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">状态占比</text>
+  <circle cx="1218" cy="570" r="72" stroke="#EAF0F7" stroke-width="24"/>
+  <path d="M1218 498A72 72 0 0 1 1288 562" stroke="#2C74FF" stroke-width="24" stroke-linecap="round"/>
+  <path d="M1288 562A72 72 0 0 1 1248 630" stroke="#10B981" stroke-width="24" stroke-linecap="round"/>
+  <path d="M1248 630A72 72 0 0 1 1182 635" stroke="#8B5CF6" stroke-width="24" stroke-linecap="round"/>
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="18">
+    <circle cx="1360" cy="536" r="8" fill="#2C74FF"/>
+    <circle cx="1360" cy="578" r="8" fill="#10B981"/>
+    <circle cx="1360" cy="620" r="8" fill="#8B5CF6"/>
+    <text x="1380" y="542" fill="#576C82">待处理 34%</text>
+    <text x="1380" y="584" fill="#576C82">处理中 41%</text>
+    <text x="1380" y="626" fill="#576C82">已完成 25%</text>
+  </g>
+
+  <g filter="url(#shadowB)">
+    <rect x="282" y="702" width="562" height="214" rx="28" fill="#FFFFFF"/>
+  </g>
+  <text x="312" y="742" fill="#19324A" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">快捷入口</text>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <rect x="314" y="776" width="104" height="112" rx="22" fill="#F6F9FD"/>
+    <rect x="436" y="776" width="104" height="112" rx="22" fill="#F6F9FD"/>
+    <rect x="558" y="776" width="104" height="112" rx="22" fill="#F6F9FD"/>
+    <rect x="680" y="776" width="104" height="112" rx="22" fill="#F6F9FD"/>
+    <circle cx="366" cy="816" r="22" fill="#D9E9FF"/>
+    <circle cx="488" cy="816" r="22" fill="#D7F6EB"/>
+    <circle cx="610" cy="816" r="22" fill="#E7DEFF"/>
+    <circle cx="732" cy="816" r="22" fill="#FFE7C5"/>
+    <text x="340" y="868" fill="#5C7187" font-size="16">报修</text>
+    <text x="467" y="868" fill="#5C7187" font-size="16">收费</text>
+    <text x="583" y="868" fill="#5C7187" font-size="16">用户</text>
+    <text x="703" y="868" fill="#5C7187" font-size="16">访客</text>
+  </g>
+
+  <g filter="url(#shadowB)">
+    <rect x="870" y="702" width="622" height="214" rx="28" fill="#FFFFFF"/>
+  </g>
+  <text x="900" y="742" fill="#19324A" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">今日安排</text>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <rect x="900" y="774" width="562" height="42" rx="14" fill="#F6F9FD"/>
+    <rect x="900" y="830" width="562" height="42" rx="14" fill="#F6F9FD"/>
+    <text x="926" y="802" fill="#44607A" font-size="18">09:00  与物业经理确认费用复核</text>
+    <text x="926" y="858" fill="#44607A" font-size="18">14:30  跟进电梯维修复检情况</text>
+  </g>
+</svg>

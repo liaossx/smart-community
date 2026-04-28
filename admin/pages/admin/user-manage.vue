@@ -1,180 +1,227 @@
 <template>
-  <admin-sidebar 
-    :showSidebar="showSidebar" 
+  <admin-sidebar
+    :showSidebar="showSidebar"
     @update:showSidebar="showSidebar = $event"
     pageTitle="用户管理"
     currentPage="/admin/pages/admin/user-manage"
+    pageBreadcrumb="管理后台 / 用户管理"
+    :showPageBanner="false"
   >
     <view class="manage-container">
-      <!-- 统计卡片 -->
-      <view class="stats-card-container">
-        <view class="stats-card" @click="handleStatsClick('')">
-          <text class="stats-number">{{ stats.total }}</text>
-          <text class="stats-label">总用户数</text>
+      <view class="overview-panel">
+        <view class="overview-copy">
+          <text class="overview-title">用户列表</text>
+          <text class="overview-subtitle">统一为后台表格页，保留按月份统计、角色筛选、用户编辑与启停用操作。</text>
         </view>
-        <view class="stats-card status-admin" @click="handleStatsClick('admin')">
-          <text class="stats-number">{{ stats.admin }}</text>
-          <text class="stats-label">管理员</text>
-        </view>
-        <view class="stats-card status-owner" @click="handleStatsClick('owner')">
-          <text class="stats-number">{{ stats.owner }}</text>
-          <text class="stats-label">业主</text>
-        </view>
-      </view>
 
-      <view class="stats-filter">
         <picker mode="selector" :range="monthOptions" range-key="label" @change="handleMonthChange">
-          <view class="stats-filter-btn">
-            <text class="stats-filter-text">{{ currentMonthLabel }}</text>
-            <text class="stats-filter-arrow">▼</text>
+          <view class="month-filter-chip">
+            <text class="month-filter-label">统计月份</text>
+            <text class="month-filter-value">{{ currentMonthLabel }}</text>
           </view>
         </picker>
       </view>
 
-      <view class="search-section">
-        <view class="search-left">
-          <input 
-            class="search-input" 
-            placeholder="搜索用户姓名或手机号" 
-            v-model="searchKey"
-            @input="handleSearch"
-          />
+      <view class="status-summary-bar user-status-bar">
+        <view class="status-summary-card" :class="{ active: roleFilter === '' }" @click="handleStatsClick('')">
+          <text class="summary-label">总用户数</text>
+          <text class="summary-value">{{ stats.total }}</text>
         </view>
-        <view class="search-right">
-          <picker 
-            mode="selector" 
-            :range="roleOptions" 
-            range-key="label" 
-            @change="handleRoleChange"
-          >
-            <view class="role-picker">
-              <text class="role-picker-text">{{ getRoleFilterLabel() }}</text>
-            </view>
-          </picker>
+        <view class="status-summary-card admin" :class="{ active: roleFilter === 'admin' }" @click="handleStatsClick('admin')">
+          <text class="summary-label">管理员</text>
+          <text class="summary-value">{{ stats.admin }}</text>
         </view>
-      </view>
-      
-      <!-- 用户列表 / 状态 -->
-      <view v-if="loading" class="empty-state">
-        <text>加载中...</text>
-      </view>
-
-      <view v-else-if="userList.length" class="user-list">
-        <view 
-          v-for="user in userList" 
-          :key="user.id || user.userId" 
-          class="user-item"
-        >
-          <view class="user-info">
-            <view class="user-avatar">
-              <text class="avatar-text">
-                {{ (user.realName || user.username || '用').slice(0,1) }}
-              </text>
-            </view>
-            <view class="user-main">
-              <text class="user-name">
-                {{ user.realName || user.username || '未填写姓名' }}
-              </text>
-              <view class="user-meta">
-                <text class="user-line">
-                  账号：{{ user.username || '-' }}
-                </text>
-                <text class="user-line">
-                  手机：{{ user.phone || '-' }}
-                </text>
-              </view>
-              <view class="user-tags">
-                <text class="user-role">
-                  {{ getRoleLabel(user.role) }}
-                </text>
-                <text v-if="user.status !== undefined" class="user-status" :class="user.status === 1 ? 'active' : 'disabled'">
-                  {{ user.status === 1 ? '正常' : '已禁用' }}
-                </text>
-              </view>
-            </view>
-          </view>
-          
-          <view class="user-actions">
-            <button 
-              class="edit-btn"
-              @click="handleEditUser(user)"
-            >
-              编辑
-            </button>
-            <button 
-              v-if="user.status !== undefined" 
-              class="status-btn" 
-              :class="user.status === 1 ? 'to-disable' : 'to-enable'"
-              @click="handleToggleStatus(user)"
-            >
-              {{ user.status === 1 ? '禁用' : '启用' }}
-            </button>
-          </view>
-        </view>
-
-        <!-- 分页组件 -->
-        <view v-if="total > 0" class="pagination">
-          <button 
-            class="page-btn" 
-            :disabled="currentPage === 1"
-            @click="handlePrevPage"
-          >
-            上一页
-          </button>
-          
-          <view class="page-info">
-            <text>{{ currentPage }}</text>
-            <text class="page-separator">/</text>
-            <text>{{ totalPages }}</text>
-          </view>
-          
-          <button 
-            class="page-btn" 
-            :disabled="currentPage === totalPages"
-            @click="handleNextPage"
-          >
-            下一页
-          </button>
+        <view class="status-summary-card owner" :class="{ active: roleFilter === 'owner' }" @click="handleStatsClick('owner')">
+          <text class="summary-label">业主</text>
+          <text class="summary-value">{{ stats.owner }}</text>
         </view>
       </view>
 
-      <view v-else class="empty-state">
-        <text>暂无用户数据</text>
-      </view>
-
-      <!-- 编辑弹层 -->
-      <view v-if="showEditPanel" class="edit-mask">
-        <view class="edit-panel">
-          <view class="edit-title">编辑用户</view>
-
-          <view class="edit-field">
-            <text class="field-label">姓名</text>
-            <input 
-              class="field-input"
-              v-model="editForm.realName"
-              placeholder="请输入姓名"
+      <view class="query-panel">
+        <view class="query-grid user-query-grid">
+          <view class="query-field query-field-wide">
+            <text class="query-label">关键词</text>
+            <input
+              v-model="searchKey"
+              class="query-input"
+              type="text"
+              placeholder="搜索姓名、账号或手机号"
+              @confirm="handleSearch"
             />
           </view>
 
-          <view class="edit-field">
-            <text class="field-label">手机号</text>
-            <input 
-              class="field-input"
-              v-model="editForm.phone"
-              placeholder="请输入手机号"
-            />
+          <view class="query-field">
+            <text class="query-label">用户角色</text>
+            <picker
+              mode="selector"
+              :range="roleOptions"
+              range-key="label"
+              :value="rolePickerIndex"
+              @change="handleRoleChange"
+            >
+              <view class="query-picker">
+                <text class="query-picker-text">{{ currentRoleLabel }}</text>
+              </view>
+            </picker>
+          </view>
+        </view>
+
+        <view class="query-actions">
+          <button class="query-btn primary" @click="handleSearch">查询</button>
+          <button class="query-btn secondary" @click="handleResetFilters">重置</button>
+        </view>
+      </view>
+
+      <view class="table-toolbar">
+        <view class="toolbar-left-group">
+          <text class="toolbar-meta">共 {{ total }} 条</text>
+          <text class="toolbar-meta active">当前筛选：{{ currentRoleLabel }}</text>
+        </view>
+
+        <view class="toolbar-right-group">
+          <text class="toolbar-meta">月份：{{ currentMonthLabel }}</text>
+        </view>
+      </view>
+
+      <view v-if="loading" class="loading-state">
+        <text class="loading-text">加载中...</text>
+      </view>
+
+      <view v-else class="table-panel">
+        <view class="scroll-table">
+          <view class="table-head user-table">
+            <text class="table-col col-name">姓名</text>
+            <text class="table-col col-username">账号</text>
+            <text class="table-col col-phone">手机号</text>
+            <text class="table-col col-role">角色</text>
+            <text class="table-col col-status">状态</text>
+            <text class="table-col col-time">最近时间</text>
+            <text class="table-col col-actions">操作</text>
           </view>
 
-          <view class="edit-field">
-            <text class="field-label">角色</text>
-            <text class="field-value">{{ getRoleLabel(editForm.role) }}</text>
+          <view
+            v-for="(user, index) in userList"
+            :key="user.userId"
+            class="table-row user-table"
+            :style="{ animationDelay: `${Math.min(360, index * 40)}ms` }"
+          >
+            <view class="table-col col-name">
+              <text class="primary-text">{{ user.realName || user.username || '未填写姓名' }}</text>
+            </view>
+
+            <view class="table-col col-username">
+              <text class="plain-text">{{ user.username || '-' }}</text>
+            </view>
+
+            <view class="table-col col-phone">
+              <text class="plain-text">{{ user.phone || '-' }}</text>
+            </view>
+
+            <view class="table-col col-role">
+              <text class="plain-text">{{ getRoleLabel(user.role) }}</text>
+            </view>
+
+            <view class="table-col col-status">
+              <text class="status-pill" :class="user.status === 1 ? 'status-active' : 'status-disabled'">
+                {{ user.status === 1 ? '正常' : '已禁用' }}
+              </text>
+            </view>
+
+            <view class="table-col col-time">
+              <text class="minor-text">{{ formatTime(user.createTime) }}</text>
+            </view>
+
+            <view class="table-col col-actions row-actions">
+              <button class="row-btn ghost" @click="handleEditUser(user)">编辑</button>
+              <button
+                class="row-btn"
+                :class="user.status === 1 ? 'secondary-warn' : 'primary'"
+                @click="handleToggleStatus(user)"
+              >
+                {{ user.status === 1 ? '禁用' : '启用' }}
+              </button>
+            </view>
+          </view>
+        </view>
+
+        <view v-if="userList.length === 0" class="empty-state">
+          <text>暂无用户数据</text>
+        </view>
+      </view>
+
+      <view v-if="total > 0" class="pagination">
+        <view class="page-meta">
+          <text>第 {{ currentPage }} / {{ totalPages }} 页</text>
+        </view>
+
+        <view class="page-controls">
+          <button class="page-btn" :disabled="currentPage === 1" @click="handlePrevPage">上一页</button>
+          <button class="page-btn" :disabled="currentPage === totalPages" @click="handleNextPage">下一页</button>
+          <view class="page-size">
+            <text>每页</text>
+            <picker mode="selector" :range="[10, 20, 50, 100]" :value="pageSizeIndex" @change="handlePageSizeChange">
+              <text class="page-size-text">{{ pageSize }} 条</text>
+            </picker>
+          </view>
+        </view>
+      </view>
+
+      <view v-if="showEditPanel" class="detail-modal" @click="closeEditPanel">
+        <view class="detail-content" @click.stop>
+          <view class="detail-header">
+            <text class="detail-title">编辑用户</text>
+            <button class="close-btn" @click="closeEditPanel">关闭</button>
           </view>
 
-          <view class="edit-actions">
-            <button class="edit-cancel" @click="closeEditPanel">取消</button>
-            <button class="edit-save" :disabled="saving" @click="submitEdit">
-              保存
-            </button>
+          <view class="detail-body">
+            <view class="detail-item detail-item-block">
+              <text class="detail-label">角色:</text>
+              <picker
+                mode="selector"
+                :range="editRoleOptions"
+                range-key="label"
+                :value="editRoleIndex"
+                @change="handleEditRoleChange"
+              >
+                <view class="modal-picker">
+                  <text class="modal-picker-text">{{ currentEditRoleLabel }}</text>
+                  <text class="modal-picker-arrow">></text>
+                </view>
+              </picker>
+            </view>
+
+            <view class="detail-item detail-item-block">
+              <text class="detail-label">姓名:</text>
+              <input class="form-input-inline" v-model="editForm.realName" placeholder="请输入姓名" />
+            </view>
+
+            <view class="detail-item detail-item-block">
+              <text class="detail-label">手机号:</text>
+              <input class="form-input-inline" v-model="editForm.phone" placeholder="请输入手机号" />
+            </view>
+
+            <view v-if="needsEditCommunityAssignment" class="detail-item detail-item-block">
+              <text class="detail-label">{{ normalizedEditRole === 'admin' ? '负责社区:' : '所属社区:' }}</text>
+              <picker
+                mode="selector"
+                :range="communityList"
+                range-key="name"
+                :value="editCommunityIndex"
+                :disabled="communityListLoading || communityList.length === 0"
+                @change="handleEditCommunityChange"
+              >
+                <view class="modal-picker" :class="{ placeholder: !editCommunityLabel }">
+                  <text class="modal-picker-text">{{ editCommunityDisplayText }}</text>
+                  <text class="modal-picker-arrow">></text>
+                </view>
+              </picker>
+              <text class="detail-tip">{{ editCommunityTip }}</text>
+            </view>
+
+            <view class="detail-actions">
+              <button class="detail-btn secondary" @click="closeEditPanel">取消</button>
+              <button class="detail-btn primary" :disabled="saving" @click="submitEdit">保存</button>
+            </view>
           </view>
         </view>
       </view>
@@ -202,22 +249,27 @@ export default {
         { label: '管理员', value: 'admin' },
         { label: '普通用户', value: 'owner' }
       ],
+      editRoleOptions: [
+        { label: '业主', value: 'owner' },
+        { label: '工作人员', value: 'worker' },
+        { label: '管理员', value: 'admin' },
+        { label: '超级管理员', value: 'super_admin' }
+      ],
+      communityList: [],
+      communityListLoading: false,
+      communityLoadError: '',
       showEditPanel: false,
-      editingUser: null,
       editForm: {
         userId: null,
         realName: '',
         phone: '',
-        role: ''
+        role: '',
+        communityId: ''
       },
       saving: false,
-      
-      // 分页相关
       currentPage: 1,
       pageSize: 10,
       total: 0,
-      
-      // 统计数据
       stats: {
         total: 0,
         admin: 0,
@@ -229,15 +281,59 @@ export default {
     }
   },
   computed: {
-    roleFilterValue() {
-      return this.roleFilter || ''
-    },
     totalPages() {
-      return Math.ceil(this.total / this.pageSize) || 1
+      return Math.max(1, Math.ceil(this.total / this.pageSize))
+    },
+    pageSizeIndex() {
+      const options = [10, 20, 50, 100]
+      return Math.max(0, options.indexOf(this.pageSize))
+    },
+    rolePickerIndex() {
+      return Math.max(0, this.roleOptions.findIndex(item => item.value === this.roleFilter))
+    },
+    currentRoleLabel() {
+      const current = this.roleOptions.find(item => item.value === this.roleFilter)
+      return current ? current.label : '全部角色'
     },
     currentMonthLabel() {
-      const opt = this.monthOptions && this.monthOptions[this.monthIndex]
-      return (opt && opt.label) || this.monthValue || '选择月份'
+      const option = this.monthOptions[this.monthIndex]
+      return option ? option.label : (this.monthValue || '选择月份')
+    },
+    normalizedEditRole() {
+      return String(this.editForm.role || '').toLowerCase()
+    },
+    editRoleIndex() {
+      return Math.max(0, this.editRoleOptions.findIndex(item => item.value === this.normalizedEditRole))
+    },
+    currentEditRoleLabel() {
+      const current = this.editRoleOptions.find(item => item.value === this.normalizedEditRole)
+      return current ? current.label : '业主'
+    },
+    needsEditCommunityAssignment() {
+      return this.normalizedEditRole === 'admin' || this.normalizedEditRole === 'worker'
+    },
+    editCommunityIndex() {
+      const index = this.communityList.findIndex(item => String(item.id) === String(this.editForm.communityId))
+      return index >= 0 ? index : 0
+    },
+    editCommunityLabel() {
+      const current = this.communityList.find(item => String(item.id) === String(this.editForm.communityId))
+      return current ? current.name : ''
+    },
+    editCommunityDisplayText() {
+      if (this.communityListLoading) return '社区列表加载中...'
+      if (this.editCommunityLabel) return this.editCommunityLabel
+      if (this.communityLoadError) return '社区列表加载失败'
+      if (!this.communityList.length) return '暂无可选社区'
+      return this.normalizedEditRole === 'admin' ? '请选择负责社区' : '请选择所属社区'
+    },
+    editCommunityTip() {
+      if (this.communityListLoading) return '正在加载社区列表，请稍候。'
+      if (this.communityLoadError) return this.communityLoadError
+      if (!this.communityList.length) return '当前未获取到社区数据，无法完成该角色编辑。'
+      return this.normalizedEditRole === 'admin'
+        ? '管理员账号需要绑定负责社区，便于后续按社区管理业务。'
+        : '工作人员账号需要绑定所属社区，便于后续按社区接收任务。'
     }
   },
   onLoad() {
@@ -248,26 +344,30 @@ export default {
   methods: {
     initMonthOptions() {
       const now = new Date()
-      const y = now.getFullYear()
-      const m = now.getMonth() + 1
-      const current = `${y}-${String(m).padStart(2, '0')}`
-      const opts = []
+      const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const options = []
       for (let i = 0; i < 12; i++) {
-        const d = new Date(y, m - 1 - i, 1)
-        const yy = d.getFullYear()
-        const mm = String(d.getMonth() + 1).padStart(2, '0')
-        const value = `${yy}-${mm}`
-        opts.push({ label: value, value })
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        options.push({ label: value, value })
       }
-      this.monthOptions = opts
+      this.monthOptions = options
       this.monthValue = current
-      this.monthIndex = Math.max(0, opts.findIndex(o => o.value === current))
+      this.monthIndex = Math.max(0, options.findIndex(item => item.value === current))
+    },
+    extractTotal(data) {
+      if (typeof data?.total === 'number') return data.total
+      if (typeof data?.data?.total === 'number') return data.data.total
+      if (Array.isArray(data?.records)) return data.records.length
+      if (Array.isArray(data?.data?.records)) return data.data.records.length
+      if (Array.isArray(data)) return data.length
+      return 0
     },
     handleMonthChange(e) {
-      const idx = Number(e && e.detail ? e.detail.value : 0)
-      const option = this.monthOptions && this.monthOptions[idx]
+      const index = Number(e?.detail?.value || 0)
+      const option = this.monthOptions[index]
       if (!option) return
-      this.monthIndex = idx
+      this.monthIndex = index
       this.monthValue = option.value
       this.currentPage = 1
       this.loadUserList()
@@ -275,53 +375,50 @@ export default {
     },
     getRoleLabel(role) {
       const val = role == null ? '' : String(role).toLowerCase()
-      if (val === 'admin') {
-        return '管理员'
-      }
-      return '普通用户'
+      if (val === 'admin') return '管理员'
+      if (val === 'worker') return '工作人员'
+      if (val === 'super_admin') return '超级管理员'
+      if (val === 'owner') return '业主'
+      return role || '未知角色'
     },
-
-    getRoleFilterLabel() {
-      const current = this.roleOptions.find(item => item.value === this.roleFilter)
-      return current ? current.label : '全部角色'
-    },
-
     handleRoleChange(e) {
-      const index = Number(e.detail.value)
+      const index = Number(e?.detail?.value || 0)
       const option = this.roleOptions[index]
       this.roleFilter = option ? option.value : ''
       this.currentPage = 1
       this.loadUserList()
     },
-    
     handleStatsClick(role) {
       this.roleFilter = role
       this.currentPage = 1
       this.loadUserList()
     },
-
     async loadUserList() {
       this.loading = true
       try {
-        const params = { 
-          pageNum: this.currentPage, 
-          pageSize: this.pageSize, 
-          keyword: this.searchKey,
-          month: this.monthValue || undefined
+        const params = {
+          pageNum: this.currentPage,
+          pageSize: this.pageSize,
+          keyword: this.searchKey || undefined,
+          month: this.monthValue || undefined,
+          role: this.roleFilter || undefined
         }
-        if (this.roleFilterValue) {
-          params.role = this.roleFilterValue
-        }
-        const res = await request(
-          '/api/admin/user/list',
-          { params },
-          'GET'
-        )
+        const res = await request('/api/admin/user/list', { params }, 'GET')
         const records = res?.records || res?.data?.records || []
-        this.userList = Array.isArray(records) ? records : []
-        this.total = res?.total || res?.data?.total || 0
-      } catch (err) {
-        console.error('加载用户列表失败:', err)
+        this.userList = (Array.isArray(records) ? records : []).map(item => ({
+          userId: item.userId || item.id,
+          realName: item.realName,
+          username: item.username,
+          phone: item.phone,
+          role: item.role,
+          communityId: item.communityId,
+          communityName: item.communityName,
+          status: item.status,
+          createTime: item.createTime || item.registerTime || item.applyTime
+        }))
+        this.total = Number(res?.total || res?.data?.total || 0)
+      } catch (error) {
+        console.error('加载用户列表失败:', error)
         uni.showToast({ title: '加载失败', icon: 'none' })
         this.userList = []
         this.total = 0
@@ -329,102 +426,136 @@ export default {
         this.loading = false
       }
     },
-    
-    // 加载统计数据
     async loadStats() {
       try {
         const month = this.monthValue || undefined
-        const totalReq = request('/api/admin/user/list', { params: { pageSize: 1, month } }, 'GET')
-        const adminReq = request('/api/admin/user/list', { params: { pageSize: 1, role: 'admin', month } }, 'GET')
-        const ownerReq = request('/api/admin/user/list', { params: { pageSize: 1, role: 'owner', month } }, 'GET')
-        
-        const [totalRes, adminRes, ownerRes] = await Promise.all([totalReq, adminReq, ownerReq])
-        
+        const [totalRes, adminRes, ownerRes] = await Promise.all([
+          request('/api/admin/user/list', { params: { pageSize: 1, month } }, 'GET'),
+          request('/api/admin/user/list', { params: { pageSize: 1, role: 'admin', month } }, 'GET'),
+          request('/api/admin/user/list', { params: { pageSize: 1, role: 'owner', month } }, 'GET')
+        ])
         this.stats = {
-          total: totalRes.total || totalRes.data?.total || 0,
-          admin: adminRes.total || adminRes.data?.total || 0,
-          owner: ownerRes.total || ownerRes.data?.total || 0
+          total: this.extractTotal(totalRes),
+          admin: this.extractTotal(adminRes),
+          owner: this.extractTotal(ownerRes)
         }
-      } catch (e) {
-        console.error('加载统计数据失败', e)
+      } catch (error) {
+        console.error('加载用户统计失败', error)
       }
     },
-    
     handleSearch() {
       this.currentPage = 1
       this.loadUserList()
     },
-    
+    handleResetFilters() {
+      this.searchKey = ''
+      this.roleFilter = ''
+      this.currentPage = 1
+      this.loadUserList()
+    },
     handlePrevPage() {
-      if (this.currentPage > 1) {
-        this.currentPage--
-        this.loadUserList()
-      }
+      if (this.currentPage <= 1) return
+      this.currentPage -= 1
+      this.loadUserList()
     },
-    
     handleNextPage() {
-      if (this.currentPage < this.totalPages) {
-        this.currentPage++
-        this.loadUserList()
+      if (this.currentPage >= this.totalPages) return
+      this.currentPage += 1
+      this.loadUserList()
+    },
+    handlePageSizeChange(e) {
+      const options = [10, 20, 50, 100]
+      const index = Number(e?.detail?.value || 0)
+      this.pageSize = options[index] || 10
+      this.currentPage = 1
+      this.loadUserList()
+    },
+    async ensureCommunityList() {
+      if (this.communityListLoading || this.communityList.length > 0) return
+      this.communityListLoading = true
+      this.communityLoadError = ''
+      try {
+        const data = await request('/api/house/community/all', {}, 'GET')
+        const list = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.records) ? data.records : [])
+        this.communityList = list.map(item => ({
+          id: item?.id,
+          name: item?.name || item?.communityName || `社区${item?.id || ''}`
+        })).filter(item => item.id != null)
+        if (!this.communityList.length) {
+          this.communityLoadError = '社区列表为空，请先确认社区数据是否已配置。'
+        }
+      } catch (error) {
+        console.error('加载社区列表失败:', error)
+        this.communityList = []
+        this.communityLoadError = error?.message || '社区列表加载失败，请检查社区查询接口。'
+      } finally {
+        this.communityListLoading = false
       }
     },
-    
-    handleEditUser(user) {
-      const userId = user.id || user.userId
-      this.editingUser = user
+    async handleEditUser(user) {
       this.editForm = {
-        userId,
+        userId: user.userId,
         realName: user.realName || '',
         phone: user.phone || '',
-        role: user.role || ''
+        role: String(user.role || '').toLowerCase(),
+        communityId: user.communityId != null ? String(user.communityId) : ''
       }
       this.showEditPanel = true
+      if (this.needsEditCommunityAssignment) {
+        await this.ensureCommunityList()
+      }
     },
-
+    handleEditRoleChange(e) {
+      const index = Number(e?.detail?.value || 0)
+      this.editForm.role = this.editRoleOptions[index]?.value || 'owner'
+      if (!this.needsEditCommunityAssignment) {
+        this.editForm.communityId = ''
+        return
+      }
+      this.ensureCommunityList()
+    },
+    handleEditCommunityChange(e) {
+      const index = Number(e?.detail?.value || 0)
+      const selected = this.communityList[index]
+      this.editForm.communityId = selected?.id != null ? String(selected.id) : ''
+    },
     async handleToggleStatus(user) {
-      const userId = user.id || user.userId
+      const userId = user.userId
       if (!userId) {
         uni.showToast({ title: '缺少用户ID', icon: 'none' })
         return
       }
       const currentStatus = user.status
       const targetStatus = currentStatus === 1 ? 0 : 1
-      const title = targetStatus === 0 ? '禁用用户' : '启用用户'
-      const content = targetStatus === 0 ? '确定要禁用该用户吗？' : '确定要启用该用户吗？'
-
       uni.showModal({
-        title,
-        content,
+        title: targetStatus === 0 ? '禁用用户' : '启用用户',
+        content: targetStatus === 0 ? '确定要禁用该用户吗？' : '确定要启用该用户吗？',
         success: async (res) => {
           if (!res.confirm) return
           try {
-            await request(
-              `/api/admin/user/${userId}/status`,
-              { params: { status: targetStatus } },
-              'PUT'
-            )
+            await request(`/api/admin/user/${userId}/status`, { params: { status: targetStatus } }, 'PUT')
             uni.showToast({ title: '操作成功', icon: 'success' })
             this.loadUserList()
-          } catch (err) {
-            console.error('修改用户状态失败:', err)
-            uni.showToast({ title: err?.message || '操作失败', icon: 'none' })
+          } catch (error) {
+            console.error('修改用户状态失败:', error)
+            uni.showToast({ title: error?.message || '操作失败', icon: 'none' })
           }
         }
       })
     },
-
     closeEditPanel() {
       if (this.saving) return
       this.showEditPanel = false
-      this.editingUser = null
       this.editForm = {
         userId: null,
         realName: '',
         phone: '',
-        role: ''
+        role: '',
+        communityId: ''
       }
     },
-
     async submitEdit() {
       if (!this.editForm.userId) {
         uni.showToast({ title: '缺少用户ID', icon: 'none' })
@@ -438,395 +569,96 @@ export default {
         uni.showToast({ title: '请输入手机号', icon: 'none' })
         return
       }
-
+      if (this.needsEditCommunityAssignment && !this.editForm.communityId) {
+        uni.showToast({
+          title: this.normalizedEditRole === 'admin' ? '请选择负责社区' : '请选择所属社区',
+          icon: 'none'
+        })
+        return
+      }
       this.saving = true
       try {
-        await request(
-          '/api/admin/user/update',
-          {
-            data: {
-              userId: this.editForm.userId,
-              realName: this.editForm.realName,
-              phone: this.editForm.phone,
-              role: this.editForm.role
-            }
-          },
-          'PUT'
-        )
+        const payload = {
+          userId: this.editForm.userId,
+          realName: this.editForm.realName,
+          phone: this.editForm.phone,
+          role: this.editForm.role,
+          communityId: this.needsEditCommunityAssignment ? Number(this.editForm.communityId) : null
+        }
+        await request('/api/admin/user/update', {
+          data: payload
+        }, 'PUT')
         uni.showToast({ title: '保存成功', icon: 'success' })
         this.closeEditPanel()
         this.loadUserList()
-      } catch (err) {
-        console.error('保存用户信息失败:', err)
-        uni.showToast({ title: err?.message || '保存失败', icon: 'none' })
+      } catch (error) {
+        console.error('保存用户信息失败:', error)
+        uni.showToast({ title: error?.message || '保存失败', icon: 'none' })
       } finally {
         this.saving = false
       }
+    },
+    formatTime(time) {
+      if (!time) return '-'
+      const date = new Date(String(time).replace(' ', 'T'))
+      if (Number.isNaN(date.getTime())) return String(time)
+      return date.toLocaleString()
     }
   }
 }
 </script>
 
+<style scoped src="../../styles/admin-table-page.css"></style>
 <style scoped>
-.manage-container {
-  padding: 30rpx;
-  background-color: #f5f6fa;
-  min-height: 100vh;
-  padding-top: 100rpx;
+.user-status-bar {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* 统计卡片样式 */
-.stats-card-container {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20rpx;
-  margin-bottom: 20rpx;
+.status-summary-card.admin {
+  background: linear-gradient(180deg, #fff 0%, #eef5ff 100%);
 }
 
-.stats-filter {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 20rpx;
+.status-summary-card.owner {
+  background: linear-gradient(180deg, #fff 0%, #fff8e8 100%);
 }
 
-.stats-filter-btn {
-  display: flex;
-  align-items: center;
-  background: #fff;
-  padding: 12rpx 18rpx;
-  border-radius: 999rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
+.user-query-grid {
+  grid-template-columns: 1.6fr 1fr;
 }
 
-.stats-filter-text {
-  font-size: 24rpx;
-  color: #333;
+.user-table {
+  grid-template-columns: 180rpx 180rpx 180rpx 160rpx 140rpx 220rpx 220rpx;
+  min-width: 1500rpx;
 }
 
-.stats-filter-arrow {
-  margin-left: 10rpx;
-  font-size: 22rpx;
-  color: #999;
-}
-
-.stats-card {
-  background-color: #fff;
-  padding: 30rpx;
-  border-radius: 15rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-  text-align: center;
-  cursor: pointer;
-  border-left: 6rpx solid #2D81FF;
-}
-
-.stats-card.status-admin {
-  border-left-color: #722ed1;
-}
-
-.stats-card.status-owner {
-  border-left-color: #faad14;
-}
-
-.stats-number {
-  display: block;
-  font-size: 40rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 10rpx;
-}
-
-.stats-label {
-  display: block;
-  font-size: 24rpx;
-  color: #999;
-}
-
-.search-section {
-  margin-bottom: 30rpx;
-  display: flex;
-  align-items: center;
-}
-
-.search-input {
-  width: 100%;
-  height: 80rpx;
-  background: white;
-  border-radius: 40rpx;
-  padding: 0 40rpx;
-  font-size: 28rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
-}
-
-.search-left {
-  flex: 1;
-}
-
-.search-right {
-  margin-left: 20rpx;
-}
-
-.user-list {
-  margin-bottom: 40rpx;
-}
-
-.user-item {
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.1);
-  display: flex;
+.modal-picker {
   justify-content: space-between;
-  align-items: center;
 }
 
-.user-info {
-  flex: 1;
-  display: flex;
-  align-items: center;
+.modal-picker.placeholder .modal-picker-text {
+  color: #9aa9b8;
 }
 
-.user-avatar {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 40rpx;
-  background: linear-gradient(135deg, #2D81FF, #4c9dff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 24rpx;
-}
-
-.avatar-text {
-  color: #fff;
-  font-size: 34rpx;
-  font-weight: 600;
-}
-
-.user-main {
-  flex: 1;
-}
-
-.user-name {
-  display: block;
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 8rpx;
-}
-
-.user-line {
-  display: block;
-  font-size: 28rpx;
-  color: #666;
-  margin-bottom: 4rpx;
-}
-
-.user-tags {
-  margin-top: 6rpx;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.user-role {
+.modal-picker-arrow {
+  color: #c0c9d4;
   font-size: 24rpx;
-  color: #2D81FF;
-  padding: 4rpx 12rpx;
-  border-radius: 20rpx;
-  background: #f0f5ff;
 }
 
-.user-status {
-  font-size: 24rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 20rpx;
-}
-
-.user-status.active {
-  background: #f6ffed;
-  color: #52c41a;
-}
-
-.user-status.disabled {
-  background: #fff2f0;
-  color: #ff4d4f;
-}
-
-.user-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-  margin-left: 20rpx;
-}
-
-.edit-btn {
-  background: #2D81FF;
-  color: white;
-  border: none;
-  border-radius: 10rpx;
-  padding: 16rpx 24rpx;
-  font-size: 26rpx;
-  min-width: 140rpx;
-}
-
-.status-btn {
-  border-radius: 10rpx;
-  padding: 12rpx 20rpx;
-  font-size: 24rpx;
-  min-width: 140rpx;
-}
-
-.status-btn.to-disable {
-  background: #fff2f0;
-  color: #ff4d4f;
-}
-
-.status-btn.to-enable {
-  background: #f6ffed;
-  color: #52c41a;
-}
-
-.empty-state {
-  text-align: center;
-  color: #999;
-  margin-top: 100rpx;
-  font-size: 32rpx;
-}
-
-.edit-mask {
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-
-.edit-panel {
-  width: 80%;
-  background-color: #fff;
-  border-radius: 20rpx;
-  padding: 30rpx 30rpx 20rpx;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.15);
-}
-
-.edit-title {
-  font-size: 32rpx;
-  font-weight: bold;
-  margin-bottom: 20rpx;
-  text-align: center;
-}
-
-.edit-field {
-  margin-bottom: 20rpx;
-}
-
-.field-label {
+.detail-tip {
   display: block;
-  font-size: 26rpx;
-  color: #666;
-  margin-bottom: 8rpx;
-}
-
-.field-input {
-  width: 100%;
-  height: 72rpx;
-  border-radius: 10rpx;
-  background-color: #f5f7fa;
-  padding: 0 20rpx;
-  font-size: 28rpx;
-}
-
-.field-value {
-  font-size: 28rpx;
-  color: #333;
-}
-
-.edit-actions {
-  display: flex;
-  justify-content: flex-end;
   margin-top: 10rpx;
-  gap: 20rpx;
+  font-size: 22rpx;
+  color: #8797aa;
+  line-height: 1.6;
 }
 
-.edit-cancel,
-.edit-save {
-  min-width: 140rpx;
-  height: 72rpx;
-  line-height: 72rpx;
-  font-size: 26rpx;
-  border-radius: 36rpx;
-  padding: 0 20rpx;
+.status-pill.status-active {
+  background: #edf9f1;
+  color: #2d8c59;
 }
 
-.edit-cancel {
-  background-color: #f5f7fa;
-  color: #606266;
-}
-
-.edit-save {
-  background-color: #2D81FF;
-  color: #fff;
-}
-
-.role-picker {
-  margin-left: 20rpx;
-  padding: 0 24rpx;
-  height: 80rpx;
-  border-radius: 40rpx;
-  background-color: #ffffff;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
-}
-
-.role-picker-text {
-  font-size: 26rpx;
-  color: #333;
-}
-
-/* 分页组件样式 */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20rpx;
-  margin-top: 40rpx;
-  padding: 20rpx 0;
-  background-color: #fff;
-  border-radius: 10rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-}
-
-.page-btn {
-  padding: 10rpx 20rpx;
-  background-color: #f5f7fa;
-  color: #333;
-  border: 1rpx solid #e4e7ed;
-  border-radius: 6rpx;
-  font-size: 28rpx;
-  min-width: 100rpx;
-}
-
-.page-btn[disabled] {
-  opacity: 0.5;
-  color: #909399;
-}
-
-.page-info {
-  display: flex;
-  align-items: center;
-  font-size: 28rpx;
-  color: #333;
-}
-
-.page-separator {
-  margin: 0 10rpx;
-  color: #909399;
+.status-pill.status-disabled {
+  background: #fff1f3;
+  color: #c44859;
 }
 </style>

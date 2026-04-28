@@ -1,6 +1,45 @@
-// @/utils/request.js（最终版：修复header合并+跨域兼容）
-const baseUrl = 'http://192.168.1.65:80'
-// const baseUrl = 'http://localhost:80' 
+// @/utils/request.js（统一请求配置）
+const DEFAULT_BASE_URL = 'http://192.168.1.65:80'
+
+function normalizeBaseUrl(url) {
+  return String(url || '').replace(/\/+$/, '')
+}
+
+function getBaseUrl() {
+  const customBaseUrl = normalizeBaseUrl(uni.getStorageSync('apiBaseUrl'))
+  if (customBaseUrl) {
+    return customBaseUrl
+  }
+
+  // H5 部署到 nginx 同域时，优先走当前域名，避免跨域
+  // #ifdef H5
+  if (typeof window !== 'undefined' && window.location && /^https?:$/.test(window.location.protocol)) {
+    const host = window.location.hostname || ''
+    const isLocalPreview = host === 'localhost' || host === '127.0.0.1'
+    if (!isLocalPreview) {
+      return normalizeBaseUrl(window.location.origin)
+    }
+  }
+  // #endif
+
+  return DEFAULT_BASE_URL
+}
+
+function getRequestHint(requestUrl) {
+  const hints = []
+
+  // #ifdef H5
+  hints.push('如果你现在是浏览器预览，请优先检查后端 CORS 或直接用同域 nginx 地址访问前端。')
+  // #endif
+
+  // #ifdef APP-PLUS
+  hints.push('如果你现在是真机预览，请确认手机和服务器在同一局域网，并且手机浏览器能打开该地址。')
+  // #endif
+
+  hints.push(`请确认接口基地址可访问：${requestUrl}`)
+  return hints.join('')
+}
+
 function request(options) {
   // 1. 兼容两种调用方式
   let finalOptions = {};
@@ -66,6 +105,7 @@ function request(options) {
   finalOptions.header = headers;
 
   // 2. 拼接URL参数（params）
+  const baseUrl = getBaseUrl()
   let requestUrl = baseUrl + finalOptions.url;
   if (finalOptions.params && Object.keys(finalOptions.params).length > 0) {
     console.log('请求参数:', finalOptions.params)
@@ -83,6 +123,7 @@ function request(options) {
   uni.showLoading({ title: '加载中...', mask: true })
 
   return new Promise((resolve, reject) => {
+    console.log('当前API基地址:', baseUrl)
     console.log('发送请求:', requestUrl, finalOptions.method, finalOptions.data)
     console.log('请求头已带授权:', Boolean(finalOptions.header && finalOptions.header.Authorization))
     
@@ -197,7 +238,7 @@ function request(options) {
         } else if (err.errMsg.includes('abort')) {
           errMsg = '请求被中止，请检查网络设置';
         } else if (err.errMsg.includes('fail')) {
-          errMsg = '请求失败，请重试';
+          errMsg = getRequestHint(requestUrl);
         } else {
           errMsg = err.errMsg || errMsg;
         }

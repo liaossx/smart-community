@@ -1,157 +1,218 @@
 <template>
-  <admin-sidebar 
-    :showSidebar="showSidebar" 
+  <admin-sidebar
+    :showSidebar="showSidebar"
     @update:showSidebar="showSidebar = $event"
     pageTitle="操作日志"
     currentPage="/admin/pages/admin/oper-log"
+    pageBreadcrumb="管理后台 / 操作日志"
+    :showPageBanner="false"
   >
     <view class="manage-container">
-      <!-- 搜索和筛选栏 -->
-      <view class="search-filter-bar">
-        <view class="search-row">
-          <input 
-            type="text"
-            placeholder="请输入模块标题"
-            v-model="queryParams.title"
-            class="search-input"
-          />
-          <input 
-            type="text"
-            placeholder="请输入操作人员"
-            v-model="queryParams.operName"
-            class="search-input"
-          />
+      <view class="overview-panel">
+        <view class="overview-copy">
+          <text class="overview-title">系统操作日志</text>
+          <text class="overview-subtitle">统一使用后台表格页展示系统模块操作记录，保留条件筛选、分页和日志详情查看。</text>
         </view>
-        <view class="search-row">
-          <picker 
-            mode="selector"
-            :range="statusOptions"
-            :range-key="'label'"
-            :value="statusOptions.findIndex(opt => opt.value === queryParams.status)"
-            @change="handleStatusChange"
-            class="filter-picker"
+
+        <view class="overview-chip">
+          <text class="overview-chip-label">当前页码</text>
+          <text class="overview-chip-value">{{ queryParams.pageNum }}</text>
+        </view>
+      </view>
+
+      <view class="status-summary-bar oper-status-bar">
+        <view class="status-summary-card" :class="{ active: queryParams.status === '' }" @click="applyQuickStatus('')">
+          <text class="summary-label">当前页总数</text>
+          <text class="summary-value">{{ pageStats.total }}</text>
+        </view>
+        <view class="status-summary-card success" :class="{ active: queryParams.status === 0 }" @click="applyQuickStatus(0)">
+          <text class="summary-label">正常日志</text>
+          <text class="summary-value">{{ pageStats.normal }}</text>
+        </view>
+        <view class="status-summary-card fail" :class="{ active: queryParams.status === 1 }" @click="applyQuickStatus(1)">
+          <text class="summary-label">异常日志</text>
+          <text class="summary-value">{{ pageStats.fail }}</text>
+        </view>
+      </view>
+
+      <view class="query-panel">
+        <view class="query-grid oper-query-grid">
+          <view class="query-field">
+            <text class="query-label">模块标题</text>
+            <input
+              v-model="queryParams.title"
+              class="query-input"
+              type="text"
+              placeholder="请输入模块标题"
+              @confirm="handleSearch"
+            />
+          </view>
+
+          <view class="query-field">
+            <text class="query-label">操作人员</text>
+            <input
+              v-model="queryParams.operName"
+              class="query-input"
+              type="text"
+              placeholder="请输入操作人员"
+              @confirm="handleSearch"
+            />
+          </view>
+
+          <view class="query-field">
+            <text class="query-label">执行状态</text>
+            <picker
+              mode="selector"
+              :range="statusOptions"
+              range-key="label"
+              :value="statusPickerIndex"
+              @change="handleStatusChange"
+            >
+              <view class="query-picker">
+                <text class="query-picker-text">{{ currentStatusLabel }}</text>
+              </view>
+            </picker>
+          </view>
+        </view>
+
+        <view class="query-actions">
+          <button class="query-btn primary" @click="handleSearch">查询</button>
+          <button class="query-btn secondary" @click="handleReset">重置</button>
+        </view>
+      </view>
+
+      <view class="table-toolbar">
+        <view class="toolbar-left-group">
+          <text class="toolbar-meta">日志总量 {{ total }} 条</text>
+          <text class="toolbar-meta active">当前页 {{ logList.length }} 条</text>
+        </view>
+
+        <view class="toolbar-right-group">
+          <button class="row-btn danger" @click="handleClean">清空日志</button>
+        </view>
+      </view>
+
+      <view v-if="loading" class="loading-state">
+        <text class="loading-text">加载中...</text>
+      </view>
+
+      <view v-else class="table-panel">
+        <view class="scroll-table">
+          <view class="table-head oper-table">
+            <text class="table-col col-id">日志编号</text>
+            <text class="table-col col-title">系统模块</text>
+            <text class="table-col col-type">业务类型</text>
+            <text class="table-col col-user">操作人员</text>
+            <text class="table-col col-status">状态</text>
+            <text class="table-col col-time">操作时间</text>
+            <text class="table-col col-actions">操作</text>
+          </view>
+
+          <view
+            v-for="(item, index) in logList"
+            :key="item.id || index"
+            class="table-row oper-table"
+            :style="{ animationDelay: `${Math.min(360, index * 40)}ms` }"
           >
-            <view class="filter-picker-text">
-              {{ statusOptions.find(opt => opt.value === queryParams.status)?.label || '全部状态' }}
+            <view class="table-col col-id">
+              <text class="minor-text">#{{ item.id }}</text>
             </view>
-          </picker>
-          <view class="btn-group">
-            <button class="action-btn search" @click="handleSearch">搜索</button>
-            <button class="action-btn reset" @click="handleReset">重置</button>
-          </view>
-        </view>
-      </view>
 
-      <!-- 操作栏 -->
-      <view class="action-bar">
-        <button class="action-btn clean" @click="handleClean">清空日志</button>
-      </view>
+            <view class="table-col col-title">
+              <text class="primary-text">{{ item.title || '-' }}</text>
+            </view>
 
-      <!-- 日志列表 -->
-      <view class="list-container">
-        <view v-if="loading" class="loading-state">
-          <text class="loading-text">加载中...</text>
-        </view>
-        
-        <view v-else-if="logList.length > 0" class="log-list">
-          <!-- 表头 (仅在大屏或模拟表格时显示，这里用卡片布局更适合移动端，但尝试模拟表格头部) -->
-          <view class="list-header">
-            <text class="col id">日志编号</text>
-            <text class="col title">系统模块</text>
-            <text class="col type">业务类型</text>
-            <text class="col user">操作人员</text>
-            <text class="col status">状态</text>
-            <text class="col time">操作日期</text>
-            <text class="col action">操作</text>
-          </view>
+            <view class="table-col col-type">
+              <text class="plain-text">{{ getBusinessType(item.businessType) }}</text>
+            </view>
 
-          <view v-for="item in logList" :key="item.id" class="log-item">
-            <text class="col id">{{ item.id }}</text>
-            <text class="col title">{{ item.title }}</text>
-            <text class="col type">{{ getBusinessType(item.businessType) }}</text>
-            <text class="col user">{{ item.operName }}</text>
-            <view class="col status">
-              <text :class="['status-tag', item.status === 0 ? 'success' : 'fail']">
+            <view class="table-col col-user">
+              <text class="plain-text">{{ item.operName || '-' }}</text>
+            </view>
+
+            <view class="table-col col-status">
+              <text class="status-pill" :class="getStatusClass(item.status)">
                 {{ item.status === 0 ? '正常' : '失败' }}
               </text>
             </view>
-            <text class="col time">{{ formatTime(item.operTime) }}</text>
-            <view class="col action">
-              <button class="detail-btn" @click="handleDetail(item)">详细</button>
+
+            <view class="table-col col-time">
+              <text class="minor-text">{{ formatTime(item.operTime) }}</text>
+            </view>
+
+            <view class="table-col col-actions row-actions">
+              <button class="row-btn ghost" @click="handleDetail(item)">查看详情</button>
             </view>
           </view>
         </view>
-        
-        <view v-else class="empty-state">
-          <text>暂无操作日志</text>
-        </view>
 
-        <!-- 分页组件 -->
-        <view v-if="total > 0" class="pagination">
-          <button 
-            class="page-btn" 
-            :disabled="queryParams.pageNum === 1"
-            @click="handlePrevPage"
-          >
-            上一页
-          </button>
-          
-          <view class="page-info">
-            <text>{{ queryParams.pageNum }}</text>
-            <text class="page-separator">/</text>
-            <text>{{ totalPages }}</text>
-          </view>
-          
-          <button 
-            class="page-btn" 
-            :disabled="queryParams.pageNum === totalPages"
-            @click="handleNextPage"
-          >
-            下一页
-          </button>
+        <view v-if="logList.length === 0" class="empty-state">
+          <text>暂无操作日志</text>
         </view>
       </view>
 
-      <!-- 详情弹窗 -->
-      <view class="modal-mask" v-if="showDetailModal" @click="closeDetailModal">
-        <view class="modal-content" @click.stop>
-          <view class="modal-header">
-            <text class="modal-title">操作日志详情</text>
-            <text class="close-btn" @click="closeDetailModal">×</text>
+      <view v-if="total > 0" class="pagination">
+        <view class="page-meta">
+          <text>第 {{ queryParams.pageNum }} / {{ totalPages }} 页</text>
+        </view>
+
+        <view class="page-controls">
+          <button class="page-btn" :disabled="queryParams.pageNum <= 1" @click="handlePrevPage">上一页</button>
+          <button class="page-btn" :disabled="queryParams.pageNum >= totalPages" @click="handleNextPage">下一页</button>
+          <view class="page-size">
+            <text>每页</text>
+            <picker mode="selector" :range="pageSizeOptions" :value="pageSizeIndex" @change="handlePageSizeChange">
+              <text class="page-size-text">{{ queryParams.pageSize }} 条</text>
+            </picker>
           </view>
-          <scroll-view scroll-y class="modal-body">
-            <view class="detail-item">
-              <text class="label">操作模块：</text>
-              <text class="value">{{ currentLog.title }} / {{ getBusinessType(currentLog.businessType) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="label">请求地址：</text>
-              <text class="value">{{ currentLog.operUrl }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="label">请求方式：</text>
-              <text class="value">{{ currentLog.requestMethod }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="label">操作方法：</text>
-              <text class="value code">{{ currentLog.method }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="label">请求参数：</text>
-              <text class="value code">{{ currentLog.operParam }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="label">返回结果：</text>
-              <text class="value code">{{ currentLog.jsonResult }}</text>
-            </view>
-            <view class="detail-item" v-if="currentLog.status === 1">
-              <text class="label error">错误信息：</text>
-              <text class="value error">{{ currentLog.errorMsg }}</text>
+        </view>
+      </view>
+
+      <view v-if="showDetailModal" class="detail-modal" @click="closeDetailModal">
+        <view class="detail-content log-detail-content" @click.stop>
+          <view class="detail-header">
+            <text class="detail-title">操作日志详情</text>
+            <button class="close-btn" @click="closeDetailModal">关闭</button>
+          </view>
+
+          <scroll-view scroll-y class="log-detail-scroll">
+            <view class="detail-body">
+              <view class="detail-item">
+                <text class="detail-label">操作模块:</text>
+                <text class="detail-value">{{ currentLog.title || '-' }} / {{ getBusinessType(currentLog.businessType) }}</text>
+              </view>
+
+              <view class="detail-item">
+                <text class="detail-label">请求地址:</text>
+                <text class="detail-value">{{ currentLog.operUrl || '-' }}</text>
+              </view>
+
+              <view class="detail-item">
+                <text class="detail-label">请求方式:</text>
+                <text class="detail-value">{{ currentLog.requestMethod || '-' }}</text>
+              </view>
+
+              <view class="detail-item detail-item-block">
+                <text class="detail-label">操作方法:</text>
+                <text class="detail-value log-code">{{ currentLog.method || '-' }}</text>
+              </view>
+
+              <view class="detail-item detail-item-block">
+                <text class="detail-label">请求参数:</text>
+                <text class="detail-value log-code">{{ currentLog.operParam || '-' }}</text>
+              </view>
+
+              <view class="detail-item detail-item-block">
+                <text class="detail-label">返回结果:</text>
+                <text class="detail-value log-code">{{ currentLog.jsonResult || '-' }}</text>
+              </view>
+
+              <view v-if="currentLog.status === 1" class="detail-item detail-item-block">
+                <text class="detail-label">错误信息:</text>
+                <text class="detail-value log-error">{{ currentLog.errorMsg || '-' }}</text>
+              </view>
             </view>
           </scroll-view>
-          <view class="modal-footer">
-            <button class="modal-btn" @click="closeDetailModal">关闭</button>
-          </view>
         </view>
       </view>
     </view>
@@ -170,12 +231,13 @@ export default {
     return {
       showSidebar: false,
       loading: false,
+      pageSizeOptions: [10, 20, 50],
       queryParams: {
         pageNum: 1,
         pageSize: 10,
         title: '',
         operName: '',
-        status: '' // 0正常 1异常
+        status: ''
       },
       statusOptions: [
         { value: '', label: '全部状态' },
@@ -184,15 +246,38 @@ export default {
       ],
       logList: [],
       total: 0,
-      
-      // 详情弹窗
       showDetailModal: false,
       currentLog: {}
     }
   },
   computed: {
     totalPages() {
-      return Math.ceil(this.total / this.queryParams.pageSize) || 1
+      return Math.max(1, Math.ceil(this.total / this.queryParams.pageSize))
+    },
+    pageSizeIndex() {
+      return Math.max(0, this.pageSizeOptions.indexOf(this.queryParams.pageSize))
+    },
+    statusPickerIndex() {
+      return Math.max(0, this.statusOptions.findIndex(item => item.value === this.queryParams.status))
+    },
+    currentStatusLabel() {
+      const current = this.statusOptions.find(item => item.value === this.queryParams.status)
+      return current ? current.label : '全部状态'
+    },
+    pageStats() {
+      return this.logList.reduce((stats, item) => {
+        stats.total += 1
+        if (Number(item.status) === 0) {
+          stats.normal += 1
+        } else {
+          stats.fail += 1
+        }
+        return stats
+      }, {
+        total: 0,
+        normal: 0,
+        fail: 0
+      })
     }
   },
   onLoad() {
@@ -207,24 +292,20 @@ export default {
           status: this.queryParams.status === '' ? undefined : this.queryParams.status
         }
         const res = await request('/api/monitor/operlog/list', { params }, 'GET')
-        
-        // 兼容不同的返回结构
         const records = res.records || res.data?.records || []
         this.total = res.total || res.data?.total || 0
-        this.logList = records
-      } catch (e) {
-        console.error('加载日志失败', e)
+        this.logList = Array.isArray(records) ? records : []
+      } catch (error) {
+        console.error('加载日志失败', error)
         uni.showToast({ title: '加载失败', icon: 'none' })
       } finally {
         this.loading = false
       }
     },
-    
     handleSearch() {
       this.queryParams.pageNum = 1
       this.loadData()
     },
-    
     handleReset() {
       this.queryParams = {
         pageNum: 1,
@@ -235,53 +316,65 @@ export default {
       }
       this.loadData()
     },
-    
     handleStatusChange(e) {
-      this.queryParams.status = this.statusOptions[e.detail.value].value
+      const index = Number(e.detail.value)
+      this.queryParams.status = this.statusOptions[index].value
     },
-    
+    applyQuickStatus(status) {
+      this.queryParams.status = status
+      this.queryParams.pageNum = 1
+      this.loadData()
+    },
+    handlePageSizeChange(e) {
+      const index = Number(e.detail.value)
+      const pageSize = this.pageSizeOptions[index]
+      if (pageSize) {
+        this.queryParams.pageSize = pageSize
+        this.queryParams.pageNum = 1
+        this.loadData()
+      }
+    },
+    handlePrevPage() {
+      if (this.queryParams.pageNum > 1) {
+        this.queryParams.pageNum -= 1
+        this.loadData()
+      }
+    },
+    handleNextPage() {
+      if (this.queryParams.pageNum < this.totalPages) {
+        this.queryParams.pageNum += 1
+        this.loadData()
+      }
+    },
     handleClean() {
       uni.showModal({
-        title: '警告',
-        content: '确定要清空所有操作日志吗？此操作不可恢复！',
-        confirmColor: '#ff4757',
+        title: '清空日志',
+        content: '确定要清空所有操作日志吗？该操作不可恢复。',
+        confirmColor: '#ee6374',
         success: async (res) => {
-          if (res.confirm) {
-            try {
-              await request('/api/monitor/operlog/clean', {}, 'DELETE')
-              uni.showToast({ title: '清空成功', icon: 'success' })
-              this.handleReset()
-            } catch (e) {
-              uni.showToast({ title: '清空失败', icon: 'none' })
-            }
+          if (!res.confirm) return
+          try {
+            await request('/api/monitor/operlog/clean', {}, 'DELETE')
+            uni.showToast({ title: '清空成功', icon: 'success' })
+            this.handleReset()
+          } catch (error) {
+            console.error('清空日志失败', error)
+            uni.showToast({ title: '清空失败', icon: 'none' })
           }
         }
       })
     },
-    
     handleDetail(item) {
-      this.currentLog = item
+      this.currentLog = item || {}
       this.showDetailModal = true
     },
-    
     closeDetailModal() {
       this.showDetailModal = false
+      this.currentLog = {}
     },
-    
-    handlePrevPage() {
-      if (this.queryParams.pageNum > 1) {
-        this.queryParams.pageNum--
-        this.loadData()
-      }
+    getStatusClass(status) {
+      return Number(status) === 0 ? 'status-normal' : 'status-fail'
     },
-    
-    handleNextPage() {
-      if (this.queryParams.pageNum < this.totalPages) {
-        this.queryParams.pageNum++
-        this.loadData()
-      }
-    },
-    
     getBusinessType(type) {
       const map = {
         0: '其它',
@@ -295,284 +388,79 @@ export default {
         8: '生成代码',
         9: '清空数据'
       }
-      return map[type] || type
+      return map[type] || type || '-'
     },
-    
     formatTime(time) {
-      if (!time) return ''
-      return new Date(time).toLocaleString()
+      if (!time) return '-'
+      const date = new Date(time)
+      if (Number.isNaN(date.getTime())) return time
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hour = String(date.getHours()).padStart(2, '0')
+      const minute = String(date.getMinutes()).padStart(2, '0')
+      const second = String(date.getSeconds()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hour}:${minute}:${second}`
     }
   }
 }
 </script>
 
+<style scoped src="../../styles/admin-table-page.css"></style>
 <style scoped>
-.manage-container {
-  padding: 30rpx;
-  background-color: #f5f7fa;
-  min-height: 100vh;
-  padding-top: 100rpx;
+.oper-status-bar {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* 搜索栏 */
-.search-filter-bar {
-  background: white;
-  padding: 20rpx;
-  border-radius: 15rpx;
-  margin-bottom: 20rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
+.status-summary-card.success {
+  background: linear-gradient(180deg, #fff 0%, #eefaf4 100%);
 }
 
-.search-row {
-  display: flex;
-  gap: 20rpx;
-  align-items: center;
+.status-summary-card.fail {
+  background: linear-gradient(180deg, #fff 0%, #fff1f3 100%);
 }
 
-.search-input {
-  flex: 1;
-  background: #f5f7fa;
-  height: 70rpx;
-  border-radius: 35rpx;
-  padding: 0 30rpx;
-  font-size: 26rpx;
+.oper-query-grid {
+  grid-template-columns: 1fr 1fr 1fr;
 }
 
-.filter-picker {
-  flex: 1;
-  background: #f5f7fa;
-  height: 70rpx;
-  border-radius: 35rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.oper-table {
+  grid-template-columns: 160rpx 320rpx 180rpx 180rpx 140rpx 240rpx 180rpx;
+  min-width: 1600rpx;
 }
 
-.filter-picker-text {
-  font-size: 26rpx;
-  color: #666;
+.status-pill.status-normal {
+  background: #edf9f1;
+  color: #2d8c59;
 }
 
-.btn-group {
-  display: flex;
-  gap: 15rpx;
+.status-pill.status-fail {
+  background: #fff1f3;
+  color: #c44859;
 }
 
-.action-btn {
-  font-size: 24rpx;
-  padding: 0 30rpx;
-  height: 60rpx;
-  line-height: 60rpx;
-  border-radius: 30rpx;
-  margin: 0;
+.log-detail-content {
+  max-width: 920rpx;
 }
 
-.action-btn.search {
-  background: #2D81FF;
-  color: white;
+.log-detail-scroll {
+  max-height: 62vh;
 }
 
-.action-btn.reset {
-  background: #f5f7fa;
-  color: #666;
-  border: 1rpx solid #ddd;
-}
-
-.action-btn.clean {
-  background: #ff4757;
-  color: white;
-  margin-bottom: 20rpx;
-}
-
-/* 列表样式 */
-.log-list {
-  background: white;
-  border-radius: 15rpx;
-  overflow: hidden;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-}
-
-.list-header {
-  display: flex;
-  background: #f5f7fa;
-  padding: 20rpx;
-  border-bottom: 1rpx solid #eee;
-  font-weight: bold;
-  font-size: 24rpx;
-  color: #333;
-}
-
-.log-item {
-  display: flex;
-  padding: 20rpx;
-  border-bottom: 1rpx solid #f0f0f0;
-  align-items: center;
-  font-size: 24rpx;
-  color: #666;
-}
-
-.col {
-  flex: 1;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 5rpx;
-}
-
-.col.id { flex: 0.5; }
-.col.title { flex: 1.5; }
-.col.time { flex: 1.5; font-size: 22rpx; }
-.col.action { flex: 0.8; }
-
-.status-tag {
-  padding: 4rpx 12rpx;
-  border-radius: 6rpx;
-  font-size: 20rpx;
-}
-
-.status-tag.success {
-  background: rgba(46, 213, 115, 0.1);
-  color: #2ed573;
-}
-
-.status-tag.fail {
-  background: rgba(255, 71, 87, 0.1);
-  color: #ff4757;
-}
-
-.detail-btn {
-  font-size: 22rpx;
-  padding: 0 15rpx;
-  height: 40rpx;
-  line-height: 40rpx;
-  background: #e6f7ff;
-  color: #1890ff;
-  border-radius: 6rpx;
-  margin: 0 auto;
-  display: inline-block;
-}
-
-/* 分页组件样式 */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20rpx;
-  margin-top: 30rpx;
-  padding-bottom: 30rpx;
-}
-
-.page-btn {
-  padding: 5rpx 20rpx;
-  background-color: #fff;
-  color: #333;
-  border: 1rpx solid #e4e7ed;
-  border-radius: 6rpx;
-  font-size: 24rpx;
-  margin: 0;
-}
-
-.page-btn[disabled] {
-  opacity: 0.5;
-  color: #909399;
-}
-
-.page-info {
-  display: flex;
-  align-items: center;
-  font-size: 24rpx;
-  color: #333;
-}
-
-/* 详情弹窗 */
-.modal-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-
-.modal-content {
-  width: 85%;
-  max-height: 80vh;
-  background: white;
-  border-radius: 20rpx;
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-header {
-  padding: 30rpx;
-  border-bottom: 1rpx solid #eee;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-title {
-  font-size: 32rpx;
-  font-weight: bold;
-}
-
-.close-btn {
-  font-size: 40rpx;
-  color: #999;
-  padding: 0 10rpx;
-}
-
-.modal-body {
-  padding: 30rpx;
-  max-height: 60vh;
-  box-sizing: border-box;
-}
-
-.detail-item {
-  margin-bottom: 20rpx;
-  display: flex;
-  flex-direction: column;
-}
-
-.detail-item .label {
-  font-size: 26rpx;
-  color: #999;
-  margin-bottom: 10rpx;
-}
-
-.detail-item .value {
-  font-size: 26rpx;
-  color: #333;
+.log-code {
+  display: block;
+  margin-top: 12rpx;
+  border-radius: 14rpx;
+  background: #f7faff;
+  border: 1rpx solid #e4ebf5;
+  padding: 18rpx 20rpx;
+  line-height: 1.5;
+  font-family: Consolas, Monaco, monospace;
   word-break: break-all;
 }
 
-.detail-item .value.code {
-  background: #f5f7fa;
-  padding: 15rpx;
-  border-radius: 8rpx;
-  font-family: monospace;
-}
-
-.detail-item .value.error {
-  color: #ff4757;
-}
-
-.modal-footer {
-  padding: 20rpx;
-  border-top: 1rpx solid #eee;
-}
-
-.modal-btn {
-  background: #2D81FF;
-  color: white;
-  font-size: 28rpx;
-  border-radius: 35rpx;
+.log-error {
+  color: #c44859;
+  line-height: 1.5;
 }
 </style>

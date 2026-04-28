@@ -1,93 +1,155 @@
 <template>
-  <admin-sidebar 
-    :showSidebar="showSidebar" 
+  <admin-sidebar
+    :showSidebar="showSidebar"
     @update:showSidebar="showSidebar = $event"
     pageTitle="工单管理"
     currentPage="/admin/pages/admin/work-order-manage"
+    pageBreadcrumb="管理后台 / 工单管理"
+    :showPageBanner="false"
   >
     <view class="manage-container">
-      <!-- 统计卡片 -->
-      <view class="stats-card-container">
-        <view class="stats-card" @click="handleStatsClick('')">
-          <text class="stats-number">{{ stats.total }}</text>
-          <text class="stats-label">总工单数</text>
+      <view class="overview-panel">
+        <view class="overview-copy">
+          <text class="overview-title">工单数据列表</text>
+          <text class="overview-subtitle">延续统一后台表格页结构，聚焦指派、状态流转与维修人员信息。</text>
         </view>
-        <view class="stats-card status-pending" @click="handleStatsClick('PENDING')">
-          <text class="stats-number">{{ stats.pending }}</text>
-          <text class="stats-label">待指派</text>
-        </view>
-        <view class="stats-card status-assigned" @click="handleStatsClick('ASSIGNED')">
-          <text class="stats-number">{{ stats.assigned }}</text>
-          <text class="stats-label">已指派</text>
-        </view>
-        <view class="stats-card status-processing" @click="handleStatsClick('PROCESSING')">
-          <text class="stats-number">{{ stats.processing }}</text>
-          <text class="stats-label">处理中</text>
-        </view>
-      </view>
 
-      <view class="stats-filter">
         <picker mode="selector" :range="monthOptions" range-key="label" @change="handleMonthChange">
-          <view class="stats-filter-btn">
-            <text class="stats-filter-text">{{ currentMonthLabel }}</text>
-            <text class="stats-filter-arrow">▼</text>
+          <view class="month-filter-chip">
+            <text class="month-filter-label">统计月份</text>
+            <text class="month-filter-value">{{ currentMonthLabel }}</text>
           </view>
         </picker>
       </view>
 
-      <!-- 筛选栏 -->
-      <view class="search-filter-bar">
-        <view class="filter-row">
-          <picker 
-            mode="selector"
-            :range="statusOptions"
-            :range-key="'label'"
-            :value="statusOptions.findIndex(opt => opt.value === statusFilter)"
-            @change="handleStatusChange"
-            class="filter-picker"
-          >
-            <view class="filter-picker-text">
-              {{ statusOptions.find(opt => opt.value === statusFilter)?.label || '全部状态' }}
-            </view>
-          </picker>
+      <view class="status-summary-bar">
+        <view class="status-summary-card" :class="{ active: statusFilter === '' }" @click="handleStatsClick('')">
+          <text class="summary-label">全部工单</text>
+          <text class="summary-value">{{ stats.total }}</text>
+        </view>
+        <view class="status-summary-card pending" :class="{ active: statusFilter === 'PENDING' }" @click="handleStatsClick('PENDING')">
+          <text class="summary-label">待指派</text>
+          <text class="summary-value">{{ stats.pending }}</text>
+        </view>
+        <view class="status-summary-card assigned" :class="{ active: statusFilter === 'ASSIGNED' }" @click="handleStatsClick('ASSIGNED')">
+          <text class="summary-label">已指派</text>
+          <text class="summary-value">{{ stats.assigned }}</text>
+        </view>
+        <view class="status-summary-card processing" :class="{ active: statusFilter === 'PROCESSING' }" @click="handleStatsClick('PROCESSING')">
+          <text class="summary-label">处理中</text>
+          <text class="summary-value">{{ stats.processing }}</text>
         </view>
       </view>
 
-      <!-- 工单列表 -->
+      <view class="query-panel">
+        <view class="query-grid">
+          <view class="query-field">
+            <text class="query-label">关联报修ID</text>
+            <input
+              v-model="repairIdFilter"
+              class="query-input"
+              type="text"
+              placeholder="输入 repairId 进行筛选"
+              @confirm="handleSearch"
+            />
+          </view>
+
+          <view class="query-field">
+            <text class="query-label">工单状态</text>
+            <picker
+              mode="selector"
+              :range="statusOptions"
+              range-key="label"
+              :value="statusPickerIndex"
+              @change="handleStatusChange"
+            >
+              <view class="query-picker">
+                <text class="query-picker-text">{{ currentStatusLabel }}</text>
+              </view>
+            </picker>
+          </view>
+        </view>
+
+        <view class="query-actions">
+          <button class="query-btn primary" @click="handleSearch">查询</button>
+          <button class="query-btn secondary" @click="handleResetFilters">重置</button>
+        </view>
+      </view>
+
+      <view class="table-toolbar">
+        <view class="toolbar-left-group">
+          <text class="toolbar-meta">共 {{ total }} 条</text>
+          <text v-if="repairIdFilter" class="toolbar-meta active">当前报修ID: {{ repairIdFilter }}</text>
+        </view>
+
+        <view class="toolbar-right-group">
+          <text class="toolbar-meta">待指派 {{ stats.pending }} 条</text>
+          <text class="toolbar-meta">已完成 {{ stats.completed }} 条</text>
+        </view>
+      </view>
+
       <view v-if="loading" class="loading-state">
         <text class="loading-text">加载中...</text>
       </view>
 
-      <view v-else class="list-container">
-        <view v-for="item in workOrderList" :key="item.id" class="order-item">
-          <view class="order-header">
-            <text class="order-no">工单号: {{ item.orderNo || item.id }}</text>
-            <text :class="['status-badge', getStatusClass(item.status)]">
+      <view v-else class="table-panel">
+        <view class="table-head">
+          <text class="table-col col-order">工单号</text>
+          <text class="table-col col-repair">关联报修</text>
+          <text class="table-col col-priority">优先级</text>
+          <text class="table-col col-status">状态</text>
+          <text class="table-col col-worker">维修人员</text>
+          <text class="table-col col-phone">联系电话</text>
+          <text class="table-col col-create">创建时间</text>
+          <text class="table-col col-update">最近时间</text>
+          <text class="table-col col-actions">操作</text>
+        </view>
+
+        <view
+          v-for="(item, index) in workOrderList"
+          :key="item.id"
+          class="table-row"
+          :style="{ animationDelay: `${Math.min(360, index * 40)}ms` }"
+        >
+          <view class="table-col col-order">
+            <text class="primary-text">{{ item.orderNo || item.id || '-' }}</text>
+          </view>
+
+          <view class="table-col col-repair">
+            <text class="plain-text">#{{ item.repairId || '-' }}</text>
+          </view>
+
+          <view class="table-col col-priority">
+            <text class="priority-pill" :class="getPriorityClass(item.priority)">
+              {{ getPriorityText(item.priority) }}
+            </text>
+          </view>
+
+          <view class="table-col col-status">
+            <text class="status-pill" :class="getStatusClass(item.status)">
               {{ getStatusText(item.status) }}
             </text>
           </view>
-          <view class="order-body">
-            <view class="info-row">
-              <text class="label">关联报修ID:</text>
-              <text class="value">{{ item.repairId }}</text>
-            </view>
-            <view class="info-row">
-              <text class="label">优先级:</text>
-              <text :class="['value', getPriorityClass(item.priority)]">
-                {{ getPriorityText(item.priority) }}
-              </text>
-            </view>
-            <view class="info-row" v-if="item.workerName">
-              <text class="label">维修员:</text>
-              <text class="value">{{ item.workerName }} ({{ item.workerPhone }})</text>
-            </view>
-            <view class="info-row">
-              <text class="label">创建时间:</text>
-              <text class="value">{{ formatTime(item.createTime) }}</text>
-            </view>
+
+          <view class="table-col col-worker">
+            <text class="plain-text">{{ getWorkerName(item) }}</text>
           </view>
-          <view class="order-footer" v-if="item.status === 'PENDING'">
-            <button class="btn-assign" @click="openAssignDialog(item)">指派维修员</button>
+
+          <view class="table-col col-phone">
+            <text class="minor-text">{{ getWorkerPhone(item) }}</text>
+          </view>
+
+          <view class="table-col col-create">
+            <text class="minor-text">{{ formatTime(item.createTime) }}</text>
+          </view>
+
+          <view class="table-col col-update">
+            <text class="minor-text">{{ formatTime(getLatestTime(item)) }}</text>
+          </view>
+
+          <view class="table-col col-actions row-actions">
+            <button v-if="item.status === 'PENDING'" class="row-btn primary" @click="openAssignDialog(item)">指派维修员</button>
+            <button v-else class="row-btn ghost" @click="reuseRepairFilter(item.repairId)">查看同报修</button>
           </view>
         </view>
 
@@ -96,70 +158,83 @@
         </view>
       </view>
 
-      <!-- 分页 -->
       <view v-if="total > 0" class="pagination">
-        <button class="page-btn" :disabled="currentPage === 1" @click="handlePageChange(-1)">上一页</button>
-        <text class="page-info">{{ currentPage }} / {{ totalPages }}</text>
-        <button class="page-btn" :disabled="currentPage === totalPages" @click="handlePageChange(1)">下一页</button>
+        <view class="page-meta">
+          <text>第 {{ currentPage }} / {{ totalPages }} 页</text>
+        </view>
+
+        <view class="page-controls">
+          <button class="page-btn" :disabled="currentPage === 1" @click="handlePageChange(-1)">上一页</button>
+          <button class="page-btn" :disabled="currentPage === totalPages" @click="handlePageChange(1)">下一页</button>
+          <view class="page-size">
+            <text>每页</text>
+            <picker mode="selector" :range="[10, 20, 50, 100]" :value="pageSizeIndex" @change="handlePageSizeChange">
+              <text class="page-size-text">{{ pageSize }} 条</text>
+            </picker>
+          </view>
+        </view>
       </view>
     </view>
 
-    <!-- 指派维修员弹窗 -->
-    <view v-if="showAssignDialog" class="modal-mask" @click="closeAssignDialog">
-      <view class="modal-content" @click.stop>
-        <view class="modal-header">
-          <text class="modal-title">指派维修任务</text>
-          <text class="modal-close" @click="closeAssignDialog">×</text>
+    <view v-if="showAssignDialog" class="detail-modal" @click="closeAssignDialog">
+      <view class="detail-content" @click.stop>
+        <view class="detail-header">
+          <text class="detail-title">指派维修任务</text>
+          <button class="close-btn" @click="closeAssignDialog">关闭</button>
         </view>
-        <view class="modal-body">
-          <view class="order-brief">
-            <text class="brief-label">待指派工单：</text>
-            <text class="brief-value">{{ currentOrder ? (currentOrder.orderNo || currentOrder.id) : '-' }}</text>
-          </view>
-          <view class="form-item">
-            <text class="form-label">选择维修人员</text>
-            <picker 
-              mode="selector" 
-              :range="workerList" 
-              :range-key="'name'" 
-              @change="handleWorkerSelect"
-              class="form-picker"
-            >
-              <view class="picker-content">
-                <text v-if="selectedWorker" class="picker-value">
-                  {{ selectedWorker.name }} ({{ selectedWorker.phone }})
-                </text>
-                <text v-else class="picker-placeholder">请点击选择维修员</text>
-                <text class="picker-arrow">▼</text>
-              </view>
-            </picker>
+
+        <view class="detail-body">
+          <view class="detail-item">
+            <text class="detail-label">工单号:</text>
+            <text class="detail-value">{{ currentOrder ? (currentOrder.orderNo || currentOrder.id) : '-' }}</text>
           </view>
 
-          <view class="form-item">
-            <text class="form-label">设置优先级</text>
-            <picker
-              mode="selector"
-              :range="priorityOptions"
-              :range-key="'label'"
-              :value="priorityOptions.findIndex(opt => opt.value === assignPriority)"
-              @change="handlePrioritySelect"
-              class="form-picker"
-            >
-              <view class="picker-content">
-                <text class="picker-value">{{ getPriorityText(assignPriority) }}</text>
-                <text class="picker-arrow">▼</text>
-              </view>
-            </picker>
+          <view class="detail-item">
+            <text class="detail-label">关联报修:</text>
+            <text class="detail-value">#{{ currentOrder && currentOrder.repairId ? currentOrder.repairId : '-' }}</text>
           </view>
-          <view class="form-tip" v-if="!workerList.length">
+
+          <view class="detail-item">
+            <text class="detail-label">维修人员:</text>
+            <view class="detail-picker-wrap">
+              <picker mode="selector" :range="workerList" range-key="displayName" @change="handleWorkerSelect">
+                <view class="detail-picker">
+                  <text v-if="selectedWorker" class="detail-picker-text">
+                    {{ selectedWorker.displayName }}
+                  </text>
+                  <text v-else class="detail-picker-placeholder">请选择维修员</text>
+                </view>
+              </picker>
+            </view>
+          </view>
+
+          <view class="detail-item">
+            <text class="detail-label">优先级:</text>
+            <view class="detail-picker-wrap">
+              <picker
+                mode="selector"
+                :range="priorityOptions"
+                range-key="label"
+                :value="priorityPickerIndex"
+                @change="handlePrioritySelect"
+              >
+                <view class="detail-picker">
+                  <text class="detail-picker-text">{{ getPriorityText(assignPriority) }}</text>
+                </view>
+              </picker>
+            </view>
+          </view>
+
+          <view v-if="!workerList.length" class="form-tip">
             <text>暂无可用维修人员数据</text>
           </view>
-        </view>
-        <view class="modal-footer">
-          <button class="btn-cancel" @click="closeAssignDialog">取消</button>
-          <button class="btn-confirm" @click="handleAssignSubmit" :loading="assigning" :disabled="!selectedWorker">
-            确认指派
-          </button>
+
+          <view class="detail-actions">
+            <button class="detail-btn secondary" @click="closeAssignDialog">取消</button>
+            <button class="detail-btn primary" @click="handleAssignSubmit" :loading="assigning" :disabled="!selectedWorker">
+              确认指派
+            </button>
+          </view>
         </view>
       </view>
     </view>
@@ -181,6 +256,7 @@ export default {
       assigning: false,
       workOrderList: [],
       workerList: [],
+      repairIdFilter: '',
       statusFilter: '',
       currentPage: 1,
       pageSize: 10,
@@ -216,76 +292,147 @@ export default {
   },
   computed: {
     totalPages() {
-      return Math.ceil(this.total / this.pageSize) || 1
+      return Math.max(1, Math.ceil(this.total / this.pageSize))
+    },
+    pageSizeIndex() {
+      const options = [10, 20, 50, 100]
+      return Math.max(0, options.indexOf(this.pageSize))
     },
     currentMonthLabel() {
-      const opt = this.monthOptions && this.monthOptions[this.monthIndex]
-      return (opt && opt.label) || this.monthValue || '选择月份'
+      const option = this.monthOptions[this.monthIndex]
+      return option ? option.label : (this.monthValue || '选择月份')
+    },
+    currentStatusLabel() {
+      const option = this.statusOptions.find(item => item.value === this.statusFilter)
+      return option ? option.label : '全部状态'
+    },
+    statusPickerIndex() {
+      return Math.max(0, this.statusOptions.findIndex(item => item.value === this.statusFilter))
+    },
+    priorityPickerIndex() {
+      return Math.max(0, this.priorityOptions.findIndex(item => item.value === this.assignPriority))
     }
   },
   onLoad(options) {
+    this.checkAdminRole()
     this.initMonthOptions()
-    if (options && options.status) {
-      const status = String(options.status).toUpperCase()
-      const exists = this.statusOptions.some(opt => opt.value === status)
-      if (exists) {
-        this.statusFilter = status
-      }
-    }
-    this.loadWorkOrders()
-    this.loadStats()
+    this.applyRouteFilters(options)
     this.loadWorkers()
+    this.refreshPage()
   },
   methods: {
+    checkAdminRole() {
+      const userInfo = uni.getStorageSync('userInfo')
+      if (!userInfo || (userInfo.role !== 'admin' && userInfo.role !== 'super_admin')) {
+        uni.showToast({ title: '无权限访问', icon: 'none' })
+        uni.redirectTo({ url: '/owner/pages/login/login' })
+      }
+    },
+    applyRouteFilters(options) {
+      if (!options) return
+
+      if (options.status) {
+        const status = String(options.status).toUpperCase()
+        if (this.statusOptions.some(item => item.value === status)) {
+          this.statusFilter = status
+        }
+      }
+
+      if (options.repairId !== undefined && options.repairId !== null) {
+        this.repairIdFilter = String(options.repairId)
+      }
+    },
     initMonthOptions() {
       const now = new Date()
-      const y = now.getFullYear()
-      const m = now.getMonth() + 1
-      const current = `${y}-${String(m).padStart(2, '0')}`
-      const opts = []
+      const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const options = []
+
       for (let i = 0; i < 12; i++) {
-        const d = new Date(y, m - 1 - i, 1)
-        const yy = d.getFullYear()
-        const mm = String(d.getMonth() + 1).padStart(2, '0')
-        const value = `${yy}-${mm}`
-        opts.push({ label: value, value })
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        options.push({ label: value, value })
       }
-      this.monthOptions = opts
+
+      this.monthOptions = options
       this.monthValue = current
-      this.monthIndex = Math.max(0, opts.findIndex(o => o.value === current))
+      this.monthIndex = Math.max(0, options.findIndex(item => item.value === current))
     },
-    handleMonthChange(e) {
-      const idx = Number(e && e.detail ? e.detail.value : 0)
-      const option = this.monthOptions && this.monthOptions[idx]
-      if (!option) return
-      this.monthIndex = idx
-      this.monthValue = option.value
-      this.currentPage = 1
+    refreshPage() {
       this.loadWorkOrders()
       this.loadStats()
+    },
+    handleMonthChange(e) {
+      const index = Number(e?.detail?.value || 0)
+      const option = this.monthOptions[index]
+      if (!option) return
+
+      this.monthIndex = index
+      this.monthValue = option.value
+      this.currentPage = 1
+      this.refreshPage()
+    },
+    handleSearch() {
+      this.currentPage = 1
+      this.refreshPage()
+    },
+    handleResetFilters() {
+      this.repairIdFilter = ''
+      this.statusFilter = ''
+      this.currentPage = 1
+      this.refreshPage()
+    },
+    handleStatusChange(e) {
+      const index = Number(e?.detail?.value || 0)
+      this.statusFilter = this.statusOptions[index]?.value || ''
+      this.currentPage = 1
+      this.loadWorkOrders()
+    },
+    handleStatsClick(status) {
+      this.statusFilter = status
+      this.currentPage = 1
+      this.loadWorkOrders()
+    },
+    handlePageChange(delta) {
+      const nextPage = this.currentPage + delta
+      if (nextPage < 1 || nextPage > this.totalPages) return
+      this.currentPage = nextPage
+      this.loadWorkOrders()
+    },
+    handlePageSizeChange(e) {
+      const options = [10, 20, 50, 100]
+      const index = Number(e?.detail?.value || 0)
+      this.pageSize = options[index] || 10
+      this.currentPage = 1
+      this.loadWorkOrders()
+    },
+    getListParams(extra = {}) {
+      return {
+        pageNum: extra.pageNum || this.currentPage,
+        pageSize: extra.pageSize || this.pageSize,
+        month: this.monthValue || undefined,
+        status: extra.status !== undefined ? extra.status : (this.statusFilter || undefined),
+        repairId: this.repairIdFilter || undefined
+      }
     },
     async loadWorkOrders() {
       this.loading = true
       try {
         const res = await request('/api/workorder/list', {
-          params: {
-            pageNum: this.currentPage,
-            pageSize: this.pageSize,
-            month: this.monthValue || undefined,
-            status: this.statusFilter || undefined
-          }
+          params: this.getListParams()
         }, 'GET')
-        
-        const data = res.data || res
-        const list = data.records || []
+
+        const data = res?.data || res || {}
+        const list = data.records || data.data?.records || []
         this.workOrderList = list.slice().sort((a, b) => {
-          const diff = this.getPriorityRank(b.priority) - this.getPriorityRank(a.priority)
-          if (diff !== 0) return diff
+          const priorityDiff = this.getPriorityRank(b.priority) - this.getPriorityRank(a.priority)
+          if (priorityDiff !== 0) return priorityDiff
           return new Date(b.createTime || 0).getTime() - new Date(a.createTime || 0).getTime()
         })
-        this.total = data.total || 0
-      } catch (e) {
-        console.error('加载工单失败', e)
+        this.total = Number(data.total || data.data?.total || this.workOrderList.length || 0)
+      } catch (error) {
+        console.error('加载工单失败', error)
+        this.workOrderList = []
+        this.total = 0
         uni.showToast({ title: '加载失败', icon: 'none' })
       } finally {
         this.loading = false
@@ -296,119 +443,129 @@ export default {
         const res = await request('/api/user/inner/list/role', {
           params: { role: 'worker' }
         }, 'GET')
-        this.workerList = res.data || res || []
-      } catch (e) {
-        console.error('加载维修员失败', e)
+
+        const rawList = res?.data || res || []
+        const list = Array.isArray(rawList) ? rawList : (rawList.records || rawList.data || [])
+        this.workerList = list.map(item => ({
+          ...item,
+          displayName: `${item.name || item.username || '未命名'}${item.phone ? ` (${item.phone})` : ''}`
+        }))
+      } catch (error) {
+        console.error('加载维修员失败', error)
+        this.workerList = []
       }
     },
     async loadStats() {
-      const getTotalFromRes = (res) => {
-        const d = res && (res.data || res)
-        return (d && (d.total ?? d.data?.total)) || 0
+      const extractTotal = (res) => {
+        const data = res?.data || res || {}
+        return Number(data.total || data.data?.total || 0)
       }
-      try {
-        const month = this.monthValue || undefined
-        const totalReq = request('/api/workorder/list', { params: { pageNum: 1, pageSize: 1, month } }, 'GET')
-        const pendingReq = request('/api/workorder/list', { params: { pageNum: 1, pageSize: 1, status: 'PENDING', month } }, 'GET')
-        const assignedReq = request('/api/workorder/list', { params: { pageNum: 1, pageSize: 1, status: 'ASSIGNED', month } }, 'GET')
-        const processingReq = request('/api/workorder/list', { params: { pageNum: 1, pageSize: 1, status: 'PROCESSING', month } }, 'GET')
-        const completedReq = request('/api/workorder/list', { params: { pageNum: 1, pageSize: 1, status: 'COMPLETED', month } }, 'GET')
 
+      const buildParams = (status) => ({
+        pageNum: 1,
+        pageSize: 1,
+        month: this.monthValue || undefined,
+        status: status || undefined,
+        repairId: this.repairIdFilter || undefined
+      })
+
+      try {
         const [totalRes, pendingRes, assignedRes, processingRes, completedRes] = await Promise.all([
-          totalReq,
-          pendingReq,
-          assignedReq,
-          processingReq,
-          completedReq
+          request('/api/workorder/list', { params: buildParams('') }, 'GET'),
+          request('/api/workorder/list', { params: buildParams('PENDING') }, 'GET'),
+          request('/api/workorder/list', { params: buildParams('ASSIGNED') }, 'GET'),
+          request('/api/workorder/list', { params: buildParams('PROCESSING') }, 'GET'),
+          request('/api/workorder/list', { params: buildParams('COMPLETED') }, 'GET')
         ])
 
-        this.stats.total = getTotalFromRes(totalRes)
-        this.stats.pending = getTotalFromRes(pendingRes)
-        this.stats.assigned = getTotalFromRes(assignedRes)
-        this.stats.processing = getTotalFromRes(processingRes)
-        this.stats.completed = getTotalFromRes(completedRes)
-      } catch (e) {
-        console.error('加载工单统计失败', e)
-        this.stats.total = this.total || this.stats.total || 0
+        this.stats.total = extractTotal(totalRes)
+        this.stats.pending = extractTotal(pendingRes)
+        this.stats.assigned = extractTotal(assignedRes)
+        this.stats.processing = extractTotal(processingRes)
+        this.stats.completed = extractTotal(completedRes)
+      } catch (error) {
+        console.error('加载工单统计失败', error)
       }
-    },
-    handleStatusChange(e) {
-      this.statusFilter = this.statusOptions[e.detail.value].value
-      this.currentPage = 1
-      this.loadWorkOrders()
-    },
-    handleStatsClick(status) {
-      this.statusFilter = status
-      this.currentPage = 1
-      this.loadWorkOrders()
-    },
-    handlePageChange(delta) {
-      this.currentPage += delta
-      this.loadWorkOrders()
     },
     getStatusText(status) {
       const map = {
-        'PENDING': '待指派',
-        'ASSIGNED': '已指派',
-        'PROCESSING': '处理中',
-        'COMPLETED': '已完成'
+        PENDING: '待指派',
+        ASSIGNED: '已指派',
+        PROCESSING: '处理中',
+        COMPLETED: '已完成'
       }
-      return map[status] || status
+      return map[status] || status || '-'
     },
     getStatusClass(status) {
-      if (!status) return ''
-      return 'status-' + String(status).toLowerCase()
+      const map = {
+        PENDING: 'status-pending',
+        ASSIGNED: 'status-assigned',
+        PROCESSING: 'status-processing',
+        COMPLETED: 'status-completed'
+      }
+      return map[status] || ''
     },
     getPriorityText(priority) {
       const map = {
-        'LOW': '低',
-        'MEDIUM': '中',
-        'HIGH': '高',
-        'URGENT': '紧急',
-        '1': '低',
-        '2': '中',
-        '3': '高',
-        '4': '紧急'
+        LOW: '低',
+        MEDIUM: '中',
+        HIGH: '高',
+        URGENT: '紧急',
+        1: '低',
+        2: '中',
+        3: '高',
+        4: '紧急'
       }
-      return map[String(priority)] || priority
+      return map[String(priority).toUpperCase()] || map[Number(priority)] || priority || '低'
     },
     getPriorityRank(priority) {
-      const str = String(priority).toUpperCase()
       const map = {
-        'LOW': 1,
-        '1': 1,
-        'MEDIUM': 2,
-        '2': 2,
-        'HIGH': 3,
-        '3': 3,
-        'URGENT': 4,
-        '4': 4
+        LOW: 1,
+        MEDIUM: 2,
+        HIGH: 3,
+        URGENT: 4,
+        1: 1,
+        2: 2,
+        3: 3,
+        4: 4
       }
-      return map[str] || 1
+      return map[String(priority).toUpperCase()] || map[Number(priority)] || 1
     },
     getPriorityClass(priority) {
-      if (!priority) return ''
-      const priorityStr = String(priority).toUpperCase()
-      const classMap = {
-        'LOW': 'priority-low',
-        '1': 'priority-low',
-        'MEDIUM': 'priority-medium',
-        '2': 'priority-medium',
-        'HIGH': 'priority-high',
-        '3': 'priority-high',
-        'URGENT': 'priority-urgent',
-        '4': 'priority-urgent'
+      const map = {
+        LOW: 'priority-low',
+        MEDIUM: 'priority-medium',
+        HIGH: 'priority-high',
+        URGENT: 'priority-urgent',
+        1: 'priority-low',
+        2: 'priority-medium',
+        3: 'priority-high',
+        4: 'priority-urgent'
       }
-      return classMap[priorityStr] || ('priority-' + priorityStr.toLowerCase())
+      return map[String(priority).toUpperCase()] || map[Number(priority)] || 'priority-low'
+    },
+    getWorkerName(item) {
+      return item.workerName || item.assigneeName || '-'
+    },
+    getWorkerPhone(item) {
+      return item.workerPhone || item.assigneePhone || '-'
+    },
+    getLatestTime(item) {
+      return item.updateTime || item.completeTime || item.finishTime || item.processTime || item.assignTime || item.startTime || item.createTime || ''
     },
     formatTime(time) {
       if (!time) return '-'
       return new Date(time).toLocaleString()
     },
+    reuseRepairFilter(repairId) {
+      this.repairIdFilter = repairId ? String(repairId) : ''
+      this.currentPage = 1
+      this.refreshPage()
+    },
     openAssignDialog(order) {
       this.currentOrder = order
       this.selectedWorker = null
-      this.assignPriority = Number(order && order.priority ? order.priority : 1)
+      this.assignPriority = Number(order?.priority || 1) || 1
       this.showAssignDialog = true
     },
     closeAssignDialog() {
@@ -418,45 +575,40 @@ export default {
       this.assignPriority = 1
     },
     handleWorkerSelect(e) {
-      this.selectedWorker = this.workerList[e.detail.value]
+      const index = Number(e?.detail?.value || 0)
+      this.selectedWorker = this.workerList[index] || null
     },
     handlePrioritySelect(e) {
-      const selected = this.priorityOptions[e.detail.value]
-      if (selected) this.assignPriority = selected.value
+      const index = Number(e?.detail?.value || 0)
+      this.assignPriority = this.priorityOptions[index]?.value || 1
     },
     async handleAssignSubmit() {
+      if (!this.currentOrder) return
       if (!this.selectedWorker) {
         uni.showToast({ title: '请选择维修员', icon: 'none' })
         return
       }
-      
-      this.assigning = true
-      const assignData = {
-        orderId: this.currentOrder.id,
-        workerId: this.selectedWorker.userId || this.selectedWorker.id, // 优先取 userId
-        workerName: this.selectedWorker.name || this.selectedWorker.username,
-        workerPhone: this.selectedWorker.phone,
-        priority: this.assignPriority
-      }
-      console.log('--- 开始指派工单 ---')
-      console.log('指派参数:', assignData)
 
+      this.assigning = true
       try {
-        const res = await request('/api/workorder/admin/assign', {
-          data: assignData
+        await request('/api/workorder/admin/assign', {
+          data: {
+            orderId: this.currentOrder.id,
+            workerId: this.selectedWorker.userId || this.selectedWorker.id,
+            workerName: this.selectedWorker.name || this.selectedWorker.username,
+            workerPhone: this.selectedWorker.phone,
+            priority: this.assignPriority
+          }
         }, 'POST')
-        
-        console.log('指派响应结果:', res)
+
         uni.showToast({ title: '指派成功', icon: 'success' })
         this.closeAssignDialog()
-        this.loadWorkOrders()
-        this.loadStats()
-      } catch (e) {
-        console.error('指派失败:', e)
+        this.refreshPage()
+      } catch (error) {
+        console.error('指派失败:', error)
         uni.showToast({ title: '指派失败', icon: 'none' })
       } finally {
         this.assigning = false
-        console.log('--- 指派操作结束 ---')
       }
     }
   }
@@ -465,348 +617,600 @@ export default {
 
 <style scoped>
 .manage-container {
-  padding: 30rpx;
-  padding-top: 100rpx;
-  background-color: #f8f9fa;
-  min-height: 100vh;
+  --work-primary: #2e7cf6;
+  --work-primary-strong: #1f5fd0;
+  --work-line: #e7edf5;
+  --work-text: #24384e;
+  --work-muted: #8797aa;
+  --work-danger-soft: #fff1f3;
+  --work-warning-soft: #fff6e9;
+  --work-success-soft: #edf9f1;
+  --work-info-soft: #edf5ff;
+  min-height: 100%;
+  color: var(--work-text);
+  background:
+    radial-gradient(circle at 0 0, rgba(46, 124, 246, 0.12), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
+  animation: pageFadeIn 260ms ease-out both;
 }
 
-.stats-card-container {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20rpx;
-  margin-bottom: 30rpx;
+.overview-panel,
+.query-panel,
+.table-toolbar,
+.table-panel,
+.pagination {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid var(--work-line);
+  border-radius: 22rpx;
+  box-shadow: 0 16rpx 40rpx rgba(20, 50, 80, 0.06);
 }
 
-.stats-filter {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 20rpx;
-}
-
-.stats-filter-btn {
+.overview-panel {
   display: flex;
   align-items: center;
-  background: #fff;
-  padding: 12rpx 18rpx;
-  border-radius: 999rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
-}
-
-.stats-filter-text {
-  font-size: 24rpx;
-  color: #333;
-}
-
-.stats-filter-arrow {
-  margin-left: 10rpx;
-  font-size: 22rpx;
-  color: #999;
-}
-
-.stats-card {
-  background: #fff;
-  padding: 20rpx;
-  border-radius: 12rpx;
-  text-align: center;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-  border-top: 6rpx solid #2D81FF;
-}
-
-.status-pending { border-top-color: #ff4757; }
-.status-assigned { border-top-color: #ffa502; }
-.status-processing { border-top-color: #2D81FF; }
-
-.stats-number {
-  display: block;
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #333;
-}
-
-.stats-label {
-  font-size: 24rpx;
-  color: #999;
-}
-
-.search-filter-bar {
-  margin-bottom: 20rpx;
-}
-
-.filter-picker {
-  background: #fff;
-  padding: 15rpx 30rpx;
-  border-radius: 30rpx;
-  display: inline-block;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
-}
-
-.filter-picker-text {
-  font-size: 28rpx;
-  color: #666;
-}
-
-.list-container {
-  margin-bottom: 30rpx;
-}
-
-.order-item {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 15rpx rgba(0,0,0,0.05);
-}
-
-.order-header {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
+  gap: 24rpx;
+  padding: 28rpx 30rpx;
   margin-bottom: 20rpx;
-  padding-bottom: 20rpx;
-  border-bottom: 1rpx solid #eee;
 }
 
-.order-no {
+.overview-title {
+  display: block;
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #17324a;
+}
+
+.overview-subtitle {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: var(--work-muted);
+}
+
+.month-filter-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 180rpx;
+  padding: 18rpx 24rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(135deg, #f7fbff 0%, #eef5ff 100%);
+  border: 1rpx solid #d8e5fb;
+}
+
+.month-filter-label {
+  font-size: 20rpx;
+  color: var(--work-muted);
+}
+
+.month-filter-value {
+  margin-top: 6rpx;
   font-size: 30rpx;
-  font-weight: bold;
-  color: #333;
+  font-weight: 600;
+  color: #183f68;
 }
 
-.status-badge {
-  font-size: 24rpx;
-  padding: 4rpx 16rpx;
+.status-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.status-summary-card {
+  padding: 24rpx 26rpx;
   border-radius: 20rpx;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1rpx solid var(--work-line);
+  box-shadow: 0 10rpx 24rpx rgba(20, 50, 80, 0.05);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  animation: cardRise 320ms ease-out both;
 }
 
-.status-pending { background: #fff1f0; color: #ff4d4f; }
-.status-assigned { background: #fff7e6; color: #faad14; }
-.status-processing { background: #e6f7ff; color: #1890ff; }
-.status-completed { background: #f6ffed; color: #52c41a; }
-
-.order-body {
-  padding: 10rpx 0;
+.status-summary-card.active {
+  border-color: rgba(46, 124, 246, 0.36);
+  box-shadow: 0 16rpx 28rpx rgba(46, 124, 246, 0.12);
+  transform: translateY(-2rpx);
 }
 
-.info-row {
+.status-summary-card.pending {
+  background: linear-gradient(180deg, #fff 0%, #fff4f6 100%);
+}
+
+.status-summary-card.assigned {
+  background: linear-gradient(180deg, #fff 0%, #fff8ef 100%);
+}
+
+.status-summary-card.processing {
+  background: linear-gradient(180deg, #fff 0%, #f2f7ff 100%);
+}
+
+.summary-label {
+  display: block;
+  font-size: 22rpx;
+  color: var(--work-muted);
+}
+
+.summary-value {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1b3248;
+}
+
+.query-panel {
   display: flex;
-  margin-bottom: 12rpx;
-  font-size: 28rpx;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 20rpx;
 }
 
-.label {
-  color: #999;
-  width: 160rpx;
-}
-
-.value {
-  color: #333;
+.query-grid {
   flex: 1;
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 18rpx;
 }
 
-.priority-high, .priority-urgent { color: #ff4d4f; font-weight: bold; }
-
-.order-footer {
-  margin-top: 20rpx;
-  display: flex;
-  justify-content: flex-end;
+.query-field {
+  min-width: 0;
 }
 
-.btn-assign {
-  background: #2D81FF;
-  color: #fff;
+.query-label {
+  display: block;
+  margin-bottom: 10rpx;
+  font-size: 22rpx;
+  color: #64778c;
+}
+
+.query-input,
+.query-picker,
+.detail-picker {
+  height: 76rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #dce6f2;
+  background: #fbfdff;
+  padding: 0 24rpx;
   font-size: 26rpx;
-  padding: 0 30rpx;
-  height: 60rpx;
-  line-height: 60rpx;
-  border-radius: 30rpx;
-  margin: 0;
+  color: var(--work-text);
+  display: flex;
+  align-items: center;
 }
 
-.loading-state, .empty-state {
+.query-picker-text,
+.detail-picker-text {
+  font-size: 26rpx;
+  color: #607387;
+}
+
+.detail-picker-placeholder {
+  font-size: 26rpx;
+  color: #98a4af;
+}
+
+.query-actions {
+  display: flex;
+  gap: 12rpx;
+}
+
+.query-btn,
+.row-btn,
+.page-btn,
+.detail-btn,
+.close-btn {
+  margin: 0;
+  border: none;
+  border-radius: 12rpx;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.query-btn {
+  height: 76rpx;
+  line-height: 76rpx;
+  padding: 0 28rpx;
+  font-size: 26rpx;
+}
+
+.query-btn.primary,
+.row-btn.primary,
+.detail-btn.primary {
+  background: linear-gradient(135deg, var(--work-primary) 0%, #58a3ff 100%);
+  color: #fff;
+  box-shadow: 0 12rpx 24rpx rgba(46, 124, 246, 0.2);
+}
+
+.query-btn.secondary,
+.row-btn.ghost,
+.detail-btn.secondary,
+.close-btn,
+.page-btn {
+  background: #f5f8fc;
+  color: var(--work-text);
+  border: 1rpx solid #dce6f2;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 18rpx 24rpx;
+  margin-bottom: 18rpx;
+}
+
+.toolbar-left-group,
+.toolbar-right-group,
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.toolbar-meta {
+  font-size: 22rpx;
+  color: var(--work-muted);
+}
+
+.toolbar-meta.active {
+  color: var(--work-primary-strong);
+  font-weight: 600;
+}
+
+.table-panel {
+  overflow: hidden;
+}
+
+.table-head,
+.table-row {
+  display: grid;
+  grid-template-columns: 220rpx 160rpx 140rpx 160rpx 180rpx 180rpx 220rpx 220rpx 220rpx;
+  align-items: center;
+}
+
+.table-head {
+  min-height: 86rpx;
+  padding: 0 18rpx;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f6fb 100%);
+  border-bottom: 1rpx solid var(--work-line);
+}
+
+.table-row {
+  min-height: 120rpx;
+  padding: 0 18rpx;
+  border-bottom: 1rpx solid #edf2f7;
+  background: rgba(255, 255, 255, 0.95);
+  animation: rowSlideIn 320ms ease-out both;
+}
+
+.table-col {
+  padding: 18rpx 12rpx;
+  font-size: 24rpx;
+  color: var(--work-muted);
+}
+
+.primary-text,
+.plain-text,
+.minor-text {
+  display: block;
+  font-size: 24rpx;
+}
+
+.primary-text,
+.plain-text {
+  color: var(--work-text);
+}
+
+.primary-text {
+  font-weight: 600;
+}
+
+.minor-text {
+  color: #7e8fa2;
+}
+
+.status-pill,
+.priority-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.status-pill.status-pending {
+  background: var(--work-danger-soft);
+  color: #c44859;
+}
+
+.status-pill.status-assigned {
+  background: var(--work-warning-soft);
+  color: #c28312;
+}
+
+.status-pill.status-processing {
+  background: var(--work-info-soft);
+  color: #235fb8;
+}
+
+.status-pill.status-completed {
+  background: var(--work-success-soft);
+  color: #2d8c59;
+}
+
+.priority-pill.priority-low {
+  background: #eef7ef;
+  color: #4b9b63;
+}
+
+.priority-pill.priority-medium {
+  background: #fff7ea;
+  color: #d18a1f;
+}
+
+.priority-pill.priority-high {
+  background: #fff1f3;
+  color: #d15268;
+}
+
+.priority-pill.priority-urgent {
+  background: #ef5e6d;
+  color: #fff;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  flex-wrap: wrap;
+}
+
+.row-btn {
+  min-height: 52rpx;
+  line-height: 52rpx;
+  padding: 0 18rpx;
+  font-size: 22rpx;
+}
+
+.loading-state,
+.empty-state {
+  padding: 80rpx 20rpx;
   text-align: center;
-  padding: 100rpx 0;
-  color: #999;
+}
+
+.loading-text,
+.empty-state text {
+  font-size: 28rpx;
+  color: var(--work-muted);
 }
 
 .pagination {
+  margin-top: 18rpx;
+  padding: 18rpx 24rpx;
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 30rpx;
-  padding: 30rpx 0;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.page-meta {
+  font-size: 22rpx;
+  color: var(--work-muted);
 }
 
 .page-btn {
-  font-size: 26rpx;
-  height: 60rpx;
-  line-height: 60rpx;
-  margin: 0;
+  min-height: 58rpx;
+  line-height: 58rpx;
+  padding: 0 20rpx;
+  font-size: 24rpx;
 }
 
-.page-info {
-  font-size: 28rpx;
-  color: #666;
+.page-size {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  font-size: 22rpx;
+  color: var(--work-muted);
 }
 
-.modal-mask {
+.page-size-text {
+  display: inline-flex;
+  align-items: center;
+  min-height: 58rpx;
+  padding: 0 18rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid #dce6f2;
+  background: #f8fbff;
+  color: var(--work-text);
+}
+
+.detail-modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.6);
+  inset: 0;
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(4rpx);
+  padding: 30rpx;
+  background: rgba(18, 34, 53, 0.52);
+  animation: pageFadeIn 180ms ease-out both;
 }
 
-.modal-content {
-  background: #fff;
-  width: 85%;
-  max-width: 600rpx;
+.detail-content {
+  width: 100%;
+  max-width: 760rpx;
   border-radius: 24rpx;
-  overflow: hidden;
-  box-shadow: 0 20rpx 60rpx rgba(0,0,0,0.15);
-  animation: modalFadeIn 0.3s ease-out;
+  background: #fff;
+  box-shadow: 0 28rpx 80rpx rgba(15, 35, 56, 0.22);
+  animation: modalScaleIn 220ms ease-out both;
 }
 
-@keyframes modalFadeIn {
-  from { opacity: 0; transform: translateY(20rpx); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.modal-header {
-  padding: 40rpx 30rpx 20rpx;
+.detail-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
+  padding: 28rpx 30rpx;
+  border-bottom: 1rpx solid var(--work-line);
 }
 
-.modal-title {
+.detail-title {
   font-size: 34rpx;
-  font-weight: 600;
-  color: #333;
+  font-weight: 700;
+  color: #163149;
 }
 
-.modal-close {
-  font-size: 44rpx;
-  color: #999;
-  line-height: 1;
-  padding: 10rpx;
+.close-btn {
+  min-width: 120rpx;
+  min-height: 56rpx;
+  line-height: 56rpx;
+  font-size: 22rpx;
 }
 
-.modal-body {
-  padding: 30rpx 40rpx 50rpx;
+.detail-body {
+  padding: 28rpx 30rpx 32rpx;
 }
 
-.order-brief {
-  background: #f0f7ff;
-  padding: 20rpx;
-  border-radius: 12rpx;
-  margin-bottom: 40rpx;
+.detail-item {
   display: flex;
-  align-items: center;
-}
-
-.brief-label {
-  font-size: 26rpx;
-  color: #666;
-}
-
-.brief-value {
-  font-size: 26rpx;
-  font-weight: bold;
-  color: #2D81FF;
-}
-
-.form-item {
+  align-items: flex-start;
   margin-bottom: 20rpx;
 }
 
-.form-label {
-  display: block;
-  font-size: 28rpx;
-  color: #333;
-  margin-bottom: 16rpx;
-  font-weight: 500;
+.detail-label {
+  width: 150rpx;
+  font-size: 25rpx;
+  color: #6f8092;
 }
 
-.form-picker {
-  border: 2rpx solid #eee;
-  padding: 0 24rpx;
-  border-radius: 12rpx;
-  background: #fafafa;
-  height: 90rpx;
-  display: flex;
-  align-items: center;
-  transition: all 0.2s;
+.detail-value {
+  flex: 1;
+  font-size: 25rpx;
+  color: var(--work-text);
+  word-break: break-word;
 }
 
-.form-picker:active {
-  background: #f0f0f0;
-  border-color: #ddd;
-}
-
-.picker-content {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.picker-value {
-  font-size: 28rpx;
-  color: #333;
-}
-
-.picker-placeholder {
-  font-size: 28rpx;
-  color: #999;
-}
-
-.picker-arrow {
-  font-size: 20rpx;
-  color: #ccc;
+.detail-picker-wrap {
+  flex: 1;
 }
 
 .form-tip {
-  margin-top: 16rpx;
+  margin-top: 8rpx;
   font-size: 24rpx;
-  color: #ff4d4f;
-  text-align: center;
+  color: #d05768;
 }
 
-.modal-footer {
+.detail-actions {
   display: flex;
-  padding: 20rpx 30rpx 40rpx;
-  gap: 20rpx;
+  gap: 14rpx;
+  margin-top: 28rpx;
 }
 
-.modal-footer button {
+.detail-btn {
   flex: 1;
-  height: 88rpx;
-  line-height: 88rpx;
-  border: none;
-  border-radius: 44rpx;
-  font-size: 30rpx;
-  font-weight: 500;
+  min-height: 68rpx;
+  line-height: 68rpx;
+  font-size: 24rpx;
 }
 
-.btn-cancel {
-  background: #f5f5f5;
-  color: #666;
+.query-btn:active,
+.row-btn:active,
+.page-btn:active,
+.detail-btn:active,
+.close-btn:active,
+.status-summary-card:active {
+  transform: scale(0.985);
 }
 
-.btn-confirm {
-  background: #2D81FF;
-  color: #fff;
+@media (hover: hover) {
+  .status-summary-card:hover,
+  .table-row:hover {
+    transform: translateY(-2rpx);
+    box-shadow: 0 14rpx 26rpx rgba(20, 50, 80, 0.08);
+  }
+
+  .query-input:hover,
+  .query-picker:hover,
+  .detail-picker:hover {
+    border-color: #c7d7ea;
+    background: #fff;
+  }
+
+  .query-btn.primary:hover,
+  .row-btn.primary:hover,
+  .detail-btn.primary:hover {
+    box-shadow: 0 16rpx 28rpx rgba(46, 124, 246, 0.22);
+    transform: translateY(-1rpx);
+  }
 }
 
-.btn-confirm[disabled] {
-  background: #a0cfff;
-  opacity: 0.7;
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cardRise {
+  from {
+    opacity: 0;
+    transform: translateY(18rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rowSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(16rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: translateY(20rpx) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 1360rpx) {
+  .query-panel,
+  .pagination,
+  .table-toolbar,
+  .overview-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-panel {
+    overflow-x: auto;
+  }
+
+  .table-head,
+  .table-row {
+    min-width: 1700rpx;
+  }
 }
 </style>
